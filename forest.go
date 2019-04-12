@@ -4,7 +4,26 @@ import (
 	"bytes"
 	"encoding"
 	"encoding/binary"
+	"fmt"
 	"io"
+	"math"
+)
+
+const (
+	Version Varint = 1
+
+	ContentTypeUTF8String ContentType = 1
+	ContentTypeJSON       ContentType = 2
+
+	KeyTypeNoKey   KeyType = 0
+	KeyTypeOpenPGP KeyType = 1
+
+	SignatureTypeOpenPGP SignatureType = 1
+
+	HashTypeNullHash   HashType = 0
+	HashTypeSHA512_256 HashType = 1
+
+	HashDigestLengthSHA512_256 ContentLength = 32
 )
 
 // fundamental types
@@ -17,6 +36,10 @@ func (g GenericType) MarshalBinary() ([]byte, error) {
 }
 
 type ContentLength uint16
+
+const (
+	MaxContentLength = math.MaxUint16
+)
 
 func (c ContentLength) MarshalBinary() ([]byte, error) {
 	b := new(bytes.Buffer)
@@ -83,6 +106,16 @@ type Descriptor struct {
 	Length ContentLength
 }
 
+func NewDescriptor(t GenericType, length int) (*Descriptor, error) {
+	if length > MaxContentLength {
+		return nil, fmt.Errorf("Cannot represent content of length %d, max is %d", length, MaxContentLength)
+	}
+	d := Descriptor{}
+	d.Type = t
+	d.Length = ContentLength(length)
+	return &d, nil
+}
+
 func (d Descriptor) MarshalBinary() ([]byte, error) {
 	b, err := d.Type.MarshalBinary()
 	if err != nil {
@@ -104,11 +137,21 @@ func (d Descriptor) MarshalBinary() ([]byte, error) {
 // concrete descriptors
 type HashDescriptor Descriptor
 
+func NewHashDescriptor(t HashType, length int) (*HashDescriptor, error) {
+	d, err := NewDescriptor(GenericType(t), length)
+	return (*HashDescriptor)(d), err
+}
+
 func (d HashDescriptor) MarshalBinary() ([]byte, error) {
 	return Descriptor(d).MarshalBinary()
 }
 
 type ContentDescriptor Descriptor
+
+func NewContentDescriptor(t ContentType, length int) (*ContentDescriptor, error) {
+	d, err := NewDescriptor(GenericType(t), length)
+	return (*ContentDescriptor)(d), err
+}
 
 func (d ContentDescriptor) MarshalBinary() ([]byte, error) {
 	return Descriptor(d).MarshalBinary()
@@ -116,11 +159,21 @@ func (d ContentDescriptor) MarshalBinary() ([]byte, error) {
 
 type SignatureDescriptor Descriptor
 
+func NewSignatureDescriptor(t SignatureType, length int) (*SignatureDescriptor, error) {
+	d, err := NewDescriptor(GenericType(t), length)
+	return (*SignatureDescriptor)(d), err
+}
+
 func (d SignatureDescriptor) MarshalBinary() ([]byte, error) {
 	return Descriptor(d).MarshalBinary()
 }
 
 type KeyDescriptor Descriptor
+
+func NewKeyDescriptor(t KeyType, length int) (*KeyDescriptor, error) {
+	d, err := NewDescriptor(GenericType(t), length)
+	return (*KeyDescriptor)(d), err
+}
 
 func (d KeyDescriptor) MarshalBinary() ([]byte, error) {
 	return Descriptor(d).MarshalBinary()
@@ -145,8 +198,36 @@ func (q Qualified) MarshalBinary() ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
+// NewQualified creates a valid Qualified from the given data
+func NewQualified(t GenericType, content []byte) (*Qualified, error) {
+	q := Qualified{}
+	d, err := NewDescriptor(t, len(content))
+	if err != nil {
+		return nil, err
+	}
+	q.Descriptor = *d
+	q.Value = Value(content)
+	return &q, nil
+}
+
 // concrete qualified data types
 type QualifiedHash Qualified
+
+// NewQualifiedHash returns a valid QualifiedHash from the given data
+func NewQualifiedHash(t HashType, content []byte) (*QualifiedHash, error) {
+	q, e := NewQualified(GenericType(t), content)
+	return (*QualifiedHash)(q), e
+}
+
+func NullHash() QualifiedHash {
+	return QualifiedHash{
+		Descriptor: Descriptor{
+			Type:   GenericType(HashTypeNullHash),
+			Length: 0,
+		},
+		Value: []byte{},
+	}
+}
 
 func (q QualifiedHash) MarshalBinary() ([]byte, error) {
 	return Qualified(q).MarshalBinary()
@@ -154,11 +235,23 @@ func (q QualifiedHash) MarshalBinary() ([]byte, error) {
 
 type QualifiedContent Qualified
 
+// NewQualifiedContent returns a valid QualifiedContent from the given data
+func NewQualifiedContent(t ContentType, content []byte) (*QualifiedContent, error) {
+	q, e := NewQualified(GenericType(t), content)
+	return (*QualifiedContent)(q), e
+}
+
 func (q QualifiedContent) MarshalBinary() ([]byte, error) {
 	return Qualified(q).MarshalBinary()
 }
 
 type QualifiedKey Qualified
+
+// NewQualifiedKey returns a valid QualifiedKey from the given data
+func NewQualifiedKey(t KeyType, content []byte) (*QualifiedKey, error) {
+	q, e := NewQualified(GenericType(t), content)
+	return (*QualifiedKey)(q), e
+}
 
 func (q QualifiedKey) MarshalBinary() ([]byte, error) {
 	return Qualified(q).MarshalBinary()
@@ -166,12 +259,20 @@ func (q QualifiedKey) MarshalBinary() ([]byte, error) {
 
 type QualifiedSignature Qualified
 
+// NewQualifiedSignature returns a valid QualifiedSignature from the given data
+func NewQualifiedSignature(t SignatureType, content []byte) (*QualifiedSignature, error) {
+	q, e := NewQualified(GenericType(t), content)
+	return (*QualifiedSignature)(q), e
+}
+
 func (q QualifiedSignature) MarshalBinary() ([]byte, error) {
 	return Qualified(q).MarshalBinary()
 }
 
 // generic node
 type Node struct {
+	// the ID is deterministically computed from the rest of the values
+	ID                 Value
 	Version            Varint
 	Parent             QualifiedHash
 	IDDesc             HashDescriptor
