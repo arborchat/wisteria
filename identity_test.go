@@ -7,7 +7,7 @@ import (
 	"golang.org/x/crypto/openpgp"
 )
 
-func TestIdentityValidatesSelf(t *testing.T) {
+func MakeIdentityOrSkip(t *testing.T) *forest.Identity {
 	builder := forest.IdentityBuilder{}
 	privkey, err := openpgp.NewEntity("forest-test", "comment", "email@email.io", nil)
 	if err != nil {
@@ -25,10 +25,26 @@ func TestIdentityValidatesSelf(t *testing.T) {
 	if err != nil {
 		t.Error("Failed to create Identity with valid parameters", err)
 	}
+	return identity
+}
+
+func TestIdentityValidatesSelf(t *testing.T) {
+	identity := MakeIdentityOrSkip(t)
 	if correct, err := identity.ValidateID(); err != nil || !correct {
 		t.Error("ID validation failed on unmodified node", err)
 	}
 	if correct, err := identity.ValidateSignatureFor(identity); err != nil || !correct {
 		t.Error("Signature validation failed on unmodified node", err)
+	}
+}
+
+func TestIdentityValidationFailsWhenTampered(t *testing.T) {
+	identity := MakeIdentityOrSkip(t)
+	identity.Name.Value = forest.Value([]byte("whatever"))
+	if correct, err := identity.ValidateID(); err == nil && correct {
+		t.Error("ID validation succeeded on modified node", err)
+	}
+	if correct, err := identity.ValidateSignatureFor(identity); err == nil && correct {
+		t.Error("Signature validation succeeded on modified node", err)
 	}
 }
