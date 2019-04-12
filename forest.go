@@ -360,12 +360,11 @@ func (n Node) ValidateID() (bool, error) {
 // signature for the given Identity. When validating an Identity node, you should
 // pass the Identity to this method.
 func (n Node) ValidateSignatureFor(identity *Identity) (bool, error) {
-	if Qualified(n.SignatureAuthority).Equals(Qualified(NullHash())) &&
-		n.Type != NodeTypeIdentity {
-
-		return false, fmt.Errorf("Only Identity nodes can have the null hash as their Signature Authority")
-	}
-	if !Qualified(n.SignatureAuthority).Equals(Qualified(identity.ID())) {
+	if Qualified(n.SignatureAuthority).Equals(Qualified(NullHash())) {
+		if n.Type != NodeTypeIdentity {
+			return false, fmt.Errorf("Only Identity nodes can have the null hash as their Signature Authority")
+		}
+	} else if !Qualified(n.SignatureAuthority).Equals(Qualified(identity.ID())) {
 		return false, fmt.Errorf("This node was signed by a different identity")
 	}
 	// get the key used to sign this node
@@ -450,11 +449,16 @@ type Identity struct {
 	PublicKey QualifiedKey
 }
 
-func (i Identity) MarshalBinary() ([]byte, error) {
+func newIdentity() *Identity {
+	i := new(Identity)
 	// define how to serialize this node type's fields
 	i.Node.WriteNodeTypeFieldsInto = func(w io.Writer) error {
 		return MarshalAllInto(w, i.Name, i.PublicKey)
 	}
+	return i
+}
+
+func (i Identity) MarshalBinary() ([]byte, error) {
 	return i.Node.MarshalBinary()
 }
 

@@ -17,7 +17,7 @@ type IdentityBuilder struct{}
 func (p IdentityBuilder) New(privkey *openpgp.Entity, name *QualifiedContent, metadata *QualifiedContent) (*Identity, error) {
 	// make an empty identity and populate all fields that need to be known before
 	// signing the data
-	identity := new(Identity)
+	identity := newIdentity()
 	identity.Version = Version
 	identity.Type = NodeTypeIdentity
 	identity.Parent = NullHash()
