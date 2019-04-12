@@ -458,21 +458,18 @@ func newIdentity() *Identity {
 	return i
 }
 
-func (i Identity) MarshalBinary() ([]byte, error) {
-	return i.Node.MarshalBinary()
-}
-
 type Community struct {
 	Node
 	Name QualifiedContent
 }
 
-func (c Community) MarshalBinary() ([]byte, error) {
+func newCommunity() *Community {
+	c := new(Community)
 	// define how to serialize this node type's fields
 	c.Node.WriteNodeTypeFieldsInto = func(w io.Writer) error {
 		return MarshalAllInto(w, c.Name)
 	}
-	return c.Node.MarshalBinary()
+	return c
 }
 
 type Conversation struct {
@@ -480,12 +477,13 @@ type Conversation struct {
 	Content QualifiedContent
 }
 
-func (c Conversation) MarshalBinary() ([]byte, error) {
+func newConversation() *Conversation {
+	c := new(Conversation)
 	// define how to serialize this node type's fields
 	c.Node.WriteNodeTypeFieldsInto = func(w io.Writer) error {
 		return MarshalAllInto(w, c.Content)
 	}
-	return c.Node.MarshalBinary()
+	return c
 }
 
 type Reply struct {
@@ -494,10 +492,11 @@ type Reply struct {
 	Content        QualifiedContent
 }
 
-func (r Reply) MarshalBinary() ([]byte, error) {
+func newReply() *Reply {
+	r := new(Reply)
 	// define how to serialize this node type's fields
 	r.Node.WriteNodeTypeFieldsInto = func(w io.Writer) error {
-		return MarshalAllInto(w, r.Content)
+		return MarshalAllInto(w, r.ConversationID, r.Content)
 	}
-	return r.Node.MarshalBinary()
+	return r
 }
