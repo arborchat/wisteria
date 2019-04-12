@@ -2,15 +2,25 @@ package forest
 
 import (
 	"bytes"
+	"crypto/sha512"
 	"encoding"
 	"encoding/binary"
 	"fmt"
+	"hash"
 	"io"
 	"math"
+
+	"golang.org/x/crypto/openpgp"
+	"golang.org/x/crypto/openpgp/packet"
 )
 
 const (
 	Version Varint = 1
+
+	NodeTypeIdentity     NodeType = 1
+	NodeTypeCommunity    NodeType = 2
+	NodeTypeConversation NodeType = 3
+	NodeTypeReply        NodeType = 4
 
 	ContentTypeUTF8String ContentType = 1
 	ContentTypeJSON       ContentType = 2
@@ -210,6 +220,10 @@ func NewQualified(t GenericType, content []byte) (*Qualified, error) {
 	return &q, nil
 }
 
+func (q Qualified) Equals(o Qualified) bool {
+	return q.Descriptor == o.Descriptor && bytes.Equal([]byte(q.Value), []byte(o.Value))
+}
+
 // concrete qualified data types
 type QualifiedHash Qualified
 
@@ -272,7 +286,8 @@ func (q QualifiedSignature) MarshalBinary() ([]byte, error) {
 // generic node
 type Node struct {
 	// the ID is deterministically computed from the rest of the values
-	ID                 Value
+	id                 Value
+	Type               NodeType
 	Version            Varint
 	Parent             QualifiedHash
 	IDDesc             HashDescriptor
@@ -300,10 +315,92 @@ func MarshalAllInto(w io.Writer, marshalers ...encoding.BinaryMarshaler) error {
 	return nil
 }
 
+// computeID determines the correct value of this node's ID without modifying
+// the node.
+func (n Node) computeID() ([]byte, error) {
+	// map from HashType to the function that creates an instance of that hash
+	// algorithm
+	hashType2Func := map[HashType]func() hash.Hash{
+		HashTypeSHA512_256: sha512.New512_256,
+	}
+	if HashType(n.IDDesc.Type) == HashTypeNullHash {
+		return []byte{}, nil
+	}
+	binaryContent, err := n.MarshalBinary()
+	if err != nil {
+		return nil, err
+	}
+	hashFunc, found := hashType2Func[HashType(n.IDDesc.Type)]
+	if !found {
+		return nil, fmt.Errorf("Unknown HashType %d", n.IDDesc.Type)
+	}
+	hasher := hashFunc()
+	_, _ = hasher.Write(binaryContent) // never errors
+	return hasher.Sum(nil), nil
+}
+
+// ValidateID returns whether the ID of this Node matches the data. The first
+// return value indicates the result of the comparison. If there is an error,
+// the first return value will always be false and the second will indicate
+// what went wrong when computing the hash.
+func (n Node) ValidateID() (bool, error) {
+	currentID := n.ID()
+	id, err := n.computeID()
+	if err != nil {
+		return false, err
+	}
+	computedID := QualifiedHash{
+		Descriptor: Descriptor(n.IDDesc),
+		Value:      Value(id),
+	}
+	return Qualified(currentID).Equals(Qualified(computedID)), nil
+}
+
+// ValidateSignature returns whether the signature contained in this Node is a valid
+// signature for the given Identity. When validating an Identity node, you should
+// pass the Identity to this method.
+func (n Node) ValidateSignatureFor(identity *Identity) (bool, error) {
+	if Qualified(n.SignatureAuthority).Equals(Qualified(NullHash())) &&
+		n.Type != NodeTypeIdentity {
+
+		return false, fmt.Errorf("Only Identity nodes can have the null hash as their Signature Authority")
+	}
+	if !Qualified(n.SignatureAuthority).Equals(Qualified(identity.ID())) {
+		return false, fmt.Errorf("This node was signed by a different identity")
+	}
+	// get the key used to sign this node
+	pubkeyBuf := bytes.NewBuffer([]byte(identity.PublicKey.Value))
+	pubkeyEntity, err := openpgp.ReadEntity(packet.NewReader(pubkeyBuf))
+	if err != nil {
+		return false, err
+	}
+
+	signedContentBuf := new(bytes.Buffer)
+	if err = n.WriteDataForSigningInto(signedContentBuf); err != nil {
+		return false, err
+	}
+	signatureBuf := bytes.NewBuffer([]byte(n.Signature.Value))
+	keyring := openpgp.EntityList([]*openpgp.Entity{pubkeyEntity})
+	_, err = openpgp.CheckDetachedSignature(keyring, signedContentBuf, signatureBuf)
+	if err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+// Compute and return the Node's ID as a Qualified Hash
+func (n Node) ID() QualifiedHash {
+	return QualifiedHash{
+		Descriptor: Descriptor(n.IDDesc),
+		Value:      n.id,
+	}
+}
+
 func (n Node) WriteCommonFieldsInto(w io.Writer) error {
 	// this slice defines the order in which the fields are written
 	return MarshalAllInto(w,
 		n.Version,
+		n.Type,
 		n.Parent,
 		n.IDDesc,
 		n.Depth,
@@ -326,7 +423,7 @@ func (n Node) WriteDataForSigningInto(w io.Writer) error {
 }
 
 func (n Node) MarshalBinary() ([]byte, error) {
-	// this is a template method. It always writes the header fields,
+	// this is a template method. It always writes the common fields,
 	// then invokes a method responsible for writing data that varies
 	// between Node Types, then writes the final data
 	b := new(bytes.Buffer)

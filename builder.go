@@ -9,11 +9,7 @@ import (
 // IdentityBuilder is a Builder implementation that can create new forest
 // nodes without requiring the invocation of an external binary (like gpg
 // or another OpenPGP implmenentation).
-type IdentityBuilder struct {
-	// Identities maps from the Fully Qualified Hash (as a base64-encoded string) of an Identity node to the private
-	// key that allows creating nodes for that Identity
-	Identities map[string]*openpgp.Entity
-}
+type IdentityBuilder struct{}
 
 // New builds an Identity node for the user with the given name and metadata, using
 // the OpenPGP Entity privkey to define the Identity. That Entity must contain a
@@ -22,6 +18,8 @@ func (p IdentityBuilder) New(privkey *openpgp.Entity, name *QualifiedContent, me
 	// make an empty identity and populate all fields that need to be known before
 	// signing the data
 	identity := new(Identity)
+	identity.Version = Version
+	identity.Type = NodeTypeIdentity
 	identity.Parent = NullHash()
 	identity.Depth = 0
 	identity.Name = *name
@@ -59,6 +57,12 @@ func (p IdentityBuilder) New(privkey *openpgp.Entity, name *QualifiedContent, me
 	}
 	identity.Signature = *qs
 
-	// now that it's signed, return it
+	// determine the node's final hash ID
+	id, err := identity.computeID()
+	if err != nil {
+		return nil, err
+	}
+	identity.id = Value(id)
+
 	return identity, nil
 }
