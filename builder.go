@@ -18,7 +18,7 @@ func (p IdentityBuilder) New(privkey *openpgp.Entity, name *QualifiedContent, me
 	// make an empty identity and populate all fields that need to be known before
 	// signing the data
 	identity := newIdentity()
-	identity.Version = Version
+	identity.SchemaVersion = CurrentVersion
 	identity.Type = NodeTypeIdentity
 	identity.Parent = NullHash()
 	identity.Depth = 0
