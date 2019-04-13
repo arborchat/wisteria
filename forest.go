@@ -36,16 +36,27 @@ const (
 	HashDigestLengthSHA512_256 ContentLength = 32
 )
 
+var MultiByteSerializationOrder binary.ByteOrder = binary.BigEndian
+
 // fundamental types
 type GenericType uint8
 
+const sizeofGenericType = 1
+
 func (g GenericType) MarshalBinary() ([]byte, error) {
 	b := new(bytes.Buffer)
-	err := binary.Write(b, binary.BigEndian, g)
+	err := binary.Write(b, MultiByteSerializationOrder, g)
 	return b.Bytes(), err
 }
 
+func (g *GenericType) UnmarshalBinary(b []byte) error {
+	buf := bytes.NewBuffer(b)
+	return binary.Read(buf, MultiByteSerializationOrder, g)
+}
+
 type ContentLength uint16
+
+const sizeofContentLength = 2
 
 const (
 	MaxContentLength = math.MaxUint16
@@ -53,16 +64,26 @@ const (
 
 func (c ContentLength) MarshalBinary() ([]byte, error) {
 	b := new(bytes.Buffer)
-	err := binary.Write(b, binary.BigEndian, c)
+	err := binary.Write(b, MultiByteSerializationOrder, c)
 	return b.Bytes(), err
+}
+
+func (c *ContentLength) UnmarshalBinary(b []byte) error {
+	buf := bytes.NewBuffer(b)
+	return binary.Read(buf, MultiByteSerializationOrder, c)
 }
 
 type TreeDepth uint32
 
 func (t TreeDepth) MarshalBinary() ([]byte, error) {
 	b := new(bytes.Buffer)
-	err := binary.Write(b, binary.BigEndian, t)
+	err := binary.Write(b, MultiByteSerializationOrder, t)
 	return b.Bytes(), err
+}
+
+func (t *TreeDepth) UnmarshalBinary(b []byte) error {
+	buf := bytes.NewBuffer(b)
+	return binary.Read(buf, MultiByteSerializationOrder, t)
 }
 
 type Value []byte
@@ -71,12 +92,22 @@ func (v Value) MarshalBinary() ([]byte, error) {
 	return v, nil
 }
 
+func (v *Value) UnmarshalBinary(b []byte) error {
+	*v = b
+	return nil
+}
+
 type Varint uint64
 
 func (v Varint) MarshalBinary() ([]byte, error) {
 	b := new(bytes.Buffer)
-	err := binary.Write(b, binary.BigEndian, v)
+	err := binary.Write(b, MultiByteSerializationOrder, v)
 	return b.Bytes(), err
+}
+
+func (v *Varint) UnmarshalBinary(b []byte) error {
+	buf := bytes.NewBuffer(b)
+	return binary.Read(buf, MultiByteSerializationOrder, v)
 }
 
 // specialized types
@@ -86,10 +117,18 @@ func (t NodeType) MarshalBinary() ([]byte, error) {
 	return GenericType(t).MarshalBinary()
 }
 
+func (t *NodeType) UnmarshalBinary(b []byte) error {
+	return (*GenericType)(t).UnmarshalBinary(b)
+}
+
 type HashType GenericType
 
 func (t HashType) MarshalBinary() ([]byte, error) {
 	return GenericType(t).MarshalBinary()
+}
+
+func (t *HashType) UnmarshalBinary(b []byte) error {
+	return (*GenericType)(t).UnmarshalBinary(b)
 }
 
 type ContentType GenericType
@@ -98,10 +137,18 @@ func (t ContentType) MarshalBinary() ([]byte, error) {
 	return GenericType(t).MarshalBinary()
 }
 
+func (t *ContentType) UnmarshalBinary(b []byte) error {
+	return (*GenericType)(t).UnmarshalBinary(b)
+}
+
 type KeyType GenericType
 
 func (t KeyType) MarshalBinary() ([]byte, error) {
 	return GenericType(t).MarshalBinary()
+}
+
+func (t *KeyType) UnmarshalBinary(b []byte) error {
+	return (*GenericType)(t).UnmarshalBinary(b)
 }
 
 type SignatureType GenericType
@@ -110,11 +157,17 @@ func (t SignatureType) MarshalBinary() ([]byte, error) {
 	return GenericType(t).MarshalBinary()
 }
 
+func (t *SignatureType) UnmarshalBinary(b []byte) error {
+	return (*GenericType)(t).UnmarshalBinary(b)
+}
+
 // generic descriptor
 type Descriptor struct {
 	Type   GenericType
 	Length ContentLength
 }
+
+const sizeofDescriptor = sizeofGenericType + sizeofContentLength
 
 func NewDescriptor(t GenericType, length int) (*Descriptor, error) {
 	if length > MaxContentLength {
@@ -144,6 +197,20 @@ func (d Descriptor) MarshalBinary() ([]byte, error) {
 
 }
 
+func (d *Descriptor) UnmarshalBinary(b []byte) error {
+	if len(b) != sizeofDescriptor {
+		return fmt.Errorf("Expected %d bytes, got %d", sizeofDescriptor, len(b))
+	}
+	if err := (&d.Type).UnmarshalBinary(b[:sizeofGenericType]); err != nil {
+		return err
+	}
+	if err := (&d.Length).UnmarshalBinary(b[sizeofGenericType:]); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 // concrete descriptors
 type HashDescriptor Descriptor
 
@@ -154,6 +221,10 @@ func NewHashDescriptor(t HashType, length int) (*HashDescriptor, error) {
 
 func (d HashDescriptor) MarshalBinary() ([]byte, error) {
 	return Descriptor(d).MarshalBinary()
+}
+
+func (d *HashDescriptor) UnmarshalBinary(b []byte) error {
+	return (*Descriptor)(d).UnmarshalBinary(b)
 }
 
 type ContentDescriptor Descriptor
@@ -167,6 +238,10 @@ func (d ContentDescriptor) MarshalBinary() ([]byte, error) {
 	return Descriptor(d).MarshalBinary()
 }
 
+func (d *ContentDescriptor) UnmarshalBinary(b []byte) error {
+	return (*Descriptor)(d).UnmarshalBinary(b)
+}
+
 type SignatureDescriptor Descriptor
 
 func NewSignatureDescriptor(t SignatureType, length int) (*SignatureDescriptor, error) {
@@ -178,6 +253,10 @@ func (d SignatureDescriptor) MarshalBinary() ([]byte, error) {
 	return Descriptor(d).MarshalBinary()
 }
 
+func (d *SignatureDescriptor) UnmarshalBinary(b []byte) error {
+	return (*Descriptor)(d).UnmarshalBinary(b)
+}
+
 type KeyDescriptor Descriptor
 
 func NewKeyDescriptor(t KeyType, length int) (*KeyDescriptor, error) {
@@ -187,6 +266,10 @@ func NewKeyDescriptor(t KeyType, length int) (*KeyDescriptor, error) {
 
 func (d KeyDescriptor) MarshalBinary() ([]byte, error) {
 	return Descriptor(d).MarshalBinary()
+}
+
+func (d *KeyDescriptor) UnmarshalBinary(b []byte) error {
+	return (*Descriptor)(d).UnmarshalBinary(b)
 }
 
 // generic qualified data
