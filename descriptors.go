@@ -55,6 +55,14 @@ func (d *descriptor) UnmarshalBinary(b []byte) error {
 	return nil
 }
 
+func (d *descriptor) SizeConstraints() (int, bool) {
+	return sizeofDescriptor, false
+}
+
+func (d *descriptor) BytesConsumed() int {
+	return sizeofDescriptor
+}
+
 // concrete descriptors
 type HashDescriptor descriptor
 
@@ -71,6 +79,14 @@ func (d HashDescriptor) MarshalBinary() ([]byte, error) {
 
 func (d *HashDescriptor) UnmarshalBinary(b []byte) error {
 	return (*descriptor)(d).UnmarshalBinary(b)
+}
+
+func (d *HashDescriptor) SizeConstraints() (int, bool) {
+	return (*descriptor)(d).SizeConstraints()
+}
+
+func (d *HashDescriptor) BytesConsumed() int {
+	return (*descriptor)(d).BytesConsumed()
 }
 
 type ContentDescriptor descriptor
@@ -90,6 +106,14 @@ func (d *ContentDescriptor) UnmarshalBinary(b []byte) error {
 	return (*descriptor)(d).UnmarshalBinary(b)
 }
 
+func (d *ContentDescriptor) SizeConstraints() (int, bool) {
+	return (*descriptor)(d).SizeConstraints()
+}
+
+func (d *ContentDescriptor) BytesConsumed() int {
+	return (*descriptor)(d).BytesConsumed()
+}
+
 type SignatureDescriptor descriptor
 
 const sizeofSignatureDescriptor = sizeofDescriptor
@@ -107,6 +131,14 @@ func (d *SignatureDescriptor) UnmarshalBinary(b []byte) error {
 	return (*descriptor)(d).UnmarshalBinary(b)
 }
 
+func (d *SignatureDescriptor) SizeConstraints() (int, bool) {
+	return (*descriptor)(d).SizeConstraints()
+}
+
+func (d *SignatureDescriptor) BytesConsumed() int {
+	return (*descriptor)(d).BytesConsumed()
+}
+
 type KeyDescriptor descriptor
 
 const sizeofKeyDescriptor = sizeofDescriptor
@@ -122,4 +154,12 @@ func (d KeyDescriptor) MarshalBinary() ([]byte, error) {
 
 func (d *KeyDescriptor) UnmarshalBinary(b []byte) error {
 	return (*descriptor)(d).UnmarshalBinary(b)
+}
+
+func (d *KeyDescriptor) SizeConstraints() (int, bool) {
+	return (*descriptor)(d).SizeConstraints()
+}
+
+func (d *KeyDescriptor) BytesConsumed() int {
+	return (*descriptor)(d).BytesConsumed()
 }

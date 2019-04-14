@@ -11,6 +11,8 @@ type qualified struct {
 	Value
 }
 
+const minSizeofQualified = sizeofDescriptor
+
 // newQualified creates a valid qualified from the given data
 func newQualified(t genericType, content []byte) (*qualified, error) {
 	q := qualified{}
@@ -54,6 +56,14 @@ func (q qualified) Equals(o qualified) bool {
 	return q.Descriptor == o.Descriptor && bytes.Equal([]byte(q.Value), []byte(o.Value))
 }
 
+func (q *qualified) SizeConstraints() (int, bool) {
+	return minSizeofQualified, true
+}
+
+func (q *qualified) BytesConsumed() int {
+	return minSizeofQualified + len([]byte(q.Value))
+}
+
 // concrete qualified data types
 type QualifiedHash qualified
 
@@ -83,6 +93,14 @@ func (q *QualifiedHash) UnmarshalBinary(b []byte) error {
 	return (*qualified)(q).UnmarshalBinary(b)
 }
 
+func (q *QualifiedHash) SizeConstraints() (int, bool) {
+	return minSizeofQualifiedHash, true
+}
+
+func (q *QualifiedHash) BytesConsumed() int {
+	return minSizeofQualifiedHash + len([]byte(q.Value))
+}
+
 type QualifiedContent qualified
 
 const minSizeofQualifiedContent = sizeofContentDescriptor
@@ -99,6 +117,14 @@ func (q QualifiedContent) MarshalBinary() ([]byte, error) {
 
 func (q *QualifiedContent) UnmarshalBinary(b []byte) error {
 	return (*qualified)(q).UnmarshalBinary(b)
+}
+
+func (q *QualifiedContent) SizeConstraints() (int, bool) {
+	return minSizeofQualifiedContent, true
+}
+
+func (q *QualifiedContent) BytesConsumed() int {
+	return minSizeofQualifiedContent + len([]byte(q.Value))
 }
 
 type QualifiedKey qualified
@@ -119,6 +145,14 @@ func (q *QualifiedKey) UnmarshalBinary(b []byte) error {
 	return (*qualified)(q).UnmarshalBinary(b)
 }
 
+func (q *QualifiedKey) SizeConstraints() (int, bool) {
+	return minSizeofQualifiedKey, true
+}
+
+func (q *QualifiedKey) BytesConsumed() int {
+	return minSizeofQualifiedKey + len([]byte(q.Value))
+}
+
 type QualifiedSignature qualified
 
 const minSizeofQualifiedSignature = sizeofSignatureDescriptor
@@ -135,4 +169,12 @@ func (q QualifiedSignature) MarshalBinary() ([]byte, error) {
 
 func (q *QualifiedSignature) UnmarshalBinary(b []byte) error {
 	return (*qualified)(q).UnmarshalBinary(b)
+}
+
+func (q *QualifiedSignature) SizeConstraints() (int, bool) {
+	return minSizeofQualifiedSignature, true
+}
+
+func (q *QualifiedSignature) BytesConsumed() int {
+	return minSizeofQualifiedSignature + len([]byte(q.Value))
 }

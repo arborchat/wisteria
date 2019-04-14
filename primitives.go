@@ -35,6 +35,14 @@ func (g *genericType) UnmarshalBinary(b []byte) error {
 	return binary.Read(buf, multiByteSerializationOrder, g)
 }
 
+func (g *genericType) SizeConstraints() (int, bool) {
+	return sizeofgenericType, false
+}
+
+func (g *genericType) BytesConsumed() int {
+	return sizeofgenericType
+}
+
 // ContentLength represents the length of a piece of data in the Forest
 type ContentLength uint16
 
@@ -60,6 +68,14 @@ func (c *ContentLength) UnmarshalBinary(b []byte) error {
 	return binary.Read(buf, multiByteSerializationOrder, c)
 }
 
+func (c *ContentLength) SizeConstraints() (int, bool) {
+	return sizeofContentLength, false
+}
+
+func (c *ContentLength) BytesConsumed() int {
+	return sizeofContentLength
+}
+
 // TreeDepth represents the depth of a node within a tree
 type TreeDepth uint32
 
@@ -79,6 +95,14 @@ func (t *TreeDepth) UnmarshalBinary(b []byte) error {
 	return binary.Read(buf, multiByteSerializationOrder, t)
 }
 
+func (t *TreeDepth) SizeConstraints() (int, bool) {
+	return sizeofTreeDepth, false
+}
+
+func (t *TreeDepth) BytesConsumed() int {
+	return sizeofTreeDepth
+}
+
 // Value represents a quantity of arbitrary binary data in the Forest
 type Value []byte
 
@@ -92,6 +116,14 @@ func (v Value) MarshalBinary() ([]byte, error) {
 func (v *Value) UnmarshalBinary(b []byte) error {
 	*v = b
 	return nil
+}
+
+func (v *Value) SizeConstraints() (int, bool) {
+	return 0, true
+}
+
+func (v *Value) BytesConsumed() int {
+	return len([]byte(*v))
 }
 
 // Version represents the version of the Arbor Forest Schema used to construct
@@ -112,6 +144,14 @@ func (v Version) MarshalBinary() ([]byte, error) {
 func (v *Version) UnmarshalBinary(b []byte) error {
 	buf := bytes.NewBuffer(b)
 	return binary.Read(buf, multiByteSerializationOrder, v)
+}
+
+func (v *Version) SizeConstraints() (int, bool) {
+	return sizeofVersion, false
+}
+
+func (v *Version) BytesConsumed() int {
+	return sizeofVersion
 }
 
 // specialized types
@@ -146,6 +186,14 @@ func (t *NodeType) UnmarshalBinary(b []byte) error {
 	return nil
 }
 
+func (t *NodeType) SizeConstraints() (int, bool) {
+	return sizeofNodeType, false
+}
+
+func (t *NodeType) BytesConsumed() int {
+	return sizeofNodeType
+}
+
 type HashType genericType
 
 const (
@@ -171,6 +219,14 @@ func (t *HashType) UnmarshalBinary(b []byte) error {
 		return fmt.Errorf("%d is not a valid hash type", *t)
 	}
 	return nil
+}
+
+func (t *HashType) SizeConstraints() (int, bool) {
+	return sizeofHashType, false
+}
+
+func (t *HashType) BytesConsumed() int {
+	return sizeofHashType
 }
 
 type ContentType genericType
@@ -200,6 +256,14 @@ func (t *ContentType) UnmarshalBinary(b []byte) error {
 	return nil
 }
 
+func (t *ContentType) SizeConstraints() (int, bool) {
+	return sizeofContentType, false
+}
+
+func (t *ContentType) BytesConsumed() int {
+	return sizeofContentType
+}
+
 type KeyType genericType
 
 const (
@@ -227,6 +291,14 @@ func (t *KeyType) UnmarshalBinary(b []byte) error {
 	return nil
 }
 
+func (t *KeyType) SizeConstraints() (int, bool) {
+	return sizeofKeyType, false
+}
+
+func (t *KeyType) BytesConsumed() int {
+	return sizeofKeyType
+}
+
 type SignatureType genericType
 
 const (
@@ -250,4 +322,12 @@ func (t *SignatureType) UnmarshalBinary(b []byte) error {
 		return fmt.Errorf("%d is not a valid signature type", *t)
 	}
 	return nil
+}
+
+func (t *SignatureType) SizeConstraints() (int, bool) {
+	return sizeofSignatureType, false
+}
+
+func (t *SignatureType) BytesConsumed() int {
+	return sizeofSignatureType
 }

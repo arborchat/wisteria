@@ -2,44 +2,7 @@ package forest
 
 import (
 	"bytes"
-	"encoding"
-	"io"
 )
-
-type BidirectionalBinaryMarshaler interface {
-	encoding.BinaryMarshaler
-	encoding.BinaryUnmarshaler
-}
-
-func asMarshaler(in []BidirectionalBinaryMarshaler) []encoding.BinaryMarshaler {
-	out := make([]encoding.BinaryMarshaler, len(in))
-	for i, f := range in {
-		out[i] = encoding.BinaryMarshaler(f)
-	}
-	return out
-}
-
-func asUnmarshaler(in []BidirectionalBinaryMarshaler) []encoding.BinaryUnmarshaler {
-	out := make([]encoding.BinaryUnmarshaler, len(in))
-	for i, f := range in {
-		out[i] = encoding.BinaryUnmarshaler(f)
-	}
-	return out
-}
-
-func MarshalAllInto(w io.Writer, marshalers ...encoding.BinaryMarshaler) error {
-	for _, marshaler := range marshalers {
-		b, err := marshaler.MarshalBinary()
-		if err != nil {
-			return err
-		}
-		_, err = w.Write(b)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
 
 // generic node
 type commonNode struct {
@@ -90,45 +53,13 @@ func (n *commonNode) postsignSerializationOrder() []BidirectionalBinaryMarshaler
 // unmarshalBinaryPreamble does the unmarshaling work for all of the common
 // node fields before the node-specific fields and returns the unused data.
 func (n *commonNode) unmarshalBinaryPreamble(b []byte) ([]byte, error) {
-	runningBytesConsumed := 0
-	if err := n.SchemaVersion.UnmarshalBinary(b[runningBytesConsumed:sizeofVersion]); err != nil {
-		return nil, err
-	}
-	runningBytesConsumed += sizeofVersion
-	if err := n.Type.UnmarshalBinary(b[:sizeofgenericType]); err != nil {
-		return nil, err
-	}
-	runningBytesConsumed += sizeofgenericType
-	if err := n.Parent.UnmarshalBinary(b[runningBytesConsumed:]); err != nil {
-		return nil, err
-	}
-	runningBytesConsumed += minSizeofQualifiedHash + int(n.Parent.Descriptor.Length)
-	if err := n.IDDesc.UnmarshalBinary(b[runningBytesConsumed:sizeofHashDescriptor]); err != nil {
-		return nil, err
-	}
-	runningBytesConsumed += sizeofHashDescriptor
-	if err := n.Depth.UnmarshalBinary(b[runningBytesConsumed:sizeofTreeDepth]); err != nil {
-		return nil, err
-	}
-	runningBytesConsumed += sizeofTreeDepth
-	if err := n.Metadata.UnmarshalBinary(b[runningBytesConsumed:]); err != nil {
-		return nil, err
-	}
-	runningBytesConsumed += minSizeofQualifiedContent + int(n.Metadata.Descriptor.Length)
-	if err := n.SignatureAuthority.UnmarshalBinary(b[runningBytesConsumed:]); err != nil {
-		return nil, err
-	}
-	runningBytesConsumed += minSizeofQualifiedHash + int(n.SignatureAuthority.Descriptor.Length)
-	return b[runningBytesConsumed:], nil
+	return UnmarshalAll(b, asUnmarshaler(n.presignSerializationOrder())...)
 }
 
 // unmarshalBinarySignature does the unmarshaling work for the signature field after the
 // node-specific fields and returns the unused data.
 func (n *commonNode) unmarshalBinarySignature(b []byte) ([]byte, error) {
-	if err := n.Signature.UnmarshalBinary(b); err != nil {
-		return nil, err
-	}
-	return b[minSizeofQualifiedSignature+int(n.Signature.Descriptor.Length):], nil
+	return UnmarshalAll(b, asUnmarshaler(n.postsignSerializationOrder())...)
 }
 
 // concrete nodes
@@ -200,17 +131,11 @@ func (i *Identity) UnmarshalBinary(b []byte) error {
 	if err != nil {
 		return err
 	}
-	b = unused
-	runningBytesConsumed := 0
-	if err := i.Name.UnmarshalBinary(b[runningBytesConsumed:]); err != nil {
+	unused, err = UnmarshalAll(unused, asUnmarshaler(i.serializationOrder())...)
+	if err != nil {
 		return err
 	}
-	runningBytesConsumed += int(i.Name.Descriptor.Length)
-	if err := i.PublicKey.UnmarshalBinary(b[runningBytesConsumed:]); err != nil {
-		return err
-	}
-	runningBytesConsumed += int(i.PublicKey.Descriptor.Length)
-	if _, err := i.commonNode.unmarshalBinarySignature(b[runningBytesConsumed:]); err != nil {
+	if _, err := i.commonNode.unmarshalBinarySignature(unused); err != nil {
 		return err
 	}
 	return nil
