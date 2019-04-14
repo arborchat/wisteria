@@ -1,11 +1,26 @@
 package forest
 
-import "bytes"
+import (
+	"bytes"
+	"fmt"
+)
 
 // generic qualified data
 type qualified struct {
 	Descriptor descriptor
 	Value
+}
+
+// newQualified creates a valid qualified from the given data
+func newQualified(t genericType, content []byte) (*qualified, error) {
+	q := qualified{}
+	d, err := newDescriptor(t, len(content))
+	if err != nil {
+		return nil, err
+	}
+	q.Descriptor = *d
+	q.Value = Value(content)
+	return &q, nil
 }
 
 func (q qualified) MarshalBinary() ([]byte, error) {
@@ -21,16 +36,18 @@ func (q qualified) MarshalBinary() ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-// newQualified creates a valid qualified from the given data
-func newQualified(t genericType, content []byte) (*qualified, error) {
-	q := qualified{}
-	d, err := newDescriptor(t, len(content))
-	if err != nil {
-		return nil, err
+func (q *qualified) UnmarshalBinary(b []byte) error {
+	if len(b) < sizeofDescriptor {
+		return fmt.Errorf("Not enough data for qualified type, need at least %d bytes, have %d", sizeofDescriptor, len(b))
 	}
-	q.Descriptor = *d
-	q.Value = Value(content)
-	return &q, nil
+	if err := (&q.Descriptor).UnmarshalBinary(b[:sizeofDescriptor]); err != nil {
+		return err
+	}
+	var length = sizeofDescriptor + q.Descriptor.Length
+	if err := (&q.Value).UnmarshalBinary(b[sizeofDescriptor:length]); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (q qualified) Equals(o qualified) bool {
@@ -60,6 +77,10 @@ func (q QualifiedHash) MarshalBinary() ([]byte, error) {
 	return qualified(q).MarshalBinary()
 }
 
+func (q *QualifiedHash) UnmarshalBinary(b []byte) error {
+	return (*qualified)(q).UnmarshalBinary(b)
+}
+
 type QualifiedContent qualified
 
 // NewQualifiedContent returns a valid QualifiedContent from the given data
@@ -70,6 +91,10 @@ func NewQualifiedContent(t ContentType, content []byte) (*QualifiedContent, erro
 
 func (q QualifiedContent) MarshalBinary() ([]byte, error) {
 	return qualified(q).MarshalBinary()
+}
+
+func (q *QualifiedContent) UnmarshalBinary(b []byte) error {
+	return (*qualified)(q).UnmarshalBinary(b)
 }
 
 type QualifiedKey qualified
@@ -84,6 +109,10 @@ func (q QualifiedKey) MarshalBinary() ([]byte, error) {
 	return qualified(q).MarshalBinary()
 }
 
+func (q *QualifiedKey) UnmarshalBinary(b []byte) error {
+	return (*qualified)(q).UnmarshalBinary(b)
+}
+
 type QualifiedSignature qualified
 
 // NewQualifiedSignature returns a valid QualifiedSignature from the given data
@@ -94,4 +123,8 @@ func NewQualifiedSignature(t SignatureType, content []byte) (*QualifiedSignature
 
 func (q QualifiedSignature) MarshalBinary() ([]byte, error) {
 	return qualified(q).MarshalBinary()
+}
+
+func (q *QualifiedSignature) UnmarshalBinary(b []byte) error {
+	return (*qualified)(q).UnmarshalBinary(b)
 }
