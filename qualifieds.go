@@ -1,0 +1,97 @@
+package forest
+
+import "bytes"
+
+// generic qualified data
+type qualified struct {
+	Descriptor descriptor
+	Value
+}
+
+func (q qualified) MarshalBinary() ([]byte, error) {
+	b, err := q.Descriptor.MarshalBinary()
+	if err != nil {
+		return nil, err
+	}
+	buf := bytes.NewBuffer(b)
+	_, err = buf.Write([]byte(q.Value))
+	if err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+// newQualified creates a valid qualified from the given data
+func newQualified(t genericType, content []byte) (*qualified, error) {
+	q := qualified{}
+	d, err := newDescriptor(t, len(content))
+	if err != nil {
+		return nil, err
+	}
+	q.Descriptor = *d
+	q.Value = Value(content)
+	return &q, nil
+}
+
+func (q qualified) Equals(o qualified) bool {
+	return q.Descriptor == o.Descriptor && bytes.Equal([]byte(q.Value), []byte(o.Value))
+}
+
+// concrete qualified data types
+type QualifiedHash qualified
+
+// NewQualifiedHash returns a valid QualifiedHash from the given data
+func NewQualifiedHash(t HashType, content []byte) (*QualifiedHash, error) {
+	q, e := newQualified(genericType(t), content)
+	return (*QualifiedHash)(q), e
+}
+
+func NullHash() QualifiedHash {
+	return QualifiedHash{
+		Descriptor: descriptor{
+			Type:   genericType(HashTypeNullHash),
+			Length: 0,
+		},
+		Value: []byte{},
+	}
+}
+
+func (q QualifiedHash) MarshalBinary() ([]byte, error) {
+	return qualified(q).MarshalBinary()
+}
+
+type QualifiedContent qualified
+
+// NewQualifiedContent returns a valid QualifiedContent from the given data
+func NewQualifiedContent(t ContentType, content []byte) (*QualifiedContent, error) {
+	q, e := newQualified(genericType(t), content)
+	return (*QualifiedContent)(q), e
+}
+
+func (q QualifiedContent) MarshalBinary() ([]byte, error) {
+	return qualified(q).MarshalBinary()
+}
+
+type QualifiedKey qualified
+
+// NewQualifiedKey returns a valid QualifiedKey from the given data
+func NewQualifiedKey(t KeyType, content []byte) (*QualifiedKey, error) {
+	q, e := newQualified(genericType(t), content)
+	return (*QualifiedKey)(q), e
+}
+
+func (q QualifiedKey) MarshalBinary() ([]byte, error) {
+	return qualified(q).MarshalBinary()
+}
+
+type QualifiedSignature qualified
+
+// NewQualifiedSignature returns a valid QualifiedSignature from the given data
+func NewQualifiedSignature(t SignatureType, content []byte) (*QualifiedSignature, error) {
+	q, e := newQualified(genericType(t), content)
+	return (*QualifiedSignature)(q), e
+}
+
+func (q QualifiedSignature) MarshalBinary() ([]byte, error) {
+	return qualified(q).MarshalBinary()
+}
