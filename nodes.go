@@ -126,18 +126,56 @@ func (n Node) ID() QualifiedHash {
 
 func (n Node) WriteCommonFieldsInto(w io.Writer) error {
 	// this slice defines the order in which the fields are written
-	return MarshalAllInto(w,
-		n.SchemaVersion,
-		n.Type,
-		n.Parent,
-		n.IDDesc,
-		n.Depth,
-		n.Metadata,
-		n.SignatureAuthority)
+	return MarshalAllInto(w, n.presignSerializationOrder()...)
+}
+
+type BidirectionalBinaryMarshaler interface {
+	encoding.BinaryMarshaler
+	encoding.BinaryUnmarshaler
+}
+
+func (n *Node) serializationOrder() []BidirectionalBinaryMarshaler {
+	return []BidirectionalBinaryMarshaler{
+		&n.SchemaVersion,
+		&n.Type,
+		&n.Parent,
+		&n.IDDesc,
+		&n.Depth,
+		&n.Metadata,
+		&n.SignatureAuthority,
+		&n.Signature,
+	}
+}
+
+func asMarshaler(in []BidirectionalBinaryMarshaler) []encoding.BinaryMarshaler {
+	out := make([]encoding.BinaryMarshaler, len(in))
+	for i, f := range in {
+		out[i] = encoding.BinaryMarshaler(f)
+	}
+	return out
+}
+
+func asUnmarshaler(in []BidirectionalBinaryMarshaler) []encoding.BinaryUnmarshaler {
+	out := make([]encoding.BinaryUnmarshaler, len(in))
+	for i, f := range in {
+		out[i] = encoding.BinaryUnmarshaler(f)
+	}
+	return out
+}
+
+func (n *Node) presignSerializationOrder() []encoding.BinaryMarshaler {
+	fields := n.serializationOrder()
+	fields = fields[:len(fields)-1] // drop the signature
+	return asMarshaler(fields)
+}
+
+func (n *Node) postsignSerializationOrder() []encoding.BinaryMarshaler {
+	fields := n.serializationOrder()
+	return asMarshaler(fields[len(fields)-1:]) // drop the signature
 }
 
 func (n Node) WriteSignatureInto(w io.Writer) error {
-	return MarshalAllInto(w, n.Signature)
+	return MarshalAllInto(w, n.postsignSerializationOrder()...)
 }
 
 func (n Node) WriteDataForSigningInto(w io.Writer) error {
