@@ -57,6 +57,8 @@ func (q qualified) Equals(o qualified) bool {
 // concrete qualified data types
 type QualifiedHash qualified
 
+const minSizeofQualifiedHash = sizeofHashDescriptor
+
 // NewQualifiedHash returns a valid QualifiedHash from the given data
 func NewQualifiedHash(t HashType, content []byte) (*QualifiedHash, error) {
 	q, e := newQualified(genericType(t), content)
@@ -83,6 +85,8 @@ func (q *QualifiedHash) UnmarshalBinary(b []byte) error {
 
 type QualifiedContent qualified
 
+const minSizeofQualifiedContent = sizeofContentDescriptor
+
 // NewQualifiedContent returns a valid QualifiedContent from the given data
 func NewQualifiedContent(t ContentType, content []byte) (*QualifiedContent, error) {
 	q, e := newQualified(genericType(t), content)
@@ -99,6 +103,8 @@ func (q *QualifiedContent) UnmarshalBinary(b []byte) error {
 
 type QualifiedKey qualified
 
+const minSizeofQualifiedKey = sizeofKeyDescriptor
+
 // NewQualifiedKey returns a valid QualifiedKey from the given data
 func NewQualifiedKey(t KeyType, content []byte) (*QualifiedKey, error) {
 	q, e := newQualified(genericType(t), content)
@@ -114,6 +120,8 @@ func (q *QualifiedKey) UnmarshalBinary(b []byte) error {
 }
 
 type QualifiedSignature qualified
+
+const minSizeofQualifiedSignature = sizeofSignatureDescriptor
 
 // NewQualifiedSignature returns a valid QualifiedSignature from the given data
 func NewQualifiedSignature(t SignatureType, content []byte) (*QualifiedSignature, error) {

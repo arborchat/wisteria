@@ -63,6 +63,8 @@ func (c *ContentLength) UnmarshalBinary(b []byte) error {
 // TreeDepth represents the depth of a node within a tree
 type TreeDepth uint32
 
+const sizeofTreeDepth = 4
+
 // MarshalBinary converts the TreeDepth into its binary representation
 func (t TreeDepth) MarshalBinary() ([]byte, error) {
 	b := new(bytes.Buffer)
@@ -96,6 +98,8 @@ func (v *Value) UnmarshalBinary(b []byte) error {
 // a particular node
 type Version uint64
 
+const sizeofVersion = 8
+
 // MarshalBinary converts the Version into its binary representation
 func (v Version) MarshalBinary() ([]byte, error) {
 	b := new(bytes.Buffer)
@@ -114,6 +118,7 @@ func (v *Version) UnmarshalBinary(b []byte) error {
 type NodeType genericType
 
 const (
+	sizeofNodeType                = sizeofgenericType
 	NodeTypeIdentity     NodeType = 1
 	NodeTypeCommunity    NodeType = 2
 	NodeTypeConversation NodeType = 3
@@ -144,6 +149,7 @@ func (t *NodeType) UnmarshalBinary(b []byte) error {
 type HashType genericType
 
 const (
+	sizeofHashType              = sizeofgenericType
 	HashTypeNullHash   HashType = 0
 	HashTypeSHA512_256 HashType = 1
 )
@@ -170,6 +176,7 @@ func (t *HashType) UnmarshalBinary(b []byte) error {
 type ContentType genericType
 
 const (
+	sizeofContentType                 = sizeofgenericType
 	ContentTypeUTF8String ContentType = 1
 	ContentTypeJSON       ContentType = 2
 )
@@ -196,6 +203,7 @@ func (t *ContentType) UnmarshalBinary(b []byte) error {
 type KeyType genericType
 
 const (
+	sizeofKeyType          = sizeofgenericType
 	KeyTypeNoKey   KeyType = 0
 	KeyTypeOpenPGP KeyType = 1
 )
@@ -222,6 +230,7 @@ func (t *KeyType) UnmarshalBinary(b []byte) error {
 type SignatureType genericType
 
 const (
+	sizeofSignatureType                = sizeofgenericType
 	SignatureTypeOpenPGP SignatureType = 1
 )
 

@@ -58,6 +58,8 @@ func (d *descriptor) UnmarshalBinary(b []byte) error {
 // concrete descriptors
 type HashDescriptor descriptor
 
+const sizeofHashDescriptor = sizeofDescriptor
+
 func NewHashDescriptor(t HashType, length int) (*HashDescriptor, error) {
 	d, err := newDescriptor(genericType(t), length)
 	return (*HashDescriptor)(d), err
@@ -72,6 +74,8 @@ func (d *HashDescriptor) UnmarshalBinary(b []byte) error {
 }
 
 type ContentDescriptor descriptor
+
+const sizeofContentDescriptor = sizeofDescriptor
 
 func NewContentDescriptor(t ContentType, length int) (*ContentDescriptor, error) {
 	d, err := newDescriptor(genericType(t), length)
@@ -88,6 +92,8 @@ func (d *ContentDescriptor) UnmarshalBinary(b []byte) error {
 
 type SignatureDescriptor descriptor
 
+const sizeofSignatureDescriptor = sizeofDescriptor
+
 func NewSignatureDescriptor(t SignatureType, length int) (*SignatureDescriptor, error) {
 	d, err := newDescriptor(genericType(t), length)
 	return (*SignatureDescriptor)(d), err
@@ -102,6 +108,8 @@ func (d *SignatureDescriptor) UnmarshalBinary(b []byte) error {
 }
 
 type KeyDescriptor descriptor
+
+const sizeofKeyDescriptor = sizeofDescriptor
 
 func NewKeyDescriptor(t KeyType, length int) (*KeyDescriptor, error) {
 	d, err := newDescriptor(genericType(t), length)

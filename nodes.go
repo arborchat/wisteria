@@ -13,7 +13,7 @@ import (
 )
 
 // generic node
-type Node struct {
+type commonNode struct {
 	// the ID is deterministically computed from the rest of the values
 	id                 Value
 	Type               NodeType
@@ -25,7 +25,7 @@ type Node struct {
 	SignatureAuthority QualifiedHash
 	Signature          QualifiedSignature
 	// WriteNodeTypeFieldsInto allows higher-level logic to define
-	// how to serialize extra fields. See the concrete Node type
+	// how to serialize extra fields. See the concrete commonNode type
 	// implementations for details
 	WriteNodeTypeFieldsInto func(w io.Writer) error
 }
@@ -46,7 +46,7 @@ func MarshalAllInto(w io.Writer, marshalers ...encoding.BinaryMarshaler) error {
 
 // computeID determines the correct value of this node's ID without modifying
 // the node.
-func (n Node) computeID() ([]byte, error) {
+func (n commonNode) computeID() ([]byte, error) {
 	// map from HashType to the function that creates an instance of that hash
 	// algorithm
 	hashType2Func := map[HashType]func() hash.Hash{
@@ -68,11 +68,11 @@ func (n Node) computeID() ([]byte, error) {
 	return hasher.Sum(nil), nil
 }
 
-// ValidateID returns whether the ID of this Node matches the data. The first
+// ValidateID returns whether the ID of this commonNode matches the data. The first
 // return value indicates the result of the comparison. If there is an error,
 // the first return value will always be false and the second will indicate
 // what went wrong when computing the hash.
-func (n Node) ValidateID() (bool, error) {
+func (n commonNode) ValidateID() (bool, error) {
 	currentID := n.ID()
 	id, err := n.computeID()
 	if err != nil {
@@ -85,10 +85,10 @@ func (n Node) ValidateID() (bool, error) {
 	return qualified(currentID).Equals(qualified(computedID)), nil
 }
 
-// ValidateSignature returns whether the signature contained in this Node is a valid
+// ValidateSignature returns whether the signature contained in this commonNode is a valid
 // signature for the given Identity. When validating an Identity node, you should
 // pass the Identity to this method.
-func (n Node) ValidateSignatureFor(identity *Identity) (bool, error) {
+func (n commonNode) ValidateSignatureFor(identity *Identity) (bool, error) {
 	if qualified(n.SignatureAuthority).Equals(qualified(NullHash())) {
 		if n.Type != NodeTypeIdentity {
 			return false, fmt.Errorf("Only Identity nodes can have the null hash as their Signature Authority")
@@ -116,15 +116,15 @@ func (n Node) ValidateSignatureFor(identity *Identity) (bool, error) {
 	return true, nil
 }
 
-// Compute and return the Node's ID as a Qualified Hash
-func (n Node) ID() QualifiedHash {
+// Compute and return the commonNode's ID as a Qualified Hash
+func (n commonNode) ID() QualifiedHash {
 	return QualifiedHash{
 		Descriptor: descriptor(n.IDDesc),
 		Value:      n.id,
 	}
 }
 
-func (n Node) WriteCommonFieldsInto(w io.Writer) error {
+func (n commonNode) WriteCommonFieldsInto(w io.Writer) error {
 	// this slice defines the order in which the fields are written
 	return MarshalAllInto(w, n.presignSerializationOrder()...)
 }
@@ -134,7 +134,7 @@ type BidirectionalBinaryMarshaler interface {
 	encoding.BinaryUnmarshaler
 }
 
-func (n *Node) serializationOrder() []BidirectionalBinaryMarshaler {
+func (n *commonNode) serializationOrder() []BidirectionalBinaryMarshaler {
 	return []BidirectionalBinaryMarshaler{
 		&n.SchemaVersion,
 		&n.Type,
@@ -163,22 +163,22 @@ func asUnmarshaler(in []BidirectionalBinaryMarshaler) []encoding.BinaryUnmarshal
 	return out
 }
 
-func (n *Node) presignSerializationOrder() []encoding.BinaryMarshaler {
+func (n *commonNode) presignSerializationOrder() []encoding.BinaryMarshaler {
 	fields := n.serializationOrder()
 	fields = fields[:len(fields)-1] // drop the signature
 	return asMarshaler(fields)
 }
 
-func (n *Node) postsignSerializationOrder() []encoding.BinaryMarshaler {
+func (n *commonNode) postsignSerializationOrder() []encoding.BinaryMarshaler {
 	fields := n.serializationOrder()
 	return asMarshaler(fields[len(fields)-1:]) // drop the signature
 }
 
-func (n Node) WriteSignatureInto(w io.Writer) error {
+func (n commonNode) WriteSignatureInto(w io.Writer) error {
 	return MarshalAllInto(w, n.postsignSerializationOrder()...)
 }
 
-func (n Node) WriteDataForSigningInto(w io.Writer) error {
+func (n commonNode) WriteDataForSigningInto(w io.Writer) error {
 	if err := n.WriteCommonFieldsInto(w); err != nil {
 		return err
 	}
@@ -188,10 +188,10 @@ func (n Node) WriteDataForSigningInto(w io.Writer) error {
 	return nil
 }
 
-func (n Node) MarshalBinary() ([]byte, error) {
+func (n commonNode) MarshalBinary() ([]byte, error) {
 	// this is a template method. It always writes the common fields,
 	// then invokes a method responsible for writing data that varies
-	// between Node Types, then writes the final data
+	// between commonNode Types, then writes the final data
 	b := new(bytes.Buffer)
 	writeFuncs := []func(io.Writer) error{
 		n.WriteDataForSigningInto,
@@ -209,9 +209,57 @@ func (n Node) MarshalBinary() ([]byte, error) {
 	return b.Bytes(), nil
 }
 
+// unmarshalBinaryPreamble does the unmarshaling work for all of the common
+// node fields before the node-specific fields and returns the unused data.
+func (n *commonNode) unmarshalBinaryPreamble(b []byte) ([]byte, error) {
+	runningBytesConsumed := 0
+	if err := n.Type.UnmarshalBinary(b[:sizeofgenericType]); err != nil {
+		return nil, err
+	}
+	runningBytesConsumed += sizeofgenericType
+	if err := n.SchemaVersion.UnmarshalBinary(b[runningBytesConsumed:sizeofVersion]); err != nil {
+		return nil, err
+	}
+	runningBytesConsumed += sizeofVersion
+	if err := n.Parent.UnmarshalBinary(b[runningBytesConsumed:]); err != nil {
+		return nil, err
+	}
+	runningBytesConsumed += minSizeofQualifiedHash + int(n.Parent.Descriptor.Length)
+	if err := n.IDDesc.UnmarshalBinary(b[runningBytesConsumed:sizeofHashDescriptor]); err != nil {
+		return nil, err
+	}
+	runningBytesConsumed += sizeofHashDescriptor
+	if err := n.IDDesc.UnmarshalBinary(b[runningBytesConsumed:sizeofHashDescriptor]); err != nil {
+		return nil, err
+	}
+	runningBytesConsumed += sizeofHashDescriptor
+	if err := n.Depth.UnmarshalBinary(b[runningBytesConsumed:sizeofTreeDepth]); err != nil {
+		return nil, err
+	}
+	runningBytesConsumed += sizeofTreeDepth
+	if err := n.Metadata.UnmarshalBinary(b[runningBytesConsumed:]); err != nil {
+		return nil, err
+	}
+	runningBytesConsumed += minSizeofQualifiedContent + int(n.Metadata.Descriptor.Length)
+	if err := n.SignatureAuthority.UnmarshalBinary(b[runningBytesConsumed:]); err != nil {
+		return nil, err
+	}
+	runningBytesConsumed += minSizeofQualifiedHash + int(n.SignatureAuthority.Descriptor.Length)
+	return b[runningBytesConsumed:], nil
+}
+
+// unmarshalBinarySignature does the unmarshaling work for the signature field after the
+// node-specific fields and returns the unused data.
+func (n *commonNode) unmarshalBinarySignature(b []byte) ([]byte, error) {
+	if err := n.Signature.UnmarshalBinary(b); err != nil {
+		return nil, err
+	}
+	return b[minSizeofQualifiedSignature+int(n.Signature.Descriptor.Length):], nil
+}
+
 // concrete nodes
 type Identity struct {
-	Node
+	commonNode
 	Name      QualifiedContent
 	PublicKey QualifiedKey
 }
@@ -219,42 +267,63 @@ type Identity struct {
 func newIdentity() *Identity {
 	i := new(Identity)
 	// define how to serialize this node type's fields
-	i.Node.WriteNodeTypeFieldsInto = func(w io.Writer) error {
+	i.commonNode.WriteNodeTypeFieldsInto = func(w io.Writer) error {
 		return MarshalAllInto(w, i.Name, i.PublicKey)
 	}
 	return i
 }
 
+func (i *Identity) UnmarshalBinary(b []byte) error {
+	unused, err := i.commonNode.unmarshalBinaryPreamble(b)
+	if err != nil {
+		return err
+	}
+	b = unused
+	runningBytesConsumed := 0
+	if err := i.Name.UnmarshalBinary(b[runningBytesConsumed:]); err != nil {
+		return err
+	}
+	runningBytesConsumed += int(i.Name.Descriptor.Length)
+	if err := i.PublicKey.UnmarshalBinary(b[runningBytesConsumed:]); err != nil {
+		return err
+	}
+	runningBytesConsumed += int(i.PublicKey.Descriptor.Length)
+	if _, err := i.commonNode.unmarshalBinarySignature(b[runningBytesConsumed:]); err != nil {
+		return err
+	}
+	return nil
+}
+
 type Community struct {
-	Node
+	commonNode
 	Name QualifiedContent
 }
 
 func newCommunity() *Community {
 	c := new(Community)
 	// define how to serialize this node type's fields
-	c.Node.WriteNodeTypeFieldsInto = func(w io.Writer) error {
+	c.commonNode.WriteNodeTypeFieldsInto = func(w io.Writer) error {
 		return MarshalAllInto(w, c.Name)
 	}
 	return c
 }
 
 type Conversation struct {
-	Node
+	commonNode
 	Content QualifiedContent
 }
 
 func newConversation() *Conversation {
 	c := new(Conversation)
 	// define how to serialize this node type's fields
-	c.Node.WriteNodeTypeFieldsInto = func(w io.Writer) error {
+	c.commonNode.WriteNodeTypeFieldsInto = func(w io.Writer) error {
 		return MarshalAllInto(w, c.Content)
 	}
 	return c
 }
 
 type Reply struct {
-	Node
+	commonNode
 	ConversationID QualifiedHash
 	Content        QualifiedContent
 }
@@ -262,7 +331,7 @@ type Reply struct {
 func newReply() *Reply {
 	r := new(Reply)
 	// define how to serialize this node type's fields
-	r.Node.WriteNodeTypeFieldsInto = func(w io.Writer) error {
+	r.commonNode.WriteNodeTypeFieldsInto = func(w io.Writer) error {
 		return MarshalAllInto(w, r.ConversationID, r.Content)
 	}
 	return r
