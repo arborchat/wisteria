@@ -30,10 +30,10 @@ func MakeIdentityOrSkip(t *testing.T) *forest.Identity {
 
 func TestIdentityValidatesSelf(t *testing.T) {
 	identity := MakeIdentityOrSkip(t)
-	if correct, err := identity.ValidateID(); err != nil || !correct {
+	if correct, err := forest.ValidateID(identity, identity.ID()); err != nil || !correct {
 		t.Error("ID validation failed on unmodified node", err)
 	}
-	if correct, err := identity.ValidateSignatureFor(identity); err != nil || !correct {
+	if correct, err := forest.ValidateSignature(identity, identity); err != nil || !correct {
 		t.Error("Signature validation failed on unmodified node", err)
 	}
 }
@@ -41,10 +41,10 @@ func TestIdentityValidatesSelf(t *testing.T) {
 func TestIdentityValidationFailsWhenTampered(t *testing.T) {
 	identity := MakeIdentityOrSkip(t)
 	identity.Name.Value = forest.Value([]byte("whatever"))
-	if correct, err := identity.ValidateID(); err == nil && correct {
+	if correct, err := forest.ValidateID(identity, identity.ID()); err == nil && correct {
 		t.Error("ID validation succeeded on modified node", err)
 	}
-	if correct, err := identity.ValidateSignatureFor(identity); err == nil && correct {
+	if correct, err := forest.ValidateSignature(identity, identity); err == nil && correct {
 		t.Error("Signature validation succeeded on modified node", err)
 	}
 }

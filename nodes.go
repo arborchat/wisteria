@@ -2,149 +2,17 @@ package forest
 
 import (
 	"bytes"
-	"crypto/sha512"
 	"encoding"
 	"fmt"
-	"hash"
 	"io"
 
 	"golang.org/x/crypto/openpgp"
 	"golang.org/x/crypto/openpgp/packet"
 )
 
-// generic node
-type commonNode struct {
-	// the ID is deterministically computed from the rest of the values
-	id                 Value
-	Type               NodeType
-	SchemaVersion      Version
-	Parent             QualifiedHash
-	IDDesc             HashDescriptor
-	Depth              TreeDepth
-	Metadata           QualifiedContent
-	SignatureAuthority QualifiedHash
-	Signature          QualifiedSignature
-	// WriteNodeTypeFieldsInto allows higher-level logic to define
-	// how to serialize extra fields. See the concrete commonNode type
-	// implementations for details
-	WriteNodeTypeFieldsInto func(w io.Writer) error
-}
-
-func MarshalAllInto(w io.Writer, marshalers ...encoding.BinaryMarshaler) error {
-	for _, marshaler := range marshalers {
-		b, err := marshaler.MarshalBinary()
-		if err != nil {
-			return err
-		}
-		_, err = w.Write(b)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-// computeID determines the correct value of this node's ID without modifying
-// the node.
-func (n commonNode) computeID() ([]byte, error) {
-	// map from HashType to the function that creates an instance of that hash
-	// algorithm
-	hashType2Func := map[HashType]func() hash.Hash{
-		HashTypeSHA512_256: sha512.New512_256,
-	}
-	if HashType(n.IDDesc.Type) == HashTypeNullHash {
-		return []byte{}, nil
-	}
-	binaryContent, err := n.MarshalBinary()
-	if err != nil {
-		return nil, err
-	}
-	hashFunc, found := hashType2Func[HashType(n.IDDesc.Type)]
-	if !found {
-		return nil, fmt.Errorf("Unknown HashType %d", n.IDDesc.Type)
-	}
-	hasher := hashFunc()
-	_, _ = hasher.Write(binaryContent) // never errors
-	return hasher.Sum(nil), nil
-}
-
-// ValidateID returns whether the ID of this commonNode matches the data. The first
-// return value indicates the result of the comparison. If there is an error,
-// the first return value will always be false and the second will indicate
-// what went wrong when computing the hash.
-func (n commonNode) ValidateID() (bool, error) {
-	currentID := n.ID()
-	id, err := n.computeID()
-	if err != nil {
-		return false, err
-	}
-	computedID := QualifiedHash{
-		Descriptor: descriptor(n.IDDesc),
-		Value:      Value(id),
-	}
-	return qualified(currentID).Equals(qualified(computedID)), nil
-}
-
-// ValidateSignature returns whether the signature contained in this commonNode is a valid
-// signature for the given Identity. When validating an Identity node, you should
-// pass the Identity to this method.
-func (n commonNode) ValidateSignatureFor(identity *Identity) (bool, error) {
-	if qualified(n.SignatureAuthority).Equals(qualified(NullHash())) {
-		if n.Type != NodeTypeIdentity {
-			return false, fmt.Errorf("Only Identity nodes can have the null hash as their Signature Authority")
-		}
-	} else if !qualified(n.SignatureAuthority).Equals(qualified(identity.ID())) {
-		return false, fmt.Errorf("This node was signed by a different identity")
-	}
-	// get the key used to sign this node
-	pubkeyBuf := bytes.NewBuffer([]byte(identity.PublicKey.Value))
-	pubkeyEntity, err := openpgp.ReadEntity(packet.NewReader(pubkeyBuf))
-	if err != nil {
-		return false, err
-	}
-
-	signedContentBuf := new(bytes.Buffer)
-	if err = n.WriteDataForSigningInto(signedContentBuf); err != nil {
-		return false, err
-	}
-	signatureBuf := bytes.NewBuffer([]byte(n.Signature.Value))
-	keyring := openpgp.EntityList([]*openpgp.Entity{pubkeyEntity})
-	_, err = openpgp.CheckDetachedSignature(keyring, signedContentBuf, signatureBuf)
-	if err != nil {
-		return false, err
-	}
-	return true, nil
-}
-
-// Compute and return the commonNode's ID as a Qualified Hash
-func (n commonNode) ID() QualifiedHash {
-	return QualifiedHash{
-		Descriptor: descriptor(n.IDDesc),
-		Value:      n.id,
-	}
-}
-
-func (n commonNode) WriteCommonFieldsInto(w io.Writer) error {
-	// this slice defines the order in which the fields are written
-	return MarshalAllInto(w, n.presignSerializationOrder()...)
-}
-
 type BidirectionalBinaryMarshaler interface {
 	encoding.BinaryMarshaler
 	encoding.BinaryUnmarshaler
-}
-
-func (n *commonNode) serializationOrder() []BidirectionalBinaryMarshaler {
-	return []BidirectionalBinaryMarshaler{
-		&n.SchemaVersion,
-		&n.Type,
-		&n.Parent,
-		&n.IDDesc,
-		&n.Depth,
-		&n.Metadata,
-		&n.SignatureAuthority,
-		&n.Signature,
-	}
 }
 
 func asMarshaler(in []BidirectionalBinaryMarshaler) []encoding.BinaryMarshaler {
@@ -163,72 +31,122 @@ func asUnmarshaler(in []BidirectionalBinaryMarshaler) []encoding.BinaryUnmarshal
 	return out
 }
 
-func (n *commonNode) presignSerializationOrder() []encoding.BinaryMarshaler {
-	fields := n.serializationOrder()
-	fields = fields[:len(fields)-1] // drop the signature
-	return asMarshaler(fields)
-}
-
-func (n *commonNode) postsignSerializationOrder() []encoding.BinaryMarshaler {
-	fields := n.serializationOrder()
-	return asMarshaler(fields[len(fields)-1:]) // drop the signature
-}
-
-func (n commonNode) WriteSignatureInto(w io.Writer) error {
-	return MarshalAllInto(w, n.postsignSerializationOrder()...)
-}
-
-func (n commonNode) WriteDataForSigningInto(w io.Writer) error {
-	if err := n.WriteCommonFieldsInto(w); err != nil {
-		return err
-	}
-	if err := n.WriteNodeTypeFieldsInto(w); err != nil {
-		return err
+func MarshalAllInto(w io.Writer, marshalers ...encoding.BinaryMarshaler) error {
+	for _, marshaler := range marshalers {
+		b, err := marshaler.MarshalBinary()
+		if err != nil {
+			return err
+		}
+		_, err = w.Write(b)
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }
 
-func (n commonNode) MarshalBinary() ([]byte, error) {
-	// this is a template method. It always writes the common fields,
-	// then invokes a method responsible for writing data that varies
-	// between commonNode Types, then writes the final data
-	b := new(bytes.Buffer)
-	writeFuncs := []func(io.Writer) error{
-		n.WriteDataForSigningInto,
-		n.WriteSignatureInto,
+// generic node
+type commonNode struct {
+	// the ID is deterministically computed from the rest of the values
+	id                 Value
+	Type               NodeType
+	SchemaVersion      Version
+	Parent             QualifiedHash
+	IDDesc             HashDescriptor
+	Depth              TreeDepth
+	Metadata           QualifiedContent
+	SignatureAuthority QualifiedHash
+	Signature          QualifiedSignature
+}
+
+type SignatureValidator interface {
+	MarshalSignedData() ([]byte, error)
+	Signature() QualifiedSignature
+	SignatureIdentityHash() QualifiedHash
+	IsIdentity() bool
+}
+
+// ValidateSignature returns whether the signature contained in this SignatureValidator is a valid
+// signature for the given Identity. When validating an Identity node, you should
+// pass the same Identity as the second parameter.
+func ValidateSignature(v SignatureValidator, identity *Identity) (bool, error) {
+	if qualified(v.SignatureIdentityHash()).Equals(qualified(NullHash())) {
+		if !v.IsIdentity() {
+			return false, fmt.Errorf("Only Identity nodes can have the null hash as their Signature Authority")
+		}
+	} else if !qualified(v.SignatureIdentityHash()).Equals(qualified(identity.ID())) {
+		return false, fmt.Errorf("This node was signed by a different identity")
+	}
+	// get the key used to sign this node
+	pubkeyBuf := bytes.NewBuffer([]byte(identity.PublicKey.Value))
+	pubkeyEntity, err := openpgp.ReadEntity(packet.NewReader(pubkeyBuf))
+	if err != nil {
+		return false, err
 	}
 
-	// invoke the methods in the order defined by the slice above
-	for _, f := range writeFuncs {
-		err := f(b)
-		if err != nil {
-			return nil, err
-		}
+	signedContent, err := v.MarshalSignedData()
+	if err != nil {
+		return false, err
 	}
-	// invoke the methods in the order defined by the slice above	}
-	return b.Bytes(), nil
+	signedContentBuf := bytes.NewBuffer(signedContent)
+
+	signatureBuf := bytes.NewBuffer([]byte(v.Signature().Value))
+	keyring := openpgp.EntityList([]*openpgp.Entity{pubkeyEntity})
+	_, err = openpgp.CheckDetachedSignature(keyring, signedContentBuf, signatureBuf)
+	if err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+// Compute and return the commonNode's ID as a Qualified Hash
+func (n commonNode) ID() QualifiedHash {
+	return QualifiedHash{
+		Descriptor: descriptor(n.IDDesc),
+		Value:      n.id,
+	}
+}
+
+func (n *commonNode) serializationOrder() []BidirectionalBinaryMarshaler {
+	return []BidirectionalBinaryMarshaler{
+		&n.SchemaVersion,
+		&n.Type,
+		&n.Parent,
+		&n.IDDesc,
+		&n.Depth,
+		&n.Metadata,
+		&n.SignatureAuthority,
+		&n.Signature,
+	}
+}
+
+func (n *commonNode) presignSerializationOrder() []BidirectionalBinaryMarshaler {
+	fields := n.serializationOrder()
+	fields = fields[:len(fields)-1] // drop the signature
+	return fields
+}
+
+func (n *commonNode) postsignSerializationOrder() []BidirectionalBinaryMarshaler {
+	fields := n.serializationOrder()
+	return fields[len(fields)-1:]
 }
 
 // unmarshalBinaryPreamble does the unmarshaling work for all of the common
 // node fields before the node-specific fields and returns the unused data.
 func (n *commonNode) unmarshalBinaryPreamble(b []byte) ([]byte, error) {
 	runningBytesConsumed := 0
-	if err := n.Type.UnmarshalBinary(b[:sizeofgenericType]); err != nil {
-		return nil, err
-	}
-	runningBytesConsumed += sizeofgenericType
 	if err := n.SchemaVersion.UnmarshalBinary(b[runningBytesConsumed:sizeofVersion]); err != nil {
 		return nil, err
 	}
 	runningBytesConsumed += sizeofVersion
+	if err := n.Type.UnmarshalBinary(b[:sizeofgenericType]); err != nil {
+		return nil, err
+	}
+	runningBytesConsumed += sizeofgenericType
 	if err := n.Parent.UnmarshalBinary(b[runningBytesConsumed:]); err != nil {
 		return nil, err
 	}
 	runningBytesConsumed += minSizeofQualifiedHash + int(n.Parent.Descriptor.Length)
-	if err := n.IDDesc.UnmarshalBinary(b[runningBytesConsumed:sizeofHashDescriptor]); err != nil {
-		return nil, err
-	}
-	runningBytesConsumed += sizeofHashDescriptor
 	if err := n.IDDesc.UnmarshalBinary(b[runningBytesConsumed:sizeofHashDescriptor]); err != nil {
 		return nil, err
 	}
@@ -267,10 +185,50 @@ type Identity struct {
 func newIdentity() *Identity {
 	i := new(Identity)
 	// define how to serialize this node type's fields
-	i.commonNode.WriteNodeTypeFieldsInto = func(w io.Writer) error {
-		return MarshalAllInto(w, i.Name, i.PublicKey)
-	}
 	return i
+}
+
+func (i *Identity) serializationOrder() []BidirectionalBinaryMarshaler {
+	return []BidirectionalBinaryMarshaler{&i.Name, &i.PublicKey}
+}
+
+func (i Identity) MarshalSignedData() ([]byte, error) {
+	buf := new(bytes.Buffer)
+	if err := MarshalAllInto(buf, asMarshaler(i.presignSerializationOrder())...); err != nil {
+		return nil, err
+	}
+	if err := MarshalAllInto(buf, asMarshaler(i.serializationOrder())...); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+func (i Identity) Signature() QualifiedSignature {
+	return i.commonNode.Signature
+}
+
+func (i Identity) SignatureIdentityHash() QualifiedHash {
+	return i.commonNode.SignatureAuthority
+}
+
+func (i Identity) IsIdentity() bool {
+	return true
+}
+
+func (i Identity) HashDescriptor() *HashDescriptor {
+	return &i.commonNode.IDDesc
+}
+
+func (i Identity) MarshalBinary() ([]byte, error) {
+	signed, err := i.MarshalSignedData()
+	if err != nil {
+		return nil, err
+	}
+	buf := bytes.NewBuffer(signed)
+	if err := MarshalAllInto(buf, asMarshaler(i.postsignSerializationOrder())...); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
 }
 
 func UnmarshalIdentity(b []byte) (*Identity, error) {
@@ -310,9 +268,6 @@ type Community struct {
 func newCommunity() *Community {
 	c := new(Community)
 	// define how to serialize this node type's fields
-	c.commonNode.WriteNodeTypeFieldsInto = func(w io.Writer) error {
-		return MarshalAllInto(w, c.Name)
-	}
 	return c
 }
 
@@ -324,9 +279,6 @@ type Conversation struct {
 func newConversation() *Conversation {
 	c := new(Conversation)
 	// define how to serialize this node type's fields
-	c.commonNode.WriteNodeTypeFieldsInto = func(w io.Writer) error {
-		return MarshalAllInto(w, c.Content)
-	}
 	return c
 }
 
@@ -339,8 +291,5 @@ type Reply struct {
 func newReply() *Reply {
 	r := new(Reply)
 	// define how to serialize this node type's fields
-	r.commonNode.WriteNodeTypeFieldsInto = func(w io.Writer) error {
-		return MarshalAllInto(w, r.ConversationID, r.Content)
-	}
 	return r
 }

@@ -43,10 +43,11 @@ func (p IdentityBuilder) New(privkey *openpgp.Entity, name *QualifiedContent, me
 	identity.IDDesc = *idDesc
 
 	// we've defined all pre-signature fields, it's time to sign the data
-	signedData := new(bytes.Buffer)
-	if err := identity.WriteDataForSigningInto(signedData); err != nil {
+	signedDataBytes, err := identity.MarshalSignedData()
+	if err != nil {
 		return nil, err
 	}
+	signedData := bytes.NewBuffer(signedDataBytes)
 	signature := new(bytes.Buffer)
 	if err := openpgp.DetachSign(signature, privkey, signedData, nil); err != nil {
 		return nil, err
@@ -55,10 +56,10 @@ func (p IdentityBuilder) New(privkey *openpgp.Entity, name *QualifiedContent, me
 	if err != nil {
 		return nil, err
 	}
-	identity.Signature = *qs
+	identity.commonNode.Signature = *qs
 
 	// determine the node's final hash ID
-	id, err := identity.computeID()
+	id, err := computeID(identity)
 	if err != nil {
 		return nil, err
 	}
