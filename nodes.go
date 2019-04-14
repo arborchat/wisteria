@@ -273,6 +273,14 @@ func newIdentity() *Identity {
 	return i
 }
 
+func UnmarshalIdentity(b []byte) (*Identity, error) {
+	i := newIdentity()
+	if err := i.UnmarshalBinary(b); err != nil {
+		return nil, err
+	}
+	return i, nil
+}
+
 func (i *Identity) UnmarshalBinary(b []byte) error {
 	unused, err := i.commonNode.unmarshalBinaryPreamble(b)
 	if err != nil {
