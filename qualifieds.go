@@ -2,6 +2,7 @@ package forest
 
 import (
 	"bytes"
+	"encoding/base64"
 	"fmt"
 )
 
@@ -101,6 +102,12 @@ func (q *QualifiedHash) BytesConsumed() int {
 	return minSizeofQualifiedHash + len([]byte(q.Value))
 }
 
+func (q QualifiedHash) MarshalText() ([]byte, error) {
+	hashData := base64.StdEncoding.EncodeToString([]byte(q.Value))
+	text := fmt.Sprintf("Hash(%s,len:%d):%s", hashNames[HashType(q.Descriptor.Type)], q.Descriptor.Length, hashData)
+	return []byte(text), nil
+}
+
 type QualifiedContent qualified
 
 const minSizeofQualifiedContent = sizeofContentDescriptor
@@ -125,6 +132,17 @@ func (q *QualifiedContent) SizeConstraints() (int, bool) {
 
 func (q *QualifiedContent) BytesConsumed() int {
 	return minSizeofQualifiedContent + len([]byte(q.Value))
+}
+
+func (q QualifiedContent) MarshalText() ([]byte, error) {
+	var contentData []byte
+	if ContentType(q.Descriptor.Type) == ContentTypeUTF8String || ContentType(q.Descriptor.Type) == ContentTypeJSON {
+		contentData = []byte(q.Value)
+	} else {
+		contentData = []byte(base64.StdEncoding.EncodeToString([]byte(q.Value)))
+	}
+	text := fmt.Sprintf("Content(%s,len:%d):%s", contentNames[ContentType(q.Descriptor.Type)], q.Descriptor.Length, contentData)
+	return []byte(text), nil
 }
 
 type QualifiedKey qualified
@@ -153,6 +171,12 @@ func (q *QualifiedKey) BytesConsumed() int {
 	return minSizeofQualifiedKey + len([]byte(q.Value))
 }
 
+func (q QualifiedKey) MarshalText() ([]byte, error) {
+	keyData := base64.StdEncoding.EncodeToString([]byte(q.Value))
+	text := fmt.Sprintf("Key(%s,len:%d):%s", keyNames[KeyType(q.Descriptor.Type)], q.Descriptor.Length, keyData)
+	return []byte(text), nil
+}
+
 type QualifiedSignature qualified
 
 const minSizeofQualifiedSignature = sizeofSignatureDescriptor
@@ -177,4 +201,10 @@ func (q *QualifiedSignature) SizeConstraints() (int, bool) {
 
 func (q *QualifiedSignature) BytesConsumed() int {
 	return minSizeofQualifiedSignature + len([]byte(q.Value))
+}
+
+func (q QualifiedSignature) MarshalText() ([]byte, error) {
+	signatureData := base64.StdEncoding.EncodeToString([]byte(q.Value))
+	text := fmt.Sprintf("Signature(%s,len:%d):%s", signatureNames[SignatureType(q.Descriptor.Type)], q.Descriptor.Length, signatureData)
+	return []byte(text), nil
 }

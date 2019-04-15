@@ -2,6 +2,8 @@ package forest
 
 import (
 	"bytes"
+	"encoding"
+	"io"
 )
 
 // generic node
@@ -139,6 +141,53 @@ func (i *Identity) UnmarshalBinary(b []byte) error {
 		return err
 	}
 	return nil
+}
+
+func marshalTextWithPrefix(w io.Writer, prefix string, target encoding.TextMarshaler) error {
+	b, err := target.MarshalText()
+	if err != nil {
+		return err
+	}
+	if _, err := w.Write([]byte(prefix)); err != nil {
+		return err
+	}
+	if _, err := w.Write(b); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (i *Identity) MarshalText() ([]byte, error) {
+	buf := new(bytes.Buffer)
+	if _, err := buf.WriteString("identity {"); err != nil {
+		return nil, err
+	}
+	id := i.ID()
+	if err := marshalTextWithPrefix(buf, "\n\tID: ", id); err != nil {
+		return nil, err
+	}
+	if err := marshalTextWithPrefix(buf, "\n\tParent: ", i.Parent); err != nil {
+		return nil, err
+	}
+	if err := marshalTextWithPrefix(buf, "\n\tName: ", i.Name); err != nil {
+		return nil, err
+	}
+	if err := marshalTextWithPrefix(buf, "\n\tPublicKey: ", i.PublicKey); err != nil {
+		return nil, err
+	}
+	if err := marshalTextWithPrefix(buf, "\n\tMetadata: ", i.Metadata); err != nil {
+		return nil, err
+	}
+	if err := marshalTextWithPrefix(buf, "\n\tSignatureAuthority: ", i.SignatureAuthority); err != nil {
+		return nil, err
+	}
+	if err := marshalTextWithPrefix(buf, "\n\tSignature: ", i.Signature()); err != nil {
+		return nil, err
+	}
+	if _, err := buf.WriteString("\n}"); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
 }
 
 type Community struct {

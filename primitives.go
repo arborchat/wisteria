@@ -207,6 +207,11 @@ var validHashTypes = map[HashType]struct{}{
 	HashTypeSHA512_256: struct{}{},
 }
 
+var hashNames = map[HashType]string{
+	HashTypeNullHash:   "null hash",
+	HashTypeSHA512_256: "SHA512/256",
+}
+
 func (t HashType) MarshalBinary() ([]byte, error) {
 	return genericType(t).MarshalBinary()
 }
@@ -240,6 +245,11 @@ const (
 var validContentTypes = map[ContentType]struct{}{
 	ContentTypeUTF8String: struct{}{},
 	ContentTypeJSON:       struct{}{},
+}
+
+var contentNames = map[ContentType]string{
+	ContentTypeUTF8String: "UTF-8",
+	ContentTypeJSON:       "JSON",
 }
 
 func (t ContentType) MarshalBinary() ([]byte, error) {
@@ -277,6 +287,11 @@ var validKeyTypes = map[KeyType]struct{}{
 	KeyTypeOpenPGP: struct{}{},
 }
 
+var keyNames = map[KeyType]string{
+	KeyTypeNoKey:   "None",
+	KeyTypeOpenPGP: "OpenPGP",
+}
+
 func (t KeyType) MarshalBinary() ([]byte, error) {
 	return genericType(t).MarshalBinary()
 }
@@ -308,6 +323,10 @@ const (
 
 var validSignatureTypes = map[SignatureType]struct{}{
 	SignatureTypeOpenPGP: struct{}{},
+}
+
+var signatureNames = map[SignatureType]string{
+	SignatureTypeOpenPGP: "OpenPGP",
 }
 
 func (t SignatureType) MarshalBinary() ([]byte, error) {
