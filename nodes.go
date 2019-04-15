@@ -140,6 +140,11 @@ func (i *Identity) UnmarshalBinary(b []byte) error {
 	if _, err := i.commonNode.unmarshalBinarySignature(unused); err != nil {
 		return err
 	}
+	idBytes, err := computeID(i)
+	if err != nil {
+		return err
+	}
+	i.id = Value(idBytes)
 	return nil
 }
 
