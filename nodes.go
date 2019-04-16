@@ -94,8 +94,8 @@ func (i Identity) MarshalSignedData() ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-func (i Identity) Signature() QualifiedSignature {
-	return i.commonNode.Signature
+func (i Identity) Signature() *QualifiedSignature {
+	return &i.commonNode.Signature
 }
 
 func (i Identity) SignatureIdentityHash() *QualifiedHash {

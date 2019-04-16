@@ -10,8 +10,8 @@ import (
 
 type SignatureValidator interface {
 	MarshalSignedData() ([]byte, error)
-	Signature() QualifiedSignature
-	SignatureIdentityHash() QualifiedHash
+	Signature() *QualifiedSignature
+	SignatureIdentityHash() *QualifiedHash
 	IsIdentity() bool
 }
 
