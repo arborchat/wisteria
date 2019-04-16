@@ -21,35 +21,28 @@ type commonNode struct {
 }
 
 // Compute and return the commonNode's ID as a Qualified Hash
-func (n commonNode) ID() QualifiedHash {
-	return QualifiedHash{
-		Descriptor: descriptor(n.IDDesc),
+func (n commonNode) ID() *QualifiedHash {
+	return &QualifiedHash{
+		Descriptor: n.IDDesc,
 		Value:      n.id,
 	}
 }
 
-func (n *commonNode) serializationOrder() []BidirectionalBinaryMarshaler {
-	return []BidirectionalBinaryMarshaler{
+func (n *commonNode) presignSerializationOrder() []BidirectionalBinaryMarshaler {
+	order := []BidirectionalBinaryMarshaler{
 		&n.SchemaVersion,
 		&n.Type,
-		&n.Parent,
-		&n.IDDesc,
-		&n.Depth,
-		&n.Metadata,
-		&n.SignatureAuthority,
-		&n.Signature,
 	}
-}
-
-func (n *commonNode) presignSerializationOrder() []BidirectionalBinaryMarshaler {
-	fields := n.serializationOrder()
-	fields = fields[:len(fields)-1] // drop the signature
-	return fields
+	order = append(order, n.Parent.serializationOrder()...)
+	order = append(order, n.IDDesc.serializationOrder()...)
+	order = append(order, &n.Depth)
+	order = append(order, n.Metadata.serializationOrder()...)
+	order = append(order, n.SignatureAuthority.serializationOrder()...)
+	return order
 }
 
 func (n *commonNode) postsignSerializationOrder() []BidirectionalBinaryMarshaler {
-	fields := n.serializationOrder()
-	return fields[len(fields)-1:]
+	return n.Signature.serializationOrder()
 }
 
 // unmarshalBinaryPreamble does the unmarshaling work for all of the common
@@ -77,8 +70,17 @@ func newIdentity() *Identity {
 	return i
 }
 
+func (i *Identity) nodeSpecificSerializationOrder() []BidirectionalBinaryMarshaler {
+	order := i.Name.serializationOrder()
+	order = append(order, i.PublicKey.serializationOrder()...)
+	return order
+}
+
 func (i *Identity) serializationOrder() []BidirectionalBinaryMarshaler {
-	return []BidirectionalBinaryMarshaler{&i.Name, &i.PublicKey}
+	order := i.commonNode.presignSerializationOrder()
+	order = append(order, i.nodeSpecificSerializationOrder()...)
+	order = append(order, i.commonNode.postsignSerializationOrder()...)
+	return order
 }
 
 func (i Identity) MarshalSignedData() ([]byte, error) {
@@ -86,7 +88,7 @@ func (i Identity) MarshalSignedData() ([]byte, error) {
 	if err := MarshalAllInto(buf, asMarshaler(i.presignSerializationOrder())...); err != nil {
 		return nil, err
 	}
-	if err := MarshalAllInto(buf, asMarshaler(i.serializationOrder())...); err != nil {
+	if err := MarshalAllInto(buf, asMarshaler(i.nodeSpecificSerializationOrder())...); err != nil {
 		return nil, err
 	}
 	return buf.Bytes(), nil
@@ -96,8 +98,8 @@ func (i Identity) Signature() QualifiedSignature {
 	return i.commonNode.Signature
 }
 
-func (i Identity) SignatureIdentityHash() QualifiedHash {
-	return i.commonNode.SignatureAuthority
+func (i Identity) SignatureIdentityHash() *QualifiedHash {
+	return &i.commonNode.SignatureAuthority
 }
 
 func (i Identity) IsIdentity() bool {
@@ -162,7 +164,7 @@ func marshalTextWithPrefix(w io.Writer, prefix string, target encoding.TextMarsh
 	return nil
 }
 
-func (i *Identity) MarshalText() ([]byte, error) {
+/*func (i *Identity) MarshalText() ([]byte, error) {
 	buf := new(bytes.Buffer)
 	if _, err := buf.WriteString("identity {"); err != nil {
 		return nil, err
@@ -193,7 +195,7 @@ func (i *Identity) MarshalText() ([]byte, error) {
 		return nil, err
 	}
 	return buf.Bytes(), nil
-}
+}*/
 
 type Community struct {
 	commonNode

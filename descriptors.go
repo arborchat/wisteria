@@ -1,165 +1,84 @@
 package forest
 
-import (
-	"bytes"
-	"fmt"
-)
-
-// generic descriptor
-type descriptor struct {
-	Type   genericType
-	Length ContentLength
-}
-
 const sizeofDescriptor = sizeofgenericType + sizeofContentLength
 
-func newDescriptor(t genericType, length int) (*descriptor, error) {
-	if length > MaxContentLength {
-		return nil, fmt.Errorf("Cannot represent content of length %d, max is %d", length, MaxContentLength)
-	}
-	d := descriptor{}
-	d.Type = t
-	d.Length = ContentLength(length)
-	return &d, nil
-}
-
-func (d descriptor) MarshalBinary() ([]byte, error) {
-	b, err := d.Type.MarshalBinary()
-	if err != nil {
-		return nil, err
-	}
-	buf := bytes.NewBuffer(b)
-	b, err = d.Length.MarshalBinary()
-	if err != nil {
-		return nil, err
-	}
-	_, err = buf.Write(b)
-	if err != nil {
-		return nil, err
-	}
-	return buf.Bytes(), nil
-
-}
-
-func (d *descriptor) UnmarshalBinary(b []byte) error {
-	if len(b) != sizeofDescriptor {
-		return fmt.Errorf("Expected %d bytes, got %d", sizeofDescriptor, len(b))
-	}
-	if err := (&d.Type).UnmarshalBinary(b[:sizeofgenericType]); err != nil {
-		return err
-	}
-	if err := (&d.Length).UnmarshalBinary(b[sizeofgenericType:]); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (d *descriptor) SizeConstraints() (int, bool) {
-	return sizeofDescriptor, false
-}
-
-func (d *descriptor) BytesConsumed() int {
-	return sizeofDescriptor
-}
-
 // concrete descriptors
-type HashDescriptor descriptor
+type HashDescriptor struct {
+	Type   HashType
+	Length ContentLength
+}
 
 const sizeofHashDescriptor = sizeofDescriptor
 
 func NewHashDescriptor(t HashType, length int) (*HashDescriptor, error) {
-	d, err := newDescriptor(genericType(t), length)
-	return (*HashDescriptor)(d), err
+	cLength, err := NewContentLength(length)
+	if err != nil {
+		return nil, err
+	}
+	return &HashDescriptor{t, *cLength}, nil
 }
 
-func (d HashDescriptor) MarshalBinary() ([]byte, error) {
-	return descriptor(d).MarshalBinary()
+func (d *HashDescriptor) serializationOrder() []BidirectionalBinaryMarshaler {
+	return []BidirectionalBinaryMarshaler{&d.Type, &d.Length}
 }
 
-func (d *HashDescriptor) UnmarshalBinary(b []byte) error {
-	return (*descriptor)(d).UnmarshalBinary(b)
+func (d *HashDescriptor) Equals(other *HashDescriptor) bool {
+	return d.Type == other.Type && d.Length == other.Length
 }
 
-func (d *HashDescriptor) SizeConstraints() (int, bool) {
-	return (*descriptor)(d).SizeConstraints()
+type ContentDescriptor struct {
+	Type   ContentType
+	Length ContentLength
 }
-
-func (d *HashDescriptor) BytesConsumed() int {
-	return (*descriptor)(d).BytesConsumed()
-}
-
-type ContentDescriptor descriptor
 
 const sizeofContentDescriptor = sizeofDescriptor
 
 func NewContentDescriptor(t ContentType, length int) (*ContentDescriptor, error) {
-	d, err := newDescriptor(genericType(t), length)
-	return (*ContentDescriptor)(d), err
+	cLength, err := NewContentLength(length)
+	if err != nil {
+		return nil, err
+	}
+	return &ContentDescriptor{t, *cLength}, nil
 }
 
-func (d ContentDescriptor) MarshalBinary() ([]byte, error) {
-	return descriptor(d).MarshalBinary()
+func (d *ContentDescriptor) serializationOrder() []BidirectionalBinaryMarshaler {
+	return []BidirectionalBinaryMarshaler{&d.Type, &d.Length}
 }
 
-func (d *ContentDescriptor) UnmarshalBinary(b []byte) error {
-	return (*descriptor)(d).UnmarshalBinary(b)
+type SignatureDescriptor struct {
+	Type   SignatureType
+	Length ContentLength
 }
-
-func (d *ContentDescriptor) SizeConstraints() (int, bool) {
-	return (*descriptor)(d).SizeConstraints()
-}
-
-func (d *ContentDescriptor) BytesConsumed() int {
-	return (*descriptor)(d).BytesConsumed()
-}
-
-type SignatureDescriptor descriptor
 
 const sizeofSignatureDescriptor = sizeofDescriptor
 
 func NewSignatureDescriptor(t SignatureType, length int) (*SignatureDescriptor, error) {
-	d, err := newDescriptor(genericType(t), length)
-	return (*SignatureDescriptor)(d), err
+	cLength, err := NewContentLength(length)
+	if err != nil {
+		return nil, err
+	}
+	return &SignatureDescriptor{t, *cLength}, nil
 }
 
-func (d SignatureDescriptor) MarshalBinary() ([]byte, error) {
-	return descriptor(d).MarshalBinary()
+func (d *SignatureDescriptor) serializationOrder() []BidirectionalBinaryMarshaler {
+	return []BidirectionalBinaryMarshaler{&d.Type, &d.Length}
 }
 
-func (d *SignatureDescriptor) UnmarshalBinary(b []byte) error {
-	return (*descriptor)(d).UnmarshalBinary(b)
+type KeyDescriptor struct {
+	Type   KeyType
+	Length ContentLength
 }
-
-func (d *SignatureDescriptor) SizeConstraints() (int, bool) {
-	return (*descriptor)(d).SizeConstraints()
-}
-
-func (d *SignatureDescriptor) BytesConsumed() int {
-	return (*descriptor)(d).BytesConsumed()
-}
-
-type KeyDescriptor descriptor
 
 const sizeofKeyDescriptor = sizeofDescriptor
 
 func NewKeyDescriptor(t KeyType, length int) (*KeyDescriptor, error) {
-	d, err := newDescriptor(genericType(t), length)
-	return (*KeyDescriptor)(d), err
+	cLength, err := NewContentLength(length)
+	if err != nil {
+		return nil, err
+	}
+	return &KeyDescriptor{t, *cLength}, nil
 }
 
-func (d KeyDescriptor) MarshalBinary() ([]byte, error) {
-	return descriptor(d).MarshalBinary()
-}
-
-func (d *KeyDescriptor) UnmarshalBinary(b []byte) error {
-	return (*descriptor)(d).UnmarshalBinary(b)
-}
-
-func (d *KeyDescriptor) SizeConstraints() (int, bool) {
-	return (*descriptor)(d).SizeConstraints()
-}
-
-func (d *KeyDescriptor) BytesConsumed() int {
-	return (*descriptor)(d).BytesConsumed()
+func (d *KeyDescriptor) serializationOrder() []BidirectionalBinaryMarshaler {
+	return []BidirectionalBinaryMarshaler{&d.Type, &d.Length}
 }

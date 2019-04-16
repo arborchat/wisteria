@@ -19,11 +19,12 @@ type SignatureValidator interface {
 // signature for the given Identity. When validating an Identity node, you should
 // pass the same Identity as the second parameter.
 func ValidateSignature(v SignatureValidator, identity *Identity) (bool, error) {
-	if qualified(v.SignatureIdentityHash()).Equals(qualified(NullHash())) {
+	sigIdHash := v.SignatureIdentityHash()
+	if sigIdHash.Equals(NullHash()) {
 		if !v.IsIdentity() {
 			return false, fmt.Errorf("Only Identity nodes can have the null hash as their Signature Authority")
 		}
-	} else if !qualified(v.SignatureIdentityHash()).Equals(qualified(identity.ID())) {
+	} else if !sigIdHash.Equals(identity.ID()) {
 		return false, fmt.Errorf("This node was signed by a different identity")
 	}
 	// get the key used to sign this node

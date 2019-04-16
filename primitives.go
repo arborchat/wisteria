@@ -2,6 +2,7 @@ package forest
 
 import (
 	"bytes"
+	"encoding/base64"
 	"encoding/binary"
 	"fmt"
 	"math"
@@ -54,11 +55,23 @@ const (
 	MaxContentLength = math.MaxUint16
 )
 
+func NewContentLength(size int) (*ContentLength, error) {
+	if size > MaxContentLength {
+		return nil, fmt.Errorf("Cannot represent content of size %d, max is %d", size, MaxContentLength)
+	}
+	c := ContentLength(size)
+	return &c, nil
+}
+
 // MarshalBinary converts the ContentLength into its binary representation
 func (c ContentLength) MarshalBinary() ([]byte, error) {
 	b := new(bytes.Buffer)
 	err := binary.Write(b, multiByteSerializationOrder, c)
 	return b.Bytes(), err
+}
+
+func (c ContentLength) MarshalText() ([]byte, error) {
+	return []byte(fmt.Sprintf("length:%d", c)), nil
 }
 
 // UnmarshalBinary converts from the binary representation of a ContentLength
@@ -88,6 +101,10 @@ func (t TreeDepth) MarshalBinary() ([]byte, error) {
 	return b.Bytes(), err
 }
 
+func (t TreeDepth) MarshalText() ([]byte, error) {
+	return []byte(fmt.Sprintf("depth:%d", t)), nil
+}
+
 // UnmarshalBinary converts from the binary representation of a TreeDepth
 // back to its structured form
 func (t *TreeDepth) UnmarshalBinary(b []byte) error {
@@ -109,6 +126,11 @@ type Value []byte
 // MarshalBinary converts the Value into its binary representation
 func (v Value) MarshalBinary() ([]byte, error) {
 	return v, nil
+}
+
+func (v Value) MarshalText() ([]byte, error) {
+	based := base64.StdEncoding.EncodeToString([]byte(v))
+	return []byte("value:" + based), nil
 }
 
 // UnmarshalBinary converts from the binary representation of a Value
@@ -137,6 +159,10 @@ func (v Version) MarshalBinary() ([]byte, error) {
 	b := new(bytes.Buffer)
 	err := binary.Write(b, multiByteSerializationOrder, v)
 	return b.Bytes(), err
+}
+
+func (v Version) MarshalText() ([]byte, error) {
+	return []byte(fmt.Sprintf("version:%d", v)), nil
 }
 
 // UnmarshalBinary converts from the binary representation of a Version
@@ -172,8 +198,19 @@ var validNodeTypes = map[NodeType]struct{}{
 	NodeTypeReply:        struct{}{},
 }
 
+var nodeTypeNames = map[NodeType]string{
+	NodeTypeIdentity:     "identity",
+	NodeTypeCommunity:    "community",
+	NodeTypeConversation: "conversation",
+	NodeTypeReply:        "reply",
+}
+
 func (t NodeType) MarshalBinary() ([]byte, error) {
 	return genericType(t).MarshalBinary()
+}
+
+func (t NodeType) MarshalText() ([]byte, error) {
+	return []byte(nodeTypeNames[t]), nil
 }
 
 func (t *NodeType) UnmarshalBinary(b []byte) error {
@@ -216,6 +253,10 @@ func (t HashType) MarshalBinary() ([]byte, error) {
 	return genericType(t).MarshalBinary()
 }
 
+func (t HashType) MarshalText() ([]byte, error) {
+	return []byte(hashNames[t]), nil
+}
+
 func (t *HashType) UnmarshalBinary(b []byte) error {
 	if err := (*genericType)(t).UnmarshalBinary(b); err != nil {
 		return err
@@ -254,6 +295,10 @@ var contentNames = map[ContentType]string{
 
 func (t ContentType) MarshalBinary() ([]byte, error) {
 	return genericType(t).MarshalBinary()
+}
+
+func (t ContentType) MarshalText() ([]byte, error) {
+	return []byte(contentNames[t]), nil
 }
 
 func (t *ContentType) UnmarshalBinary(b []byte) error {
@@ -296,6 +341,10 @@ func (t KeyType) MarshalBinary() ([]byte, error) {
 	return genericType(t).MarshalBinary()
 }
 
+func (t KeyType) MarshalText() ([]byte, error) {
+	return []byte(keyNames[t]), nil
+}
+
 func (t *KeyType) UnmarshalBinary(b []byte) error {
 	if err := (*genericType)(t).UnmarshalBinary(b); err != nil {
 		return err
@@ -331,6 +380,10 @@ var signatureNames = map[SignatureType]string{
 
 func (t SignatureType) MarshalBinary() ([]byte, error) {
 	return genericType(t).MarshalBinary()
+}
+
+func (t SignatureType) MarshalText() ([]byte, error) {
+	return []byte(signatureNames[t]), nil
 }
 
 func (t *SignatureType) UnmarshalBinary(b []byte) error {

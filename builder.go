@@ -20,7 +20,7 @@ func (p IdentityBuilder) New(privkey *openpgp.Entity, name *QualifiedContent, me
 	identity := newIdentity()
 	identity.SchemaVersion = CurrentVersion
 	identity.Type = NodeTypeIdentity
-	identity.Parent = NullHash()
+	identity.Parent = *NullHash()
 	identity.Depth = 0
 	identity.Name = *name
 	identity.Metadata = *metadata
@@ -35,7 +35,7 @@ func (p IdentityBuilder) New(privkey *openpgp.Entity, name *QualifiedContent, me
 		return nil, err
 	}
 	identity.PublicKey = *qKey
-	identity.SignatureAuthority = NullHash()
+	identity.SignatureAuthority = *NullHash()
 	idDesc, err := NewHashDescriptor(HashTypeSHA512_256, int(HashDigestLengthSHA512_256))
 	if err != nil {
 		return nil, err

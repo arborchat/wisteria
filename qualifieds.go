@@ -1,210 +1,100 @@
 package forest
 
-import (
-	"bytes"
-	"encoding/base64"
-	"fmt"
-)
-
-// generic qualified data
-type qualified struct {
-	Descriptor descriptor
-	Value
-}
+import "bytes"
 
 const minSizeofQualified = sizeofDescriptor
 
-// newQualified creates a valid qualified from the given data
-func newQualified(t genericType, content []byte) (*qualified, error) {
-	q := qualified{}
-	d, err := newDescriptor(t, len(content))
-	if err != nil {
-		return nil, err
-	}
-	q.Descriptor = *d
-	q.Value = Value(content)
-	return &q, nil
-}
-
-func (q qualified) MarshalBinary() ([]byte, error) {
-	b, err := q.Descriptor.MarshalBinary()
-	if err != nil {
-		return nil, err
-	}
-	buf := bytes.NewBuffer(b)
-	_, err = buf.Write([]byte(q.Value))
-	if err != nil {
-		return nil, err
-	}
-	return buf.Bytes(), nil
-}
-
-func (q *qualified) UnmarshalBinary(b []byte) error {
-	if len(b) < sizeofDescriptor {
-		return fmt.Errorf("Not enough data for qualified type, need at least %d bytes, have %d", sizeofDescriptor, len(b))
-	}
-	if err := (&q.Descriptor).UnmarshalBinary(b[:sizeofDescriptor]); err != nil {
-		return err
-	}
-	var length = sizeofDescriptor + q.Descriptor.Length
-	if err := (&q.Value).UnmarshalBinary(b[sizeofDescriptor:length]); err != nil {
-		return err
-	}
-	return nil
-}
-
-func (q qualified) Equals(o qualified) bool {
-	return q.Descriptor == o.Descriptor && bytes.Equal([]byte(q.Value), []byte(o.Value))
-}
-
-func (q *qualified) SizeConstraints() (int, bool) {
-	return minSizeofQualified, true
-}
-
-func (q *qualified) BytesConsumed() int {
-	return minSizeofQualified + len([]byte(q.Value))
-}
-
 // concrete qualified data types
-type QualifiedHash qualified
+type QualifiedHash struct {
+	Descriptor HashDescriptor
+	Value      Value
+}
 
 const minSizeofQualifiedHash = sizeofHashDescriptor
 
 // NewQualifiedHash returns a valid QualifiedHash from the given data
 func NewQualifiedHash(t HashType, content []byte) (*QualifiedHash, error) {
-	q, e := newQualified(genericType(t), content)
-	return (*QualifiedHash)(q), e
+	hd, err := NewHashDescriptor(t, len(content))
+	if err != nil {
+		return nil, err
+	}
+	return &QualifiedHash{*hd, Value(content)}, nil
 }
 
-func NullHash() QualifiedHash {
-	return QualifiedHash{
-		Descriptor: descriptor{
-			Type:   genericType(HashTypeNullHash),
+func NullHash() *QualifiedHash {
+	return &QualifiedHash{
+		Descriptor: HashDescriptor{
+			Type:   HashTypeNullHash,
 			Length: 0,
 		},
 		Value: []byte{},
 	}
 }
 
-func (q QualifiedHash) MarshalBinary() ([]byte, error) {
-	return qualified(q).MarshalBinary()
+func (q *QualifiedHash) serializationOrder() []BidirectionalBinaryMarshaler {
+	return append(q.Descriptor.serializationOrder(), &q.Value)
 }
 
-func (q *QualifiedHash) UnmarshalBinary(b []byte) error {
-	return (*qualified)(q).UnmarshalBinary(b)
+func (q *QualifiedHash) Equals(other *QualifiedHash) bool {
+	return q.Descriptor.Equals(&other.Descriptor) && bytes.Equal([]byte(q.Value), []byte(other.Value))
 }
 
-func (q *QualifiedHash) SizeConstraints() (int, bool) {
-	return minSizeofQualifiedHash, true
+type QualifiedContent struct {
+	Descriptor ContentDescriptor
+	Value      Value
 }
-
-func (q *QualifiedHash) BytesConsumed() int {
-	return minSizeofQualifiedHash + len([]byte(q.Value))
-}
-
-func (q QualifiedHash) MarshalText() ([]byte, error) {
-	hashData := base64.StdEncoding.EncodeToString([]byte(q.Value))
-	text := fmt.Sprintf("Hash(%s,len:%d):%s", hashNames[HashType(q.Descriptor.Type)], q.Descriptor.Length, hashData)
-	return []byte(text), nil
-}
-
-type QualifiedContent qualified
 
 const minSizeofQualifiedContent = sizeofContentDescriptor
 
 // NewQualifiedContent returns a valid QualifiedContent from the given data
 func NewQualifiedContent(t ContentType, content []byte) (*QualifiedContent, error) {
-	q, e := newQualified(genericType(t), content)
-	return (*QualifiedContent)(q), e
-}
-
-func (q QualifiedContent) MarshalBinary() ([]byte, error) {
-	return qualified(q).MarshalBinary()
-}
-
-func (q *QualifiedContent) UnmarshalBinary(b []byte) error {
-	return (*qualified)(q).UnmarshalBinary(b)
-}
-
-func (q *QualifiedContent) SizeConstraints() (int, bool) {
-	return minSizeofQualifiedContent, true
-}
-
-func (q *QualifiedContent) BytesConsumed() int {
-	return minSizeofQualifiedContent + len([]byte(q.Value))
-}
-
-func (q QualifiedContent) MarshalText() ([]byte, error) {
-	var contentData []byte
-	if ContentType(q.Descriptor.Type) == ContentTypeUTF8String || ContentType(q.Descriptor.Type) == ContentTypeJSON {
-		contentData = []byte(q.Value)
-	} else {
-		contentData = []byte(base64.StdEncoding.EncodeToString([]byte(q.Value)))
+	hd, err := NewContentDescriptor(t, len(content))
+	if err != nil {
+		return nil, err
 	}
-	text := fmt.Sprintf("Content(%s,len:%d):%s", contentNames[ContentType(q.Descriptor.Type)], q.Descriptor.Length, contentData)
-	return []byte(text), nil
+	return &QualifiedContent{*hd, Value(content)}, nil
 }
 
-type QualifiedKey qualified
+func (q *QualifiedContent) serializationOrder() []BidirectionalBinaryMarshaler {
+	return append(q.Descriptor.serializationOrder(), &q.Value)
+}
+
+type QualifiedKey struct {
+	Descriptor KeyDescriptor
+	Value      Value
+}
 
 const minSizeofQualifiedKey = sizeofKeyDescriptor
 
 // NewQualifiedKey returns a valid QualifiedKey from the given data
 func NewQualifiedKey(t KeyType, content []byte) (*QualifiedKey, error) {
-	q, e := newQualified(genericType(t), content)
-	return (*QualifiedKey)(q), e
+	hd, err := NewKeyDescriptor(t, len(content))
+	if err != nil {
+		return nil, err
+	}
+	return &QualifiedKey{*hd, Value(content)}, nil
 }
 
-func (q QualifiedKey) MarshalBinary() ([]byte, error) {
-	return qualified(q).MarshalBinary()
+func (q *QualifiedKey) serializationOrder() []BidirectionalBinaryMarshaler {
+	return append(q.Descriptor.serializationOrder(), &q.Value)
 }
 
-func (q *QualifiedKey) UnmarshalBinary(b []byte) error {
-	return (*qualified)(q).UnmarshalBinary(b)
+type QualifiedSignature struct {
+	Descriptor SignatureDescriptor
+	Value      Value
 }
-
-func (q *QualifiedKey) SizeConstraints() (int, bool) {
-	return minSizeofQualifiedKey, true
-}
-
-func (q *QualifiedKey) BytesConsumed() int {
-	return minSizeofQualifiedKey + len([]byte(q.Value))
-}
-
-func (q QualifiedKey) MarshalText() ([]byte, error) {
-	keyData := base64.StdEncoding.EncodeToString([]byte(q.Value))
-	text := fmt.Sprintf("Key(%s,len:%d):%s", keyNames[KeyType(q.Descriptor.Type)], q.Descriptor.Length, keyData)
-	return []byte(text), nil
-}
-
-type QualifiedSignature qualified
 
 const minSizeofQualifiedSignature = sizeofSignatureDescriptor
 
 // NewQualifiedSignature returns a valid QualifiedSignature from the given data
 func NewQualifiedSignature(t SignatureType, content []byte) (*QualifiedSignature, error) {
-	q, e := newQualified(genericType(t), content)
-	return (*QualifiedSignature)(q), e
+	hd, err := NewSignatureDescriptor(t, len(content))
+	if err != nil {
+		return nil, err
+	}
+	return &QualifiedSignature{*hd, Value(content)}, nil
 }
 
-func (q QualifiedSignature) MarshalBinary() ([]byte, error) {
-	return qualified(q).MarshalBinary()
-}
-
-func (q *QualifiedSignature) UnmarshalBinary(b []byte) error {
-	return (*qualified)(q).UnmarshalBinary(b)
-}
-
-func (q *QualifiedSignature) SizeConstraints() (int, bool) {
-	return minSizeofQualifiedSignature, true
-}
-
-func (q *QualifiedSignature) BytesConsumed() int {
-	return minSizeofQualifiedSignature + len([]byte(q.Value))
-}
-
-func (q QualifiedSignature) MarshalText() ([]byte, error) {
-	signatureData := base64.StdEncoding.EncodeToString([]byte(q.Value))
-	text := fmt.Sprintf("Signature(%s,len:%d):%s", signatureNames[SignatureType(q.Descriptor.Type)], q.Descriptor.Length, signatureData)
-	return []byte(text), nil
+func (q *QualifiedSignature) serializationOrder() []BidirectionalBinaryMarshaler {
+	return append(q.Descriptor.serializationOrder(), &q.Value)
 }

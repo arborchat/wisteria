@@ -20,7 +20,7 @@ func computeID(h Hashable) ([]byte, error) {
 		HashTypeSHA512_256: sha512.New512_256,
 	}
 	hd := h.HashDescriptor()
-	if HashType(hd.Type) == HashTypeNullHash {
+	if hd.Type == HashTypeNullHash {
 		return []byte{}, nil
 	}
 	binaryContent, err := h.MarshalBinary()
@@ -46,8 +46,8 @@ func ValidateID(h Hashable, expected QualifiedHash) (bool, error) {
 		return false, err
 	}
 	computedID := QualifiedHash{
-		Descriptor: descriptor(*h.HashDescriptor()),
+		Descriptor: *h.HashDescriptor(),
 		Value:      Value(id),
 	}
-	return qualified(expected).Equals(qualified(computedID)), nil
+	return expected.Equals(&computedID), nil
 }
