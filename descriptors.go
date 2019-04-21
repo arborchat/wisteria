@@ -23,7 +23,7 @@ func (d *HashDescriptor) serializationOrder() []BidirectionalBinaryMarshaler {
 }
 
 func (d *HashDescriptor) Equals(other *HashDescriptor) bool {
-	return d.Type == other.Type && d.Length == other.Length
+	return d.Type.Equals(&other.Type) && d.Length.Equals(&other.Length)
 }
 
 type ContentDescriptor struct {
@@ -45,6 +45,10 @@ func (d *ContentDescriptor) serializationOrder() []BidirectionalBinaryMarshaler 
 	return []BidirectionalBinaryMarshaler{&d.Type, &d.Length}
 }
 
+func (d *ContentDescriptor) Equals(other *ContentDescriptor) bool {
+	return d.Type.Equals(&other.Type) && d.Length.Equals(&other.Length)
+}
+
 type SignatureDescriptor struct {
 	Type   SignatureType
 	Length ContentLength
@@ -64,6 +68,10 @@ func (d *SignatureDescriptor) serializationOrder() []BidirectionalBinaryMarshale
 	return []BidirectionalBinaryMarshaler{&d.Type, &d.Length}
 }
 
+func (d *SignatureDescriptor) Equals(other *SignatureDescriptor) bool {
+	return d.Type.Equals(&other.Type) && d.Length.Equals(&other.Length)
+}
+
 type KeyDescriptor struct {
 	Type   KeyType
 	Length ContentLength
@@ -81,4 +89,8 @@ func NewKeyDescriptor(t KeyType, length int) (*KeyDescriptor, error) {
 
 func (d *KeyDescriptor) serializationOrder() []BidirectionalBinaryMarshaler {
 	return []BidirectionalBinaryMarshaler{&d.Type, &d.Length}
+}
+
+func (d *KeyDescriptor) Equals(other *KeyDescriptor) bool {
+	return d.Type.Equals(&other.Type) && d.Length.Equals(&other.Length)
 }

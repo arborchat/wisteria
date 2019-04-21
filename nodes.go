@@ -57,6 +57,17 @@ func (n *commonNode) unmarshalBinarySignature(b []byte) ([]byte, error) {
 	return UnmarshalAll(b, asUnmarshaler(n.postsignSerializationOrder())...)
 }
 
+func (n *commonNode) Equals(n2 *commonNode) bool {
+	return n.Type.Equals(&n2.Type) &&
+		n.SchemaVersion.Equals(&n2.SchemaVersion) &&
+		n.Parent.Equals(&n2.Parent) &&
+		n.IDDesc.Equals(&n2.IDDesc) &&
+		n.Depth.Equals(&n2.Depth) &&
+		n.Metadata.Equals(&n2.Metadata) &&
+		n.SignatureAuthority.Equals(&n2.SignatureAuthority) &&
+		n.Signature.Equals(&n2.Signature)
+}
+
 // concrete nodes
 type Identity struct {
 	commonNode
@@ -196,6 +207,12 @@ func marshalTextWithPrefix(w io.Writer, prefix string, target encoding.TextMarsh
 	}
 	return buf.Bytes(), nil
 }*/
+
+func (i *Identity) Equals(i2 *Identity) bool {
+	return i.commonNode.Equals(&i2.commonNode) &&
+		i.Name.Equals(&i2.Name) &&
+		i.PublicKey.Equals(&i2.PublicKey)
+}
 
 type Community struct {
 	commonNode

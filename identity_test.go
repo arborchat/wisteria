@@ -48,3 +48,18 @@ func TestIdentityValidationFailsWhenTampered(t *testing.T) {
 		t.Error("Signature validation succeeded on modified node", err)
 	}
 }
+
+func TestIdentitySerialize(t *testing.T) {
+	identity := MakeIdentityOrSkip(t)
+	buf, err := identity.MarshalBinary()
+	if err != nil {
+		t.Error("Failed to serialize identity", err)
+	}
+	id2, err := forest.UnmarshalIdentity(buf)
+	if err != nil {
+		t.Error("Failed to deserialize identity", err)
+	}
+	if !identity.Equals(id2) {
+		t.Errorf("Deserialized identity should be the same as what went in, expected %v, got %v", identity, id2)
+	}
+}

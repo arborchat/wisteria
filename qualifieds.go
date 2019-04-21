@@ -1,7 +1,5 @@
 package forest
 
-import "bytes"
-
 const minSizeofQualified = sizeofDescriptor
 
 // concrete qualified data types
@@ -36,7 +34,7 @@ func (q *QualifiedHash) serializationOrder() []BidirectionalBinaryMarshaler {
 }
 
 func (q *QualifiedHash) Equals(other *QualifiedHash) bool {
-	return q.Descriptor.Equals(&other.Descriptor) && bytes.Equal([]byte(q.Value), []byte(other.Value))
+	return q.Descriptor.Equals(&other.Descriptor) && q.Value.Equals(&other.Value)
 }
 
 type QualifiedContent struct {
@@ -59,6 +57,10 @@ func (q *QualifiedContent) serializationOrder() []BidirectionalBinaryMarshaler {
 	return append(q.Descriptor.serializationOrder(), &q.Value)
 }
 
+func (q *QualifiedContent) Equals(other *QualifiedContent) bool {
+	return q.Descriptor.Equals(&other.Descriptor) && q.Value.Equals(&other.Value)
+}
+
 type QualifiedKey struct {
 	Descriptor KeyDescriptor
 	Value      Value
@@ -79,6 +81,10 @@ func (q *QualifiedKey) serializationOrder() []BidirectionalBinaryMarshaler {
 	return append(q.Descriptor.serializationOrder(), &q.Value)
 }
 
+func (q *QualifiedKey) Equals(other *QualifiedKey) bool {
+	return q.Descriptor.Equals(&other.Descriptor) && q.Value.Equals(&other.Value)
+}
+
 type QualifiedSignature struct {
 	Descriptor SignatureDescriptor
 	Value      Value
@@ -97,4 +103,8 @@ func NewQualifiedSignature(t SignatureType, content []byte) (*QualifiedSignature
 
 func (q *QualifiedSignature) serializationOrder() []BidirectionalBinaryMarshaler {
 	return append(q.Descriptor.serializationOrder(), &q.Value)
+}
+
+func (q *QualifiedSignature) Equals(other *QualifiedSignature) bool {
+	return q.Descriptor.Equals(&other.Descriptor) && q.Value.Equals(&other.Value)
 }

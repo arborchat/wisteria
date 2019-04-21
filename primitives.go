@@ -44,6 +44,10 @@ func (g *genericType) BytesConsumed() int {
 	return sizeofgenericType
 }
 
+func (g *genericType) Equals(g2 *genericType) bool {
+	return *g == *g2
+}
+
 // ContentLength represents the length of a piece of data in the Forest
 type ContentLength uint16
 
@@ -89,6 +93,10 @@ func (c *ContentLength) BytesConsumed() int {
 	return sizeofContentLength
 }
 
+func (c *ContentLength) Equals(c2 *ContentLength) bool {
+	return *c == *c2
+}
+
 // TreeDepth represents the depth of a node within a tree
 type TreeDepth uint32
 
@@ -120,6 +128,10 @@ func (t *TreeDepth) BytesConsumed() int {
 	return sizeofTreeDepth
 }
 
+func (t *TreeDepth) Equals(t2 *TreeDepth) bool {
+	return *t == *t2
+}
+
 // Value represents a quantity of arbitrary binary data in the Forest
 type Value []byte
 
@@ -146,6 +158,10 @@ func (v *Value) SizeConstraints() (int, bool) {
 
 func (v *Value) BytesConsumed() int {
 	return len([]byte(*v))
+}
+
+func (v *Value) Equals(v2 *Value) bool {
+	return bytes.Equal([]byte(*v), []byte(*v2))
 }
 
 // Version represents the version of the Arbor Forest Schema used to construct
@@ -178,6 +194,10 @@ func (v *Version) SizeConstraints() (int, bool) {
 
 func (v *Version) BytesConsumed() int {
 	return sizeofVersion
+}
+
+func (v *Version) Equals(v2 *Version) bool {
+	return *v == *v2
 }
 
 // specialized types
@@ -231,6 +251,10 @@ func (t *NodeType) BytesConsumed() int {
 	return sizeofNodeType
 }
 
+func (t *NodeType) Equals(t2 *NodeType) bool {
+	return ((*genericType)(t)).Equals((*genericType)(t2))
+}
+
 type HashType genericType
 
 const (
@@ -273,6 +297,10 @@ func (t *HashType) SizeConstraints() (int, bool) {
 
 func (t *HashType) BytesConsumed() int {
 	return sizeofHashType
+}
+
+func (t *HashType) Equals(t2 *HashType) bool {
+	return ((*genericType)(t)).Equals((*genericType)(t2))
 }
 
 type ContentType genericType
@@ -319,6 +347,10 @@ func (t *ContentType) BytesConsumed() int {
 	return sizeofContentType
 }
 
+func (t *ContentType) Equals(t2 *ContentType) bool {
+	return ((*genericType)(t)).Equals((*genericType)(t2))
+}
+
 type KeyType genericType
 
 const (
@@ -363,6 +395,10 @@ func (t *KeyType) BytesConsumed() int {
 	return sizeofKeyType
 }
 
+func (t *KeyType) Equals(t2 *KeyType) bool {
+	return ((*genericType)(t)).Equals((*genericType)(t2))
+}
+
 type SignatureType genericType
 
 const (
@@ -402,4 +438,8 @@ func (t *SignatureType) SizeConstraints() (int, bool) {
 
 func (t *SignatureType) BytesConsumed() int {
 	return sizeofSignatureType
+}
+
+func (t *SignatureType) Equals(t2 *SignatureType) bool {
+	return ((*genericType)(t)).Equals((*genericType)(t2))
 }
