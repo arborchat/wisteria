@@ -33,16 +33,16 @@ func (n *commonNode) presignSerializationOrder() []BidirectionalBinaryMarshaler 
 		&n.SchemaVersion,
 		&n.Type,
 	}
-	order = append(order, n.Parent.serializationOrder()...)
+	order = append(order, &n.Parent)
 	order = append(order, n.IDDesc.serializationOrder()...)
 	order = append(order, &n.Depth)
-	order = append(order, n.Metadata.serializationOrder()...)
-	order = append(order, n.SignatureAuthority.serializationOrder()...)
+	order = append(order, &n.Metadata)
+	order = append(order, &n.SignatureAuthority)
 	return order
 }
 
 func (n *commonNode) postsignSerializationOrder() []BidirectionalBinaryMarshaler {
-	return n.Signature.serializationOrder()
+	return []BidirectionalBinaryMarshaler{&n.Signature}
 }
 
 // unmarshalBinaryPreamble does the unmarshaling work for all of the common
@@ -82,9 +82,7 @@ func newIdentity() *Identity {
 }
 
 func (i *Identity) nodeSpecificSerializationOrder() []BidirectionalBinaryMarshaler {
-	order := i.Name.serializationOrder()
-	order = append(order, i.PublicKey.serializationOrder()...)
-	return order
+	return []BidirectionalBinaryMarshaler{&i.Name, &i.PublicKey}
 }
 
 func (i *Identity) serializationOrder() []BidirectionalBinaryMarshaler {
@@ -142,15 +140,8 @@ func UnmarshalIdentity(b []byte) (*Identity, error) {
 }
 
 func (i *Identity) UnmarshalBinary(b []byte) error {
-	unused, err := i.commonNode.unmarshalBinaryPreamble(b)
+	_, err := UnmarshalAll(b, asUnmarshaler(i.serializationOrder())...)
 	if err != nil {
-		return err
-	}
-	unused, err = UnmarshalAll(unused, asUnmarshaler(i.serializationOrder())...)
-	if err != nil {
-		return err
-	}
-	if _, err := i.commonNode.unmarshalBinarySignature(unused); err != nil {
 		return err
 	}
 	idBytes, err := computeID(i)

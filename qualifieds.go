@@ -1,5 +1,7 @@
 package forest
 
+import "bytes"
+
 const minSizeofQualified = sizeofDescriptor
 
 // concrete qualified data types
@@ -27,6 +29,29 @@ func NullHash() *QualifiedHash {
 		},
 		Value: []byte{},
 	}
+}
+
+func (q *QualifiedHash) UnmarshalBinary(b []byte) error {
+	unused, err := UnmarshalAll(b, asUnmarshaler(q.Descriptor.serializationOrder())...)
+	if err != nil {
+		return err
+	}
+	if err := q.Value.UnmarshalBinary(unused[:q.Descriptor.Length]); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (q *QualifiedHash) MarshalBinary() ([]byte, error) {
+	buf := new(bytes.Buffer)
+	if err := MarshalAllInto(buf, asMarshaler(q.serializationOrder())...); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+func (q *QualifiedHash) BytesConsumed() int {
+	return totalBytesConsumed(q.serializationOrder()...)
 }
 
 func (q *QualifiedHash) serializationOrder() []BidirectionalBinaryMarshaler {
@@ -61,6 +86,29 @@ func (q *QualifiedContent) Equals(other *QualifiedContent) bool {
 	return q.Descriptor.Equals(&other.Descriptor) && q.Value.Equals(&other.Value)
 }
 
+func (q *QualifiedContent) UnmarshalBinary(b []byte) error {
+	unused, err := UnmarshalAll(b, asUnmarshaler(q.Descriptor.serializationOrder())...)
+	if err != nil {
+		return err
+	}
+	if err := q.Value.UnmarshalBinary(unused[:q.Descriptor.Length]); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (q *QualifiedContent) MarshalBinary() ([]byte, error) {
+	buf := new(bytes.Buffer)
+	if err := MarshalAllInto(buf, asMarshaler(q.serializationOrder())...); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+func (q *QualifiedContent) BytesConsumed() int {
+	return totalBytesConsumed(q.serializationOrder()...)
+}
+
 type QualifiedKey struct {
 	Descriptor KeyDescriptor
 	Value      Value
@@ -85,6 +133,29 @@ func (q *QualifiedKey) Equals(other *QualifiedKey) bool {
 	return q.Descriptor.Equals(&other.Descriptor) && q.Value.Equals(&other.Value)
 }
 
+func (q *QualifiedKey) UnmarshalBinary(b []byte) error {
+	unused, err := UnmarshalAll(b, asUnmarshaler(q.Descriptor.serializationOrder())...)
+	if err != nil {
+		return err
+	}
+	if err := q.Value.UnmarshalBinary(unused[:q.Descriptor.Length]); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (q *QualifiedKey) MarshalBinary() ([]byte, error) {
+	buf := new(bytes.Buffer)
+	if err := MarshalAllInto(buf, asMarshaler(q.serializationOrder())...); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+func (q *QualifiedKey) BytesConsumed() int {
+	return totalBytesConsumed(q.serializationOrder()...)
+}
+
 type QualifiedSignature struct {
 	Descriptor SignatureDescriptor
 	Value      Value
@@ -107,4 +178,27 @@ func (q *QualifiedSignature) serializationOrder() []BidirectionalBinaryMarshaler
 
 func (q *QualifiedSignature) Equals(other *QualifiedSignature) bool {
 	return q.Descriptor.Equals(&other.Descriptor) && q.Value.Equals(&other.Value)
+}
+
+func (q *QualifiedSignature) UnmarshalBinary(b []byte) error {
+	unused, err := UnmarshalAll(b, asUnmarshaler(q.Descriptor.serializationOrder())...)
+	if err != nil {
+		return err
+	}
+	if err := q.Value.UnmarshalBinary(unused[:q.Descriptor.Length]); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (q *QualifiedSignature) MarshalBinary() ([]byte, error) {
+	buf := new(bytes.Buffer)
+	if err := MarshalAllInto(buf, asMarshaler(q.serializationOrder())...); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+func (q *QualifiedSignature) BytesConsumed() int {
+	return totalBytesConsumed(q.serializationOrder()...)
 }
