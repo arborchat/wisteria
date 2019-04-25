@@ -303,6 +303,82 @@ func newConversation() *Conversation {
 	return c
 }
 
+func (c *Conversation) nodeSpecificSerializationOrder() []BidirectionalBinaryMarshaler {
+	return []BidirectionalBinaryMarshaler{&c.Content}
+}
+
+func (c *Conversation) serializationOrder() []BidirectionalBinaryMarshaler {
+	order := c.commonNode.presignSerializationOrder()
+	order = append(order, c.nodeSpecificSerializationOrder()...)
+	order = append(order, c.commonNode.postsignSerializationOrder()...)
+	return order
+}
+
+func (c Conversation) MarshalSignedData() ([]byte, error) {
+	buf := new(bytes.Buffer)
+	if err := MarshalAllInto(buf, asMarshaler(c.presignSerializationOrder())...); err != nil {
+		return nil, err
+	}
+	if err := MarshalAllInto(buf, asMarshaler(c.nodeSpecificSerializationOrder())...); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+func (c Conversation) Signature() *QualifiedSignature {
+	return &c.commonNode.Signature
+}
+
+func (c Conversation) SignatureIdentityHash() *QualifiedHash {
+	return &c.commonNode.SignatureAuthority
+}
+
+func (c Conversation) IsIdentity() bool {
+	return false
+}
+
+func (c Conversation) HashDescriptor() *HashDescriptor {
+	return &c.commonNode.IDDesc
+}
+
+func (c Conversation) MarshalBinary() ([]byte, error) {
+	signed, err := c.MarshalSignedData()
+	if err != nil {
+		return nil, err
+	}
+	buf := bytes.NewBuffer(signed)
+	if err := MarshalAllInto(buf, asMarshaler(c.postsignSerializationOrder())...); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+func UnmarshalConversation(b []byte) (*Conversation, error) {
+	c := newConversation()
+	if err := c.UnmarshalBinary(b); err != nil {
+		return nil, err
+	}
+	return c, nil
+}
+
+func (c *Conversation) UnmarshalBinary(b []byte) error {
+	_, err := UnmarshalAll(b, asUnmarshaler(c.serializationOrder())...)
+	if err != nil {
+		return err
+	}
+	idBytes, err := computeID(c)
+	if err != nil {
+		return err
+	}
+	c.id = Value(idBytes)
+	return nil
+}
+
+func (c *Conversation) Equals(c2 *Conversation) bool {
+	return c.commonNode.Equals(&c2.commonNode) &&
+		c.Content.Equals(&c2.Content)
+}
+
 type Reply struct {
 	commonNode
 	ConversationID QualifiedHash
