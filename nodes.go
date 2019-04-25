@@ -381,12 +381,88 @@ func (c *Conversation) Equals(c2 *Conversation) bool {
 
 type Reply struct {
 	commonNode
-	ConversationID QualifiedHash
-	Content        QualifiedContent
+	CommunityID QualifiedHash
+	Content     QualifiedContent
 }
 
 func newReply() *Reply {
 	r := new(Reply)
 	// define how to serialize this node type's fields
 	return r
+}
+
+func (r *Reply) nodeSpecificSerializationOrder() []BidirectionalBinaryMarshaler {
+	return []BidirectionalBinaryMarshaler{&r.CommunityID, &r.Content}
+}
+
+func (r *Reply) serializationOrder() []BidirectionalBinaryMarshaler {
+	order := r.commonNode.presignSerializationOrder()
+	order = append(order, r.nodeSpecificSerializationOrder()...)
+	order = append(order, r.commonNode.postsignSerializationOrder()...)
+	return order
+}
+
+func (r Reply) MarshalSignedData() ([]byte, error) {
+	buf := new(bytes.Buffer)
+	if err := MarshalAllInto(buf, asMarshaler(r.presignSerializationOrder())...); err != nil {
+		return nil, err
+	}
+	if err := MarshalAllInto(buf, asMarshaler(r.nodeSpecificSerializationOrder())...); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+func (r Reply) Signature() *QualifiedSignature {
+	return &r.commonNode.Signature
+}
+
+func (r Reply) SignatureIdentityHash() *QualifiedHash {
+	return &r.commonNode.SignatureAuthority
+}
+
+func (r Reply) IsIdentity() bool {
+	return false
+}
+
+func (r Reply) HashDescriptor() *HashDescriptor {
+	return &r.commonNode.IDDesc
+}
+
+func (r Reply) MarshalBinary() ([]byte, error) {
+	signed, err := r.MarshalSignedData()
+	if err != nil {
+		return nil, err
+	}
+	buf := bytes.NewBuffer(signed)
+	if err := MarshalAllInto(buf, asMarshaler(r.postsignSerializationOrder())...); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+func UnmarshalReply(b []byte) (*Reply, error) {
+	r := newReply()
+	if err := r.UnmarshalBinary(b); err != nil {
+		return nil, err
+	}
+	return r, nil
+}
+
+func (r *Reply) UnmarshalBinary(b []byte) error {
+	_, err := UnmarshalAll(b, asUnmarshaler(r.serializationOrder())...)
+	if err != nil {
+		return err
+	}
+	idBytes, err := computeID(r)
+	if err != nil {
+		return err
+	}
+	r.id = Value(idBytes)
+	return nil
+}
+
+func (r *Reply) Equals(r2 *Reply) bool {
+	return r.commonNode.Equals(&r2.commonNode) &&
+		r.Content.Equals(&r2.Content)
 }

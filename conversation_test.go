@@ -4,11 +4,11 @@ import (
 	"testing"
 
 	forest "git.sr.ht/~whereswaldon/forest-go"
+	"golang.org/x/crypto/openpgp"
 )
 
-func MakeConversationOrSkip(t *testing.T) (*forest.Identity, *forest.Community, *forest.Conversation) {
-	identity, privkey := MakeIdentityOrSkip(t)
-	_, community := MakeCommunityOrSkip(t)
+func MakeConversationOrSkip(t *testing.T) (*forest.Identity, *openpgp.Entity, *forest.Community, *forest.Conversation) {
+	identity, privkey, community := MakeCommunityOrSkip(t)
 	content, err := forest.NewQualifiedContent(forest.ContentTypeUTF8String, []byte("Test content"))
 	if err != nil {
 		t.Skip("Failed to qualify content", err)
@@ -21,11 +21,11 @@ func MakeConversationOrSkip(t *testing.T) (*forest.Identity, *forest.Community, 
 	if err != nil {
 		t.Error("Failed to create Conversation with valid parameters", err)
 	}
-	return identity, community, conversation
+	return identity, privkey, community, conversation
 }
 
 func TestConversationValidatesSelf(t *testing.T) {
-	identity, _, conversation := MakeConversationOrSkip(t)
+	identity, _, _, conversation := MakeConversationOrSkip(t)
 	if correct, err := forest.ValidateID(conversation, *conversation.ID()); err != nil || !correct {
 		t.Error("ID validation failed on unmodified node", err)
 	}
@@ -35,7 +35,7 @@ func TestConversationValidatesSelf(t *testing.T) {
 }
 
 func TestConversationValidationFailsWhenTampered(t *testing.T) {
-	identity, _, conversation := MakeConversationOrSkip(t)
+	identity, _, _, conversation := MakeConversationOrSkip(t)
 	identity.Name.Value = forest.Value([]byte("whatever"))
 	if correct, err := forest.ValidateID(conversation, *conversation.ID()); err != nil || !correct {
 		t.Error("ID validation failed on unmodified node", err)
@@ -46,7 +46,7 @@ func TestConversationValidationFailsWhenTampered(t *testing.T) {
 }
 
 func TestConversationSerialize(t *testing.T) {
-	_, _, conversation := MakeConversationOrSkip(t)
+	_, _, _, conversation := MakeConversationOrSkip(t)
 	buf, err := conversation.MarshalBinary()
 	if err != nil {
 		t.Error("Failed to serialize identity", err)

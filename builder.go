@@ -151,3 +151,46 @@ func NewConversation(identity *Identity, privkey *openpgp.Entity, parent *Commun
 
 	return c, nil
 }
+
+// NewReply creates a conversation node (signed by the given identity with the given privkey) as a child of the given conversation
+func NewReply(identity *Identity, privkey *openpgp.Entity, parent *Conversation, content *QualifiedContent, metadata *QualifiedContent) (*Reply, error) {
+	r := newReply()
+	r.SchemaVersion = CurrentVersion
+	r.Type = NodeTypeReply
+	r.Parent = *parent.ID()
+	r.CommunityID = parent.Parent
+	r.Depth = parent.Depth + 1
+	r.Content = *content
+	r.Metadata = *metadata
+	r.SignatureAuthority = *identity.ID()
+	idDesc, err := NewHashDescriptor(HashTypeSHA512_256, int(HashDigestLengthSHA512_256))
+	if err != nil {
+		return nil, err
+	}
+	r.IDDesc = *idDesc
+
+	// we've defined all pre-signature fields, it's time to sign the data
+	signedDataBytes, err := r.MarshalSignedData()
+	if err != nil {
+		return nil, err
+	}
+	signedData := bytes.NewBuffer(signedDataBytes)
+	signature := new(bytes.Buffer)
+	if err := openpgp.DetachSign(signature, privkey, signedData, nil); err != nil {
+		return nil, err
+	}
+	qs, err := NewQualifiedSignature(SignatureTypeOpenPGP, signature.Bytes())
+	if err != nil {
+		return nil, err
+	}
+	r.commonNode.Signature = *qs
+
+	// determine the node's final hash ID
+	id, err := computeID(r)
+	if err != nil {
+		return nil, err
+	}
+	r.id = Value(id)
+
+	return r, nil
+}

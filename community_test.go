@@ -4,9 +4,10 @@ import (
 	"testing"
 
 	forest "git.sr.ht/~whereswaldon/forest-go"
+	"golang.org/x/crypto/openpgp"
 )
 
-func MakeCommunityOrSkip(t *testing.T) (*forest.Identity, *forest.Community) {
+func MakeCommunityOrSkip(t *testing.T) (*forest.Identity, *openpgp.Entity, *forest.Community) {
 	identity, privkey := MakeIdentityOrSkip(t)
 	name, err := forest.NewQualifiedContent(forest.ContentTypeUTF8String, []byte("Test Name"))
 	if err != nil {
@@ -20,11 +21,11 @@ func MakeCommunityOrSkip(t *testing.T) (*forest.Identity, *forest.Community) {
 	if err != nil {
 		t.Error("Failed to create Community with valid parameters", err)
 	}
-	return identity, community
+	return identity, privkey, community
 }
 
 func TestCommunityValidatesSelf(t *testing.T) {
-	identity, community := MakeCommunityOrSkip(t)
+	identity, _, community := MakeCommunityOrSkip(t)
 	if correct, err := forest.ValidateID(community, *community.ID()); err != nil || !correct {
 		t.Error("ID validation failed on unmodified node", err)
 	}
@@ -34,7 +35,7 @@ func TestCommunityValidatesSelf(t *testing.T) {
 }
 
 func TestCommunityValidationFailsWhenTampered(t *testing.T) {
-	identity, community := MakeCommunityOrSkip(t)
+	identity, _, community := MakeCommunityOrSkip(t)
 	identity.Name.Value = forest.Value([]byte("whatever"))
 	if correct, err := forest.ValidateID(community, *community.ID()); err != nil || !correct {
 		t.Error("ID validation failed on unmodified node", err)
@@ -45,7 +46,7 @@ func TestCommunityValidationFailsWhenTampered(t *testing.T) {
 }
 
 func TestCommunitySerialize(t *testing.T) {
-	_, community := MakeCommunityOrSkip(t)
+	_, _, community := MakeCommunityOrSkip(t)
 	buf, err := community.MarshalBinary()
 	if err != nil {
 		t.Error("Failed to serialize identity", err)
