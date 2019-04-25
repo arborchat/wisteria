@@ -7,7 +7,7 @@ import (
 	"golang.org/x/crypto/openpgp"
 )
 
-func MakeIdentityOrSkip(t *testing.T) *forest.Identity {
+func MakeIdentityOrSkip(t *testing.T) (*forest.Identity, *openpgp.Entity) {
 	builder := forest.IdentityBuilder{}
 	privkey, err := openpgp.NewEntity("forest-test", "comment", "email@email.io", nil)
 	if err != nil {
@@ -25,11 +25,11 @@ func MakeIdentityOrSkip(t *testing.T) *forest.Identity {
 	if err != nil {
 		t.Error("Failed to create Identity with valid parameters", err)
 	}
-	return identity
+	return identity, privkey
 }
 
 func TestIdentityValidatesSelf(t *testing.T) {
-	identity := MakeIdentityOrSkip(t)
+	identity, _ := MakeIdentityOrSkip(t)
 	if correct, err := forest.ValidateID(identity, *identity.ID()); err != nil || !correct {
 		t.Error("ID validation failed on unmodified node", err)
 	}
@@ -39,7 +39,7 @@ func TestIdentityValidatesSelf(t *testing.T) {
 }
 
 func TestIdentityValidationFailsWhenTampered(t *testing.T) {
-	identity := MakeIdentityOrSkip(t)
+	identity, _ := MakeIdentityOrSkip(t)
 	identity.Name.Value = forest.Value([]byte("whatever"))
 	if correct, err := forest.ValidateID(identity, *identity.ID()); err == nil && correct {
 		t.Error("ID validation succeeded on modified node", err)
@@ -50,7 +50,7 @@ func TestIdentityValidationFailsWhenTampered(t *testing.T) {
 }
 
 func TestIdentitySerialize(t *testing.T) {
-	identity := MakeIdentityOrSkip(t)
+	identity, _ := MakeIdentityOrSkip(t)
 	buf, err := identity.MarshalBinary()
 	if err != nil {
 		t.Error("Failed to serialize identity", err)

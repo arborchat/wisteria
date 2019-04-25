@@ -67,3 +67,44 @@ func (p IdentityBuilder) New(privkey *openpgp.Entity, name *QualifiedContent, me
 
 	return identity, nil
 }
+
+func NewCommunity(identity *Identity, privkey *openpgp.Entity, name *QualifiedContent, metadata *QualifiedContent) (*Community, error) {
+	c := newCommunity()
+	c.SchemaVersion = CurrentVersion
+	c.Type = NodeTypeIdentity
+	c.Parent = *NullHash()
+	c.Depth = 0
+	c.Name = *name
+	c.Metadata = *metadata
+	c.SignatureAuthority = *identity.ID()
+	idDesc, err := NewHashDescriptor(HashTypeSHA512_256, int(HashDigestLengthSHA512_256))
+	if err != nil {
+		return nil, err
+	}
+	c.IDDesc = *idDesc
+
+	// we've defined all pre-signature fields, it's time to sign the data
+	signedDataBytes, err := c.MarshalSignedData()
+	if err != nil {
+		return nil, err
+	}
+	signedData := bytes.NewBuffer(signedDataBytes)
+	signature := new(bytes.Buffer)
+	if err := openpgp.DetachSign(signature, privkey, signedData, nil); err != nil {
+		return nil, err
+	}
+	qs, err := NewQualifiedSignature(SignatureTypeOpenPGP, signature.Bytes())
+	if err != nil {
+		return nil, err
+	}
+	c.commonNode.Signature = *qs
+
+	// determine the node's final hash ID
+	id, err := computeID(c)
+	if err != nil {
+		return nil, err
+	}
+	c.id = Value(id)
+
+	return c, nil
+}

@@ -216,6 +216,82 @@ func newCommunity() *Community {
 	return c
 }
 
+func (c *Community) nodeSpecificSerializationOrder() []BidirectionalBinaryMarshaler {
+	return []BidirectionalBinaryMarshaler{&c.Name}
+}
+
+func (c *Community) serializationOrder() []BidirectionalBinaryMarshaler {
+	order := c.commonNode.presignSerializationOrder()
+	order = append(order, c.nodeSpecificSerializationOrder()...)
+	order = append(order, c.commonNode.postsignSerializationOrder()...)
+	return order
+}
+
+func (c Community) MarshalSignedData() ([]byte, error) {
+	buf := new(bytes.Buffer)
+	if err := MarshalAllInto(buf, asMarshaler(c.presignSerializationOrder())...); err != nil {
+		return nil, err
+	}
+	if err := MarshalAllInto(buf, asMarshaler(c.nodeSpecificSerializationOrder())...); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+func (c Community) Signature() *QualifiedSignature {
+	return &c.commonNode.Signature
+}
+
+func (c Community) SignatureIdentityHash() *QualifiedHash {
+	return &c.commonNode.SignatureAuthority
+}
+
+func (c Community) IsIdentity() bool {
+	return false
+}
+
+func (c Community) HashDescriptor() *HashDescriptor {
+	return &c.commonNode.IDDesc
+}
+
+func (c Community) MarshalBinary() ([]byte, error) {
+	signed, err := c.MarshalSignedData()
+	if err != nil {
+		return nil, err
+	}
+	buf := bytes.NewBuffer(signed)
+	if err := MarshalAllInto(buf, asMarshaler(c.postsignSerializationOrder())...); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+func UnmarshalCommunity(b []byte) (*Community, error) {
+	c := newCommunity()
+	if err := c.UnmarshalBinary(b); err != nil {
+		return nil, err
+	}
+	return c, nil
+}
+
+func (c *Community) UnmarshalBinary(b []byte) error {
+	_, err := UnmarshalAll(b, asUnmarshaler(c.serializationOrder())...)
+	if err != nil {
+		return err
+	}
+	idBytes, err := computeID(c)
+	if err != nil {
+		return err
+	}
+	c.id = Value(idBytes)
+	return nil
+}
+
+func (c *Community) Equals(c2 *Community) bool {
+	return c.commonNode.Equals(&c2.commonNode) &&
+		c.Name.Equals(&c2.Name)
+}
+
 type Conversation struct {
 	commonNode
 	Content QualifiedContent
