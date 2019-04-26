@@ -1,0 +1,17 @@
+image: archlinux
+packages:
+  - go
+sources:
+  - https://git.sr.ht/~whereswaldon/forest-go
+environment:
+  oses: '"linux darwin openbsd freebsd netbsd windows"'
+tasks:
+  - setup: |
+      cd forest-go
+      go build
+  - build: |
+      cd forest-go
+      go test -cover
+  - cross_compile: |
+      cd forest-go
+      for os in $oses ; do env GOOS="$os" go build ; done
