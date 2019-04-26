@@ -1,5 +1,7 @@
 # forest-go
 
+[![builds.sr.ht status](https://builds.sr.ht/~whereswaldon/forest-go.svg)](https://builds.sr.ht/~whereswaldon/forest-go?)
+
 A golang library for working with nodes in the Arbor Forest. The `cmd/` subdirectory contains utilities for creating and examining Forest Nodes.
 
 ## Build
