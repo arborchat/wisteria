@@ -6,10 +6,7 @@ sources:
 environment:
   oses: '"linux darwin openbsd freebsd netbsd windows"'
 tasks:
-  - setup: |
-      cd forest-go
-      go build
-  - build: |
+  - test: |
       cd forest-go
       go test -cover
   - cross_compile: |
