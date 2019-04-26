@@ -30,7 +30,7 @@ func TestConversationValidatesSelf(t *testing.T) {
 
 func TestConversationValidationFailsWhenTampered(t *testing.T) {
 	identity, _, _, conversation := MakeConversationOrSkip(t)
-	identity.Name.Value = forest.Value([]byte("whatever"))
+	conversation.Content.Value = forest.Value([]byte("whatever"))
 	if correct, err := forest.ValidateID(conversation, *conversation.ID()); err == nil && correct {
 		t.Error("ID validation failed on unmodified node", err)
 	}

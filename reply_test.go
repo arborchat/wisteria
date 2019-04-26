@@ -43,7 +43,7 @@ func validateReply(t *testing.T, author *forest.Identity, reply *forest.Reply) {
 
 func TestReplyValidationFailsWhenTampered(t *testing.T) {
 	identity, _, _, _, reply := MakeReplyOrSkip(t)
-	identity.Name.Value = forest.Value([]byte("whatever"))
+	reply.Content.Value = forest.Value([]byte("whatever"))
 	failToValidateReply(t, identity, reply)
 }
 
