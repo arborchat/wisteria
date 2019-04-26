@@ -2,6 +2,7 @@ package forest
 
 import (
 	"bytes"
+	"fmt"
 
 	"golang.org/x/crypto/openpgp"
 )
@@ -153,13 +154,23 @@ func NewConversation(identity *Identity, privkey *openpgp.Entity, parent *Commun
 }
 
 // NewReply creates a conversation node (signed by the given identity with the given privkey) as a child of the given conversation
-func NewReply(identity *Identity, privkey *openpgp.Entity, parent *Conversation, content *QualifiedContent, metadata *QualifiedContent) (*Reply, error) {
+func NewReply(identity *Identity, privkey *openpgp.Entity, parent interface{}, content *QualifiedContent, metadata *QualifiedContent) (*Reply, error) {
 	r := newReply()
 	r.SchemaVersion = CurrentVersion
 	r.Type = NodeTypeReply
-	r.Parent = *parent.ID()
-	r.CommunityID = parent.Parent
-	r.Depth = parent.Depth + 1
+	switch concreteParent := parent.(type) {
+	case *Conversation:
+		r.CommunityID = concreteParent.Parent
+		r.Parent = *concreteParent.ID()
+		r.Depth = concreteParent.Depth + 1
+	case *Reply:
+		r.CommunityID = concreteParent.CommunityID
+		r.Parent = *concreteParent.ID()
+		r.Depth = concreteParent.Depth + 1
+	default:
+		return nil, fmt.Errorf("parent must be either a conversation or reply node")
+
+	}
 	r.Content = *content
 	r.Metadata = *metadata
 	r.SignatureAuthority = *identity.ID()

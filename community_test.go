@@ -37,10 +37,10 @@ func TestCommunityValidatesSelf(t *testing.T) {
 func TestCommunityValidationFailsWhenTampered(t *testing.T) {
 	identity, _, community := MakeCommunityOrSkip(t)
 	identity.Name.Value = forest.Value([]byte("whatever"))
-	if correct, err := forest.ValidateID(community, *community.ID()); err != nil || !correct {
+	if correct, err := forest.ValidateID(community, *community.ID()); err == nil && correct {
 		t.Error("ID validation failed on unmodified node", err)
 	}
-	if correct, err := forest.ValidateSignature(community, identity); err != nil || !correct {
+	if correct, err := forest.ValidateSignature(community, identity); err == nil && correct {
 		t.Error("Signature validation failed on unmodified node", err)
 	}
 }
