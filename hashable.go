@@ -5,10 +5,12 @@ import (
 	"encoding"
 	"fmt"
 	"hash"
+
+	"git.sr.ht/~whereswaldon/forest-go/fields"
 )
 
 type Hashable interface {
-	HashDescriptor() *HashDescriptor
+	HashDescriptor() *fields.HashDescriptor
 	encoding.BinaryMarshaler
 }
 
@@ -16,18 +18,18 @@ type Hashable interface {
 func computeID(h Hashable) ([]byte, error) {
 	// map from HashType to the function that creates an instance of that hash
 	// algorithm
-	hashType2Func := map[HashType]func() hash.Hash{
-		HashTypeSHA512_256: sha512.New512_256,
+	hashType2Func := map[fields.HashType]func() hash.Hash{
+		fields.HashTypeSHA512_256: sha512.New512_256,
 	}
 	hd := h.HashDescriptor()
-	if hd.Type == HashTypeNullHash {
+	if hd.Type == fields.HashTypeNullHash {
 		return []byte{}, nil
 	}
 	binaryContent, err := h.MarshalBinary()
 	if err != nil {
 		return nil, err
 	}
-	hashFunc, found := hashType2Func[HashType(hd.Type)]
+	hashFunc, found := hashType2Func[fields.HashType(hd.Type)]
 	if !found {
 		return nil, fmt.Errorf("Unknown HashType %d", hd.Type)
 	}
@@ -40,14 +42,14 @@ func computeID(h Hashable) ([]byte, error) {
 // return value indicates the result of the comparison. If there is an error,
 // the first return value will always be false and the second will indicate
 // what went wrong when computing the hash.
-func ValidateID(h Hashable, expected QualifiedHash) (bool, error) {
+func ValidateID(h Hashable, expected fields.QualifiedHash) (bool, error) {
 	id, err := computeID(h)
 	if err != nil {
 		return false, err
 	}
-	computedID := QualifiedHash{
+	computedID := fields.QualifiedHash{
 		Descriptor: *h.HashDescriptor(),
-		Value:      Value(id),
+		Value:      fields.Value(id),
 	}
 	return expected.Equals(&computedID), nil
 }

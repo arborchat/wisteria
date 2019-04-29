@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 
+	"git.sr.ht/~whereswaldon/forest-go/fields"
 	"golang.org/x/crypto/openpgp"
 )
 
@@ -15,13 +16,13 @@ type IdentityBuilder struct{}
 // New builds an Identity node for the user with the given name and metadata, using
 // the OpenPGP Entity privkey to define the Identity. That Entity must contain a
 // private key with no passphrase.
-func (p IdentityBuilder) New(privkey *openpgp.Entity, name *QualifiedContent, metadata *QualifiedContent) (*Identity, error) {
+func (p IdentityBuilder) New(privkey *openpgp.Entity, name *fields.QualifiedContent, metadata *fields.QualifiedContent) (*Identity, error) {
 	// make an empty identity and populate all fields that need to be known before
 	// signing the data
 	identity := newIdentity()
-	identity.SchemaVersion = CurrentVersion
-	identity.Type = NodeTypeIdentity
-	identity.Parent = *NullHash()
+	identity.SchemaVersion = fields.CurrentVersion
+	identity.Type = fields.NodeTypeIdentity
+	identity.Parent = *fields.NullHash()
 	identity.Depth = 0
 	identity.Name = *name
 	identity.Metadata = *metadata
@@ -31,13 +32,13 @@ func (p IdentityBuilder) New(privkey *openpgp.Entity, name *QualifiedContent, me
 	if err := privkey.Serialize(keybuf); err != nil {
 		return nil, err
 	}
-	qKey, err := NewQualifiedKey(KeyTypeOpenPGP, keybuf.Bytes())
+	qKey, err := fields.NewQualifiedKey(fields.KeyTypeOpenPGP, keybuf.Bytes())
 	if err != nil {
 		return nil, err
 	}
 	identity.PublicKey = *qKey
-	identity.SignatureAuthority = *NullHash()
-	idDesc, err := NewHashDescriptor(HashTypeSHA512_256, int(HashDigestLengthSHA512_256))
+	identity.SignatureAuthority = *fields.NullHash()
+	idDesc, err := fields.NewHashDescriptor(fields.HashTypeSHA512_256, int(fields.HashDigestLengthSHA512_256))
 	if err != nil {
 		return nil, err
 	}
@@ -53,7 +54,7 @@ func (p IdentityBuilder) New(privkey *openpgp.Entity, name *QualifiedContent, me
 	if err := openpgp.DetachSign(signature, privkey, signedData, nil); err != nil {
 		return nil, err
 	}
-	qs, err := NewQualifiedSignature(SignatureTypeOpenPGP, signature.Bytes())
+	qs, err := fields.NewQualifiedSignature(fields.SignatureTypeOpenPGP, signature.Bytes())
 	if err != nil {
 		return nil, err
 	}
@@ -64,22 +65,22 @@ func (p IdentityBuilder) New(privkey *openpgp.Entity, name *QualifiedContent, me
 	if err != nil {
 		return nil, err
 	}
-	identity.id = Value(id)
+	identity.id = fields.Value(id)
 
 	return identity, nil
 }
 
 // NewCommunity creates a community node (signed by the given identity with the given privkey).
-func NewCommunity(identity *Identity, privkey *openpgp.Entity, name *QualifiedContent, metadata *QualifiedContent) (*Community, error) {
+func NewCommunity(identity *Identity, privkey *openpgp.Entity, name *fields.QualifiedContent, metadata *fields.QualifiedContent) (*Community, error) {
 	c := newCommunity()
-	c.SchemaVersion = CurrentVersion
-	c.Type = NodeTypeCommunity
-	c.Parent = *NullHash()
+	c.SchemaVersion = fields.CurrentVersion
+	c.Type = fields.NodeTypeCommunity
+	c.Parent = *fields.NullHash()
 	c.Depth = 0
 	c.Name = *name
 	c.Metadata = *metadata
 	c.SignatureAuthority = *identity.ID()
-	idDesc, err := NewHashDescriptor(HashTypeSHA512_256, int(HashDigestLengthSHA512_256))
+	idDesc, err := fields.NewHashDescriptor(fields.HashTypeSHA512_256, int(fields.HashDigestLengthSHA512_256))
 	if err != nil {
 		return nil, err
 	}
@@ -95,7 +96,7 @@ func NewCommunity(identity *Identity, privkey *openpgp.Entity, name *QualifiedCo
 	if err := openpgp.DetachSign(signature, privkey, signedData, nil); err != nil {
 		return nil, err
 	}
-	qs, err := NewQualifiedSignature(SignatureTypeOpenPGP, signature.Bytes())
+	qs, err := fields.NewQualifiedSignature(fields.SignatureTypeOpenPGP, signature.Bytes())
 	if err != nil {
 		return nil, err
 	}
@@ -106,22 +107,22 @@ func NewCommunity(identity *Identity, privkey *openpgp.Entity, name *QualifiedCo
 	if err != nil {
 		return nil, err
 	}
-	c.id = Value(id)
+	c.id = fields.Value(id)
 
 	return c, nil
 }
 
 // NewConversation creates a conversation node (signed by the given identity with the given privkey) as a child of the given community
-func NewConversation(identity *Identity, privkey *openpgp.Entity, parent *Community, content *QualifiedContent, metadata *QualifiedContent) (*Conversation, error) {
+func NewConversation(identity *Identity, privkey *openpgp.Entity, parent *Community, content *fields.QualifiedContent, metadata *fields.QualifiedContent) (*Conversation, error) {
 	c := newConversation()
-	c.SchemaVersion = CurrentVersion
-	c.Type = NodeTypeConversation
+	c.SchemaVersion = fields.CurrentVersion
+	c.Type = fields.NodeTypeConversation
 	c.Parent = *parent.ID()
 	c.Depth = parent.Depth + 1
 	c.Content = *content
 	c.Metadata = *metadata
 	c.SignatureAuthority = *identity.ID()
-	idDesc, err := NewHashDescriptor(HashTypeSHA512_256, int(HashDigestLengthSHA512_256))
+	idDesc, err := fields.NewHashDescriptor(fields.HashTypeSHA512_256, int(fields.HashDigestLengthSHA512_256))
 	if err != nil {
 		return nil, err
 	}
@@ -137,7 +138,7 @@ func NewConversation(identity *Identity, privkey *openpgp.Entity, parent *Commun
 	if err := openpgp.DetachSign(signature, privkey, signedData, nil); err != nil {
 		return nil, err
 	}
-	qs, err := NewQualifiedSignature(SignatureTypeOpenPGP, signature.Bytes())
+	qs, err := fields.NewQualifiedSignature(fields.SignatureTypeOpenPGP, signature.Bytes())
 	if err != nil {
 		return nil, err
 	}
@@ -148,16 +149,16 @@ func NewConversation(identity *Identity, privkey *openpgp.Entity, parent *Commun
 	if err != nil {
 		return nil, err
 	}
-	c.id = Value(id)
+	c.id = fields.Value(id)
 
 	return c, nil
 }
 
 // NewReply creates a conversation node (signed by the given identity with the given privkey) as a child of the given conversation
-func NewReply(identity *Identity, privkey *openpgp.Entity, parent interface{}, content *QualifiedContent, metadata *QualifiedContent) (*Reply, error) {
+func NewReply(identity *Identity, privkey *openpgp.Entity, parent interface{}, content *fields.QualifiedContent, metadata *fields.QualifiedContent) (*Reply, error) {
 	r := newReply()
-	r.SchemaVersion = CurrentVersion
-	r.Type = NodeTypeReply
+	r.SchemaVersion = fields.CurrentVersion
+	r.Type = fields.NodeTypeReply
 	switch concreteParent := parent.(type) {
 	case *Conversation:
 		r.CommunityID = concreteParent.Parent
@@ -174,7 +175,7 @@ func NewReply(identity *Identity, privkey *openpgp.Entity, parent interface{}, c
 	r.Content = *content
 	r.Metadata = *metadata
 	r.SignatureAuthority = *identity.ID()
-	idDesc, err := NewHashDescriptor(HashTypeSHA512_256, int(HashDigestLengthSHA512_256))
+	idDesc, err := fields.NewHashDescriptor(fields.HashTypeSHA512_256, int(fields.HashDigestLengthSHA512_256))
 	if err != nil {
 		return nil, err
 	}
@@ -190,7 +191,7 @@ func NewReply(identity *Identity, privkey *openpgp.Entity, parent interface{}, c
 	if err := openpgp.DetachSign(signature, privkey, signedData, nil); err != nil {
 		return nil, err
 	}
-	qs, err := NewQualifiedSignature(SignatureTypeOpenPGP, signature.Bytes())
+	qs, err := fields.NewQualifiedSignature(fields.SignatureTypeOpenPGP, signature.Bytes())
 	if err != nil {
 		return nil, err
 	}
@@ -201,7 +202,7 @@ func NewReply(identity *Identity, privkey *openpgp.Entity, parent interface{}, c
 	if err != nil {
 		return nil, err
 	}
-	r.id = Value(id)
+	r.id = fields.Value(id)
 
 	return r, nil
 }

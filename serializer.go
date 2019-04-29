@@ -1,27 +1,31 @@
 package forest
 
-import "bytes"
+import (
+	"bytes"
+
+	"git.sr.ht/~whereswaldon/forest-go/fields"
+)
 
 // serializer is a type that can describe how to serialize and deserialize itself
 type serializer interface {
-	serializationOrder() []BidirectionalBinaryMarshaler
+	SerializationOrder() []fields.BidirectionalBinaryMarshaler
 }
 
 func MarshalBinary(s serializer) ([]byte, error) {
 	buf := new(bytes.Buffer)
-	if err := MarshalAllInto(buf, asMarshaler(s.serializationOrder())...); err != nil {
+	if err := fields.MarshalAllInto(buf, fields.AsMarshaler(s.SerializationOrder())...); err != nil {
 		return nil, err
 	}
 	return buf.Bytes(), nil
 }
 
 func UnmarshalBinary(s serializer, b []byte) error {
-	if _, err := UnmarshalAll(b, asUnmarshaler(s.serializationOrder())...); err != nil {
+	if _, err := fields.UnmarshalAll(b, fields.AsUnmarshaler(s.SerializationOrder())...); err != nil {
 		return err
 	}
 	return nil
 }
 
 func BytesConsumed(s serializer) int {
-	return totalBytesConsumed(s.serializationOrder()...)
+	return fields.TotalBytesConsumed(s.SerializationOrder()...)
 }

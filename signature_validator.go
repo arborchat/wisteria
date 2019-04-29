@@ -6,12 +6,14 @@ import (
 
 	"golang.org/x/crypto/openpgp"
 	"golang.org/x/crypto/openpgp/packet"
+
+	"git.sr.ht/~whereswaldon/forest-go/fields"
 )
 
 type SignatureValidator interface {
 	MarshalSignedData() ([]byte, error)
-	Signature() *QualifiedSignature
-	SignatureIdentityHash() *QualifiedHash
+	Signature() *fields.QualifiedSignature
+	SignatureIdentityHash() *fields.QualifiedHash
 	IsIdentity() bool
 }
 
@@ -20,7 +22,7 @@ type SignatureValidator interface {
 // pass the same Identity as the second parameter.
 func ValidateSignature(v SignatureValidator, identity *Identity) (bool, error) {
 	sigIdHash := v.SignatureIdentityHash()
-	if sigIdHash.Equals(NullHash()) {
+	if sigIdHash.Equals(fields.NullHash()) {
 		if !v.IsIdentity() {
 			return false, fmt.Errorf("Only Identity nodes can have the null hash as their Signature Authority")
 		}

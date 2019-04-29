@@ -3,11 +3,11 @@ package forest_test
 import (
 	"testing"
 
-	forest "git.sr.ht/~whereswaldon/forest-go"
+	"git.sr.ht/~whereswaldon/forest-go/fields"
 )
 
-func QualifiedContentOrSkip(t *testing.T, contentType forest.ContentType, content []byte) *forest.QualifiedContent {
-	qContent, err := forest.NewQualifiedContent(contentType, content)
+func QualifiedContentOrSkip(t *testing.T, contentType fields.ContentType, content []byte) *fields.QualifiedContent {
+	qContent, err := fields.NewQualifiedContent(contentType, content)
 	if err != nil {
 		t.Skip("Failed to qualify content", err)
 	}

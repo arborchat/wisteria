@@ -1,4 +1,4 @@
-package forest
+package fields
 
 import (
 	"encoding"
@@ -19,7 +19,7 @@ type ProgressiveBinaryUnmarshaler interface {
 	BytesConsumed() int
 }
 
-func asMarshaler(in []BidirectionalBinaryMarshaler) []encoding.BinaryMarshaler {
+func AsMarshaler(in []BidirectionalBinaryMarshaler) []encoding.BinaryMarshaler {
 	out := make([]encoding.BinaryMarshaler, len(in))
 	for i, f := range in {
 		out[i] = encoding.BinaryMarshaler(f)
@@ -27,7 +27,7 @@ func asMarshaler(in []BidirectionalBinaryMarshaler) []encoding.BinaryMarshaler {
 	return out
 }
 
-func asUnmarshaler(in []BidirectionalBinaryMarshaler) []ProgressiveBinaryUnmarshaler {
+func AsUnmarshaler(in []BidirectionalBinaryMarshaler) []ProgressiveBinaryUnmarshaler {
 	out := make([]ProgressiveBinaryUnmarshaler, len(in))
 	for i, f := range in {
 		out[i] = ProgressiveBinaryUnmarshaler(f)
@@ -35,7 +35,7 @@ func asUnmarshaler(in []BidirectionalBinaryMarshaler) []ProgressiveBinaryUnmarsh
 	return out
 }
 
-func totalBytesConsumed(in ...BidirectionalBinaryMarshaler) int {
+func TotalBytesConsumed(in ...BidirectionalBinaryMarshaler) int {
 	total := 0
 	for _, unmarshaler := range in {
 		total += unmarshaler.BytesConsumed()

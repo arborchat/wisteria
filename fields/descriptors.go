@@ -1,4 +1,4 @@
-package forest
+package fields
 
 const sizeofDescriptor = sizeofgenericType + sizeofContentLength
 
@@ -18,7 +18,7 @@ func NewHashDescriptor(t HashType, length int) (*HashDescriptor, error) {
 	return &HashDescriptor{t, *cLength}, nil
 }
 
-func (d *HashDescriptor) serializationOrder() []BidirectionalBinaryMarshaler {
+func (d *HashDescriptor) SerializationOrder() []BidirectionalBinaryMarshaler {
 	return []BidirectionalBinaryMarshaler{&d.Type, &d.Length}
 }
 
@@ -41,7 +41,7 @@ func NewContentDescriptor(t ContentType, length int) (*ContentDescriptor, error)
 	return &ContentDescriptor{t, *cLength}, nil
 }
 
-func (d *ContentDescriptor) serializationOrder() []BidirectionalBinaryMarshaler {
+func (d *ContentDescriptor) SerializationOrder() []BidirectionalBinaryMarshaler {
 	return []BidirectionalBinaryMarshaler{&d.Type, &d.Length}
 }
 
@@ -64,7 +64,7 @@ func NewSignatureDescriptor(t SignatureType, length int) (*SignatureDescriptor, 
 	return &SignatureDescriptor{t, *cLength}, nil
 }
 
-func (d *SignatureDescriptor) serializationOrder() []BidirectionalBinaryMarshaler {
+func (d *SignatureDescriptor) SerializationOrder() []BidirectionalBinaryMarshaler {
 	return []BidirectionalBinaryMarshaler{&d.Type, &d.Length}
 }
 
@@ -87,7 +87,7 @@ func NewKeyDescriptor(t KeyType, length int) (*KeyDescriptor, error) {
 	return &KeyDescriptor{t, *cLength}, nil
 }
 
-func (d *KeyDescriptor) serializationOrder() []BidirectionalBinaryMarshaler {
+func (d *KeyDescriptor) SerializationOrder() []BidirectionalBinaryMarshaler {
 	return []BidirectionalBinaryMarshaler{&d.Type, &d.Length}
 }
 

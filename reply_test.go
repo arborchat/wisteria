@@ -4,13 +4,14 @@ import (
 	"testing"
 
 	forest "git.sr.ht/~whereswaldon/forest-go"
+	"git.sr.ht/~whereswaldon/forest-go/fields"
 	"golang.org/x/crypto/openpgp"
 )
 
 func MakeReplyOrSkip(t *testing.T) (*forest.Identity, *openpgp.Entity, *forest.Community, *forest.Conversation, *forest.Reply) {
 	identity, privkey, community, conversation := MakeConversationOrSkip(t)
-	content := QualifiedContentOrSkip(t, forest.ContentTypeUTF8String, []byte("test content"))
-	metadata := QualifiedContentOrSkip(t, forest.ContentTypeUTF8String, []byte{})
+	content := QualifiedContentOrSkip(t, fields.ContentTypeUTF8String, []byte("test content"))
+	metadata := QualifiedContentOrSkip(t, fields.ContentTypeUTF8String, []byte{})
 	reply, err := forest.NewReply(identity, privkey, conversation, content, metadata)
 	if err != nil {
 		t.Error("Failed to create Conversation with valid parameters", err)
@@ -43,7 +44,7 @@ func validateReply(t *testing.T, author *forest.Identity, reply *forest.Reply) {
 
 func TestReplyValidationFailsWhenTampered(t *testing.T) {
 	identity, _, _, _, reply := MakeReplyOrSkip(t)
-	reply.Content.Value = forest.Value([]byte("whatever"))
+	reply.Content.Value = fields.Value([]byte("whatever"))
 	failToValidateReply(t, identity, reply)
 }
 
@@ -68,8 +69,8 @@ func TestReplySerializes(t *testing.T) {
 
 func TestReplyToReplyValidates(t *testing.T) {
 	identity, privkey, _, _, reply := MakeReplyOrSkip(t)
-	content := QualifiedContentOrSkip(t, forest.ContentTypeUTF8String, []byte("hello"))
-	metadata := QualifiedContentOrSkip(t, forest.ContentTypeUTF8String, []byte(""))
+	content := QualifiedContentOrSkip(t, fields.ContentTypeUTF8String, []byte("hello"))
+	metadata := QualifiedContentOrSkip(t, fields.ContentTypeUTF8String, []byte(""))
 	r2, err := forest.NewReply(identity, privkey, reply, content, metadata)
 	if err != nil {
 		t.Error("Failed to create reply to existing reply", err)
@@ -79,20 +80,20 @@ func TestReplyToReplyValidates(t *testing.T) {
 
 func TestReplyToReplyFailsWhenTampered(t *testing.T) {
 	identity, privkey, _, _, reply := MakeReplyOrSkip(t)
-	content := QualifiedContentOrSkip(t, forest.ContentTypeUTF8String, []byte("hello"))
-	metadata := QualifiedContentOrSkip(t, forest.ContentTypeUTF8String, []byte(""))
+	content := QualifiedContentOrSkip(t, fields.ContentTypeUTF8String, []byte("hello"))
+	metadata := QualifiedContentOrSkip(t, fields.ContentTypeUTF8String, []byte(""))
 	r2, err := forest.NewReply(identity, privkey, reply, content, metadata)
 	if err != nil {
 		t.Error("Failed to create reply to existing reply", err)
 	}
-	r2.Content.Value = forest.Value([]byte("else"))
+	r2.Content.Value = fields.Value([]byte("else"))
 	failToValidateReply(t, identity, r2)
 }
 
 func TestReplyToReplySerializes(t *testing.T) {
 	identity, privkey, _, _, reply := MakeReplyOrSkip(t)
-	content := QualifiedContentOrSkip(t, forest.ContentTypeUTF8String, []byte("hello"))
-	metadata := QualifiedContentOrSkip(t, forest.ContentTypeUTF8String, []byte(""))
+	content := QualifiedContentOrSkip(t, fields.ContentTypeUTF8String, []byte("hello"))
+	metadata := QualifiedContentOrSkip(t, fields.ContentTypeUTF8String, []byte(""))
 	r2, err := forest.NewReply(identity, privkey, reply, content, metadata)
 	if err != nil {
 		t.Error("Failed to create reply to existing reply", err)

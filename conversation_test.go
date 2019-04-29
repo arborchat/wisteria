@@ -4,13 +4,14 @@ import (
 	"testing"
 
 	forest "git.sr.ht/~whereswaldon/forest-go"
+	"git.sr.ht/~whereswaldon/forest-go/fields"
 	"golang.org/x/crypto/openpgp"
 )
 
 func MakeConversationOrSkip(t *testing.T) (*forest.Identity, *openpgp.Entity, *forest.Community, *forest.Conversation) {
 	identity, privkey, community := MakeCommunityOrSkip(t)
-	content := QualifiedContentOrSkip(t, forest.ContentTypeUTF8String, []byte("Test content"))
-	metadata := QualifiedContentOrSkip(t, forest.ContentTypeUTF8String, []byte{})
+	content := QualifiedContentOrSkip(t, fields.ContentTypeUTF8String, []byte("Test content"))
+	metadata := QualifiedContentOrSkip(t, fields.ContentTypeUTF8String, []byte{})
 	conversation, err := forest.NewConversation(identity, privkey, community, content, metadata)
 	if err != nil {
 		t.Error("Failed to create Conversation with valid parameters", err)
@@ -30,7 +31,7 @@ func TestConversationValidatesSelf(t *testing.T) {
 
 func TestConversationValidationFailsWhenTampered(t *testing.T) {
 	identity, _, _, conversation := MakeConversationOrSkip(t)
-	conversation.Content.Value = forest.Value([]byte("whatever"))
+	conversation.Content.Value = fields.Value([]byte("whatever"))
 	if correct, err := forest.ValidateID(conversation, *conversation.ID()); err == nil && correct {
 		t.Error("ID validation failed on unmodified node", err)
 	}

@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	forest "git.sr.ht/~whereswaldon/forest-go"
+	"git.sr.ht/~whereswaldon/forest-go/fields"
 	"golang.org/x/crypto/openpgp"
 )
 
@@ -13,11 +14,11 @@ func MakeIdentityOrSkip(t *testing.T) (*forest.Identity, *openpgp.Entity) {
 	if err != nil {
 		t.Skip("Failed to create private key", err)
 	}
-	username, err := forest.NewQualifiedContent(forest.ContentTypeUTF8String, []byte("Test Name"))
+	username, err := fields.NewQualifiedContent(fields.ContentTypeUTF8String, []byte("Test Name"))
 	if err != nil {
 		t.Skip("Failed to qualify username", err)
 	}
-	metadata, err := forest.NewQualifiedContent(forest.ContentTypeUTF8String, []byte{})
+	metadata, err := fields.NewQualifiedContent(fields.ContentTypeUTF8String, []byte{})
 	if err != nil {
 		t.Skip("Failed to qualify metadata", err)
 	}
@@ -40,7 +41,7 @@ func TestIdentityValidatesSelf(t *testing.T) {
 
 func TestIdentityValidationFailsWhenTampered(t *testing.T) {
 	identity, _ := MakeIdentityOrSkip(t)
-	identity.Name.Value = forest.Value([]byte("whatever"))
+	identity.Name.Value = fields.Value([]byte("whatever"))
 	if correct, err := forest.ValidateID(identity, *identity.ID()); err == nil && correct {
 		t.Error("ID validation succeeded on modified node", err)
 	}
