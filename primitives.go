@@ -85,10 +85,6 @@ func (c *ContentLength) UnmarshalBinary(b []byte) error {
 	return binary.Read(buf, multiByteSerializationOrder, c)
 }
 
-func (c *ContentLength) SizeConstraints() (int, bool) {
-	return sizeofContentLength, false
-}
-
 func (c *ContentLength) BytesConsumed() int {
 	return sizeofContentLength
 }
@@ -120,10 +116,6 @@ func (t *TreeDepth) UnmarshalBinary(b []byte) error {
 	return binary.Read(buf, multiByteSerializationOrder, t)
 }
 
-func (t *TreeDepth) SizeConstraints() (int, bool) {
-	return sizeofTreeDepth, false
-}
-
 func (t *TreeDepth) BytesConsumed() int {
 	return sizeofTreeDepth
 }
@@ -150,10 +142,6 @@ func (v Value) MarshalText() ([]byte, error) {
 func (v *Value) UnmarshalBinary(b []byte) error {
 	*v = b
 	return nil
-}
-
-func (v *Value) SizeConstraints() (int, bool) {
-	return 0, true
 }
 
 func (v *Value) BytesConsumed() int {
@@ -186,10 +174,6 @@ func (v Version) MarshalText() ([]byte, error) {
 func (v *Version) UnmarshalBinary(b []byte) error {
 	buf := bytes.NewBuffer(b)
 	return binary.Read(buf, multiByteSerializationOrder, v)
-}
-
-func (v *Version) SizeConstraints() (int, bool) {
-	return sizeofVersion, false
 }
 
 func (v *Version) BytesConsumed() int {
@@ -243,10 +227,6 @@ func (t *NodeType) UnmarshalBinary(b []byte) error {
 	return nil
 }
 
-func (t *NodeType) SizeConstraints() (int, bool) {
-	return sizeofNodeType, false
-}
-
 func (t *NodeType) BytesConsumed() int {
 	return sizeofNodeType
 }
@@ -289,10 +269,6 @@ func (t *HashType) UnmarshalBinary(b []byte) error {
 		return fmt.Errorf("%d is not a valid hash type", *t)
 	}
 	return nil
-}
-
-func (t *HashType) SizeConstraints() (int, bool) {
-	return sizeofHashType, false
 }
 
 func (t *HashType) BytesConsumed() int {
@@ -339,10 +315,6 @@ func (t *ContentType) UnmarshalBinary(b []byte) error {
 	return nil
 }
 
-func (t *ContentType) SizeConstraints() (int, bool) {
-	return sizeofContentType, false
-}
-
 func (t *ContentType) BytesConsumed() int {
 	return sizeofContentType
 }
@@ -387,10 +359,6 @@ func (t *KeyType) UnmarshalBinary(b []byte) error {
 	return nil
 }
 
-func (t *KeyType) SizeConstraints() (int, bool) {
-	return sizeofKeyType, false
-}
-
 func (t *KeyType) BytesConsumed() int {
 	return sizeofKeyType
 }
@@ -430,10 +398,6 @@ func (t *SignatureType) UnmarshalBinary(b []byte) error {
 		return fmt.Errorf("%d is not a valid signature type", *t)
 	}
 	return nil
-}
-
-func (t *SignatureType) SizeConstraints() (int, bool) {
-	return sizeofSignatureType, false
 }
 
 func (t *SignatureType) BytesConsumed() int {
