@@ -12,7 +12,7 @@ func MakeReplyOrSkip(t *testing.T) (*forest.Identity, *openpgp.Entity, *forest.C
 	identity, privkey, community, conversation := MakeConversationOrSkip(t)
 	content := QualifiedContentOrSkip(t, fields.ContentTypeUTF8String, []byte("test content"))
 	metadata := QualifiedContentOrSkip(t, fields.ContentTypeUTF8String, []byte{})
-	reply, err := forest.NewReply(identity, privkey, conversation, content, metadata)
+	reply, err := forest.As(identity, privkey).NewReply(conversation, content, metadata)
 	if err != nil {
 		t.Error("Failed to create Conversation with valid parameters", err)
 	}
@@ -71,7 +71,7 @@ func TestReplyToReplyValidates(t *testing.T) {
 	identity, privkey, _, _, reply := MakeReplyOrSkip(t)
 	content := QualifiedContentOrSkip(t, fields.ContentTypeUTF8String, []byte("hello"))
 	metadata := QualifiedContentOrSkip(t, fields.ContentTypeUTF8String, []byte(""))
-	r2, err := forest.NewReply(identity, privkey, reply, content, metadata)
+	r2, err := forest.As(identity, privkey).NewReply(reply, content, metadata)
 	if err != nil {
 		t.Error("Failed to create reply to existing reply", err)
 	}
@@ -82,7 +82,7 @@ func TestReplyToReplyFailsWhenTampered(t *testing.T) {
 	identity, privkey, _, _, reply := MakeReplyOrSkip(t)
 	content := QualifiedContentOrSkip(t, fields.ContentTypeUTF8String, []byte("hello"))
 	metadata := QualifiedContentOrSkip(t, fields.ContentTypeUTF8String, []byte(""))
-	r2, err := forest.NewReply(identity, privkey, reply, content, metadata)
+	r2, err := forest.As(identity, privkey).NewReply(reply, content, metadata)
 	if err != nil {
 		t.Error("Failed to create reply to existing reply", err)
 	}
@@ -94,7 +94,7 @@ func TestReplyToReplySerializes(t *testing.T) {
 	identity, privkey, _, _, reply := MakeReplyOrSkip(t)
 	content := QualifiedContentOrSkip(t, fields.ContentTypeUTF8String, []byte("hello"))
 	metadata := QualifiedContentOrSkip(t, fields.ContentTypeUTF8String, []byte(""))
-	r2, err := forest.NewReply(identity, privkey, reply, content, metadata)
+	r2, err := forest.As(identity, privkey).NewReply(reply, content, metadata)
 	if err != nil {
 		t.Error("Failed to create reply to existing reply", err)
 	}

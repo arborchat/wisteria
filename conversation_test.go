@@ -12,7 +12,7 @@ func MakeConversationOrSkip(t *testing.T) (*forest.Identity, *openpgp.Entity, *f
 	identity, privkey, community := MakeCommunityOrSkip(t)
 	content := QualifiedContentOrSkip(t, fields.ContentTypeUTF8String, []byte("Test content"))
 	metadata := QualifiedContentOrSkip(t, fields.ContentTypeUTF8String, []byte{})
-	conversation, err := forest.NewConversation(identity, privkey, community, content, metadata)
+	conversation, err := forest.As(identity, privkey).NewConversation(community, content, metadata)
 	if err != nil {
 		t.Error("Failed to create Conversation with valid parameters", err)
 	}

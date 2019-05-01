@@ -9,7 +9,6 @@ import (
 )
 
 func MakeIdentityOrSkip(t *testing.T) (*forest.Identity, *openpgp.Entity) {
-	builder := forest.IdentityBuilder{}
 	privkey, err := openpgp.NewEntity("forest-test", "comment", "email@email.io", nil)
 	if err != nil {
 		t.Skip("Failed to create private key", err)
@@ -22,7 +21,7 @@ func MakeIdentityOrSkip(t *testing.T) (*forest.Identity, *openpgp.Entity) {
 	if err != nil {
 		t.Skip("Failed to qualify metadata", err)
 	}
-	identity, err := builder.New(privkey, username, metadata)
+	identity, err := forest.NewIdentity(privkey, username, metadata)
 	if err != nil {
 		t.Error("Failed to create Identity with valid parameters", err)
 	}

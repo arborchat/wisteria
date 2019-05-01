@@ -18,7 +18,7 @@ func MakeCommunityOrSkip(t *testing.T) (*forest.Identity, *openpgp.Entity, *fore
 	if err != nil {
 		t.Skip("Failed to qualify metadata", err)
 	}
-	community, err := forest.NewCommunity(identity, privkey, name, metadata)
+	community, err := forest.As(identity, privkey).NewCommunity(name, metadata)
 	if err != nil {
 		t.Error("Failed to create Community with valid parameters", err)
 	}

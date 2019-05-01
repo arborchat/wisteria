@@ -10,6 +10,7 @@ import (
 	"git.sr.ht/~whereswaldon/forest-go/fields"
 )
 
+// SignatureValidator is a type that has a signature and can supply the ID of the node that signed it.
 type SignatureValidator interface {
 	MarshalSignedData() ([]byte, error)
 	GetSignature() *fields.QualifiedSignature
