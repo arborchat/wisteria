@@ -7,6 +7,7 @@ import (
 	"os"
 
 	forest "git.sr.ht/~whereswaldon/forest-go"
+	"git.sr.ht/~whereswaldon/forest-go/fields"
 	"golang.org/x/crypto/openpgp"
 	"golang.org/x/crypto/openpgp/packet"
 )
@@ -84,20 +85,19 @@ func main() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
-	qUsername, err := forest.NewQualifiedContent(forest.ContentTypeUTF8String, []byte(username))
+	qUsername, err := fields.NewQualifiedContent(fields.ContentTypeUTF8String, []byte(username))
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 
-	qMetadata, err := forest.NewQualifiedContent(forest.ContentTypeUTF8String, []byte(""))
+	qMetadata, err := fields.NewQualifiedContent(fields.ContentTypeUTF8String, []byte(""))
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 
-	builder := forest.IdentityBuilder{}
-	identity, err := builder.New(privkey, qUsername, qMetadata)
+	identity, err := forest.NewIdentity(privkey, qUsername, qMetadata)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)

@@ -1,6 +1,9 @@
 package fields
 
-import "bytes"
+import (
+	"bytes"
+	"encoding"
+)
 
 const minSizeofQualified = sizeofDescriptor
 
@@ -11,6 +14,22 @@ type QualifiedHash struct {
 }
 
 const minSizeofQualifiedHash = sizeofHashDescriptor
+
+func marshalTextQualified(first, second encoding.TextMarshaler) ([]byte, error) {
+	buf := new(bytes.Buffer)
+	b, err := first.MarshalText()
+	if err != nil {
+		return nil, err
+	}
+	_, _ = buf.Write(b)
+	_, _ = buf.Write([]byte(":"))
+	b, err = second.MarshalText()
+	if err != nil {
+		return nil, err
+	}
+	_, _ = buf.Write(b)
+	return buf.Bytes(), nil
+}
 
 // NewQualifiedHash returns a valid QualifiedHash from the given data
 func NewQualifiedHash(t HashType, content []byte) (*QualifiedHash, error) {
@@ -62,6 +81,10 @@ func (q *QualifiedHash) Equals(other *QualifiedHash) bool {
 	return q.Descriptor.Equals(&other.Descriptor) && q.Value.Equals(&other.Value)
 }
 
+func (q *QualifiedHash) MarshalText() ([]byte, error) {
+	return marshalTextQualified(&q.Descriptor, q.Value)
+}
+
 type QualifiedContent struct {
 	Descriptor ContentDescriptor
 	Value      Value
@@ -107,6 +130,10 @@ func (q *QualifiedContent) MarshalBinary() ([]byte, error) {
 
 func (q *QualifiedContent) BytesConsumed() int {
 	return TotalBytesConsumed(q.SerializationOrder()...)
+}
+
+func (q *QualifiedContent) MarshalText() ([]byte, error) {
+	return marshalTextQualified(&q.Descriptor, q.Value)
 }
 
 type QualifiedKey struct {
@@ -156,6 +183,10 @@ func (q *QualifiedKey) BytesConsumed() int {
 	return TotalBytesConsumed(q.SerializationOrder()...)
 }
 
+func (q *QualifiedKey) MarshalText() ([]byte, error) {
+	return marshalTextQualified(&q.Descriptor, q.Value)
+}
+
 type QualifiedSignature struct {
 	Descriptor SignatureDescriptor
 	Value      Value
@@ -201,4 +232,8 @@ func (q *QualifiedSignature) MarshalBinary() ([]byte, error) {
 
 func (q *QualifiedSignature) BytesConsumed() int {
 	return TotalBytesConsumed(q.SerializationOrder()...)
+}
+
+func (q *QualifiedSignature) MarshalText() ([]byte, error) {
+	return marshalTextQualified(&q.Descriptor, q.Value)
 }

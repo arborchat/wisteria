@@ -1,6 +1,28 @@
 package fields
 
+import (
+	"bytes"
+	"encoding"
+)
+
 const sizeofDescriptor = sizeofgenericType + sizeofContentLength
+
+func marshalTextDescriptor(descriptorType encoding.TextMarshaler, length encoding.TextMarshaler) ([]byte, error) {
+	buf := bytes.NewBufferString("[")
+	b, err := descriptorType.MarshalText()
+	if err != nil {
+		return nil, err
+	}
+	_, _ = buf.Write(b)
+	_, _ = buf.Write([]byte(","))
+	b, err = length.MarshalText()
+	if err != nil {
+		return nil, err
+	}
+	_, _ = buf.Write(b)
+	_, _ = buf.Write([]byte("]"))
+	return buf.Bytes(), nil
+}
 
 // concrete descriptors
 type HashDescriptor struct {
@@ -26,6 +48,10 @@ func (d *HashDescriptor) Equals(other *HashDescriptor) bool {
 	return d.Type.Equals(&other.Type) && d.Length.Equals(&other.Length)
 }
 
+func (d *HashDescriptor) MarshalText() ([]byte, error) {
+	return marshalTextDescriptor(d.Type, d.Length)
+}
+
 type ContentDescriptor struct {
 	Type   ContentType
 	Length ContentLength
@@ -47,6 +73,10 @@ func (d *ContentDescriptor) SerializationOrder() []BidirectionalBinaryMarshaler 
 
 func (d *ContentDescriptor) Equals(other *ContentDescriptor) bool {
 	return d.Type.Equals(&other.Type) && d.Length.Equals(&other.Length)
+}
+
+func (d *ContentDescriptor) MarshalText() ([]byte, error) {
+	return marshalTextDescriptor(d.Type, d.Length)
 }
 
 type SignatureDescriptor struct {
@@ -72,6 +102,10 @@ func (d *SignatureDescriptor) Equals(other *SignatureDescriptor) bool {
 	return d.Type.Equals(&other.Type) && d.Length.Equals(&other.Length)
 }
 
+func (d *SignatureDescriptor) MarshalText() ([]byte, error) {
+	return marshalTextDescriptor(d.Type, d.Length)
+}
+
 type KeyDescriptor struct {
 	Type   KeyType
 	Length ContentLength
@@ -93,4 +127,8 @@ func (d *KeyDescriptor) SerializationOrder() []BidirectionalBinaryMarshaler {
 
 func (d *KeyDescriptor) Equals(other *KeyDescriptor) bool {
 	return d.Type.Equals(&other.Type) && d.Length.Equals(&other.Length)
+}
+
+func (d *KeyDescriptor) MarshalText() ([]byte, error) {
+	return marshalTextDescriptor(d.Type, d.Length)
 }

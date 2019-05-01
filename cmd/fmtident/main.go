@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -20,7 +21,7 @@ func prettyPrintFrom(input io.Reader) {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
-	text, err := i.MarshalText()
+	text, err := json.Marshal(i)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
@@ -37,7 +38,15 @@ func main() {
 		inputs = append(inputs, os.Stdin)
 	} else {
 		for _, name := range os.Args[1:] {
-			file, err := os.Open(name)
+			var (
+				file io.Reader
+				err  error
+			)
+			if name == "-" {
+				file = os.Stdin
+			} else {
+				file, err = os.Open(name)
+			}
 			if err != nil {
 				fmt.Fprintln(os.Stderr, err)
 				os.Exit(1)
