@@ -59,6 +59,25 @@ func (n *commonNode) unmarshalBinarySignature(b []byte) ([]byte, error) {
 	return fields.UnmarshalAll(b, fields.AsUnmarshaler(n.postsignSerializationOrder())...)
 }
 
+// GetSignature returns the signature for the node, which must correspond to the Signature Authority for
+// the node in order to be valid.
+func (n *commonNode) GetSignature() *fields.QualifiedSignature {
+	return &n.Signature
+}
+
+// SignatureIdentityHash returns the node identitifer for the Identity that signed this node.
+func (n *commonNode) SignatureIdentityHash() *fields.QualifiedHash {
+	return &n.SignatureAuthority
+}
+
+func (n commonNode) IsIdentity() bool {
+	return n.Type == fields.NodeTypeIdentity
+}
+
+func (n commonNode) HashDescriptor() *fields.HashDescriptor {
+	return &n.IDDesc
+}
+
 func (n *commonNode) Equals(n2 *commonNode) bool {
 	return n.Type.Equals(&n2.Type) &&
 		n.SchemaVersion.Equals(&n2.SchemaVersion) &&
@@ -71,6 +90,9 @@ func (n *commonNode) Equals(n2 *commonNode) bool {
 }
 
 // concrete nodes
+
+// Identity nodes represent a user. They associate a username with a public key that the user
+// will sign messages with.
 type Identity struct {
 	commonNode
 	Name      fields.QualifiedContent
@@ -94,6 +116,8 @@ func (i *Identity) SerializationOrder() []fields.BidirectionalBinaryMarshaler {
 	return order
 }
 
+// MarshalSignedData writes all data that should be signed in the correct order for signing. This
+// can be used both to generate and validate message signatures.
 func (i Identity) MarshalSignedData() ([]byte, error) {
 	buf := new(bytes.Buffer)
 	if err := fields.MarshalAllInto(buf, fields.AsMarshaler(i.presignSerializationOrder())...); err != nil {
@@ -103,22 +127,6 @@ func (i Identity) MarshalSignedData() ([]byte, error) {
 		return nil, err
 	}
 	return buf.Bytes(), nil
-}
-
-func (i Identity) Signature() *fields.QualifiedSignature {
-	return &i.commonNode.Signature
-}
-
-func (i Identity) SignatureIdentityHash() *fields.QualifiedHash {
-	return &i.commonNode.SignatureAuthority
-}
-
-func (i Identity) IsIdentity() bool {
-	return true
-}
-
-func (i Identity) HashDescriptor() *fields.HashDescriptor {
-	return &i.commonNode.IDDesc
 }
 
 func (i Identity) MarshalBinary() ([]byte, error) {
@@ -240,22 +248,6 @@ func (c Community) MarshalSignedData() ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-func (c Community) Signature() *fields.QualifiedSignature {
-	return &c.commonNode.Signature
-}
-
-func (c Community) SignatureIdentityHash() *fields.QualifiedHash {
-	return &c.commonNode.SignatureAuthority
-}
-
-func (c Community) IsIdentity() bool {
-	return false
-}
-
-func (c Community) HashDescriptor() *fields.HashDescriptor {
-	return &c.commonNode.IDDesc
-}
-
 func (c Community) MarshalBinary() ([]byte, error) {
 	signed, err := c.MarshalSignedData()
 	if err != nil {
@@ -325,22 +317,6 @@ func (c Conversation) MarshalSignedData() ([]byte, error) {
 		return nil, err
 	}
 	return buf.Bytes(), nil
-}
-
-func (c Conversation) Signature() *fields.QualifiedSignature {
-	return &c.commonNode.Signature
-}
-
-func (c Conversation) SignatureIdentityHash() *fields.QualifiedHash {
-	return &c.commonNode.SignatureAuthority
-}
-
-func (c Conversation) IsIdentity() bool {
-	return false
-}
-
-func (c Conversation) HashDescriptor() *fields.HashDescriptor {
-	return &c.commonNode.IDDesc
 }
 
 func (c Conversation) MarshalBinary() ([]byte, error) {
@@ -413,22 +389,6 @@ func (r Reply) MarshalSignedData() ([]byte, error) {
 		return nil, err
 	}
 	return buf.Bytes(), nil
-}
-
-func (r Reply) Signature() *fields.QualifiedSignature {
-	return &r.commonNode.Signature
-}
-
-func (r Reply) SignatureIdentityHash() *fields.QualifiedHash {
-	return &r.commonNode.SignatureAuthority
-}
-
-func (r Reply) IsIdentity() bool {
-	return false
-}
-
-func (r Reply) HashDescriptor() *fields.HashDescriptor {
-	return &r.commonNode.IDDesc
 }
 
 func (r Reply) MarshalBinary() ([]byte, error) {

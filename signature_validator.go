@@ -12,7 +12,7 @@ import (
 
 type SignatureValidator interface {
 	MarshalSignedData() ([]byte, error)
-	Signature() *fields.QualifiedSignature
+	GetSignature() *fields.QualifiedSignature
 	SignatureIdentityHash() *fields.QualifiedHash
 	IsIdentity() bool
 }
@@ -42,7 +42,7 @@ func ValidateSignature(v SignatureValidator, identity *Identity) (bool, error) {
 	}
 	signedContentBuf := bytes.NewBuffer(signedContent)
 
-	signatureBuf := bytes.NewBuffer([]byte(v.Signature().Value))
+	signatureBuf := bytes.NewBuffer([]byte(v.GetSignature().Value))
 	keyring := openpgp.EntityList([]*openpgp.Entity{pubkeyEntity})
 	_, err = openpgp.CheckDetachedSignature(keyring, signedContentBuf, signatureBuf)
 	if err != nil {
