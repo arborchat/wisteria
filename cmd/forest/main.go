@@ -19,7 +19,8 @@ import (
 const (
 	usageError = 1
 
-	commandIdentity = "identity"
+	commandIdentity  = "identity"
+	commandCommunity = "community"
 
 	subcommandCreate = "create"
 	subcommandShow   = "show"
@@ -38,6 +39,8 @@ func main() {
 	switch os.Args[1] {
 	case commandIdentity:
 		cmdHandler = identity
+	case commandCommunity:
+		cmdHandler = community
 	default:
 		flag.Usage()
 	}
@@ -80,7 +83,7 @@ func createIdentity(args []string) error {
 	var (
 		name, metadata, keyfile string
 	)
-	flags := flag.NewFlagSet(commandIdentity+" "+subcommandCreate, flag.ContinueOnError)
+	flags := flag.NewFlagSet(commandIdentity+" "+subcommandCreate, flag.ExitOnError)
 	flags.StringVar(&name, "name", "forest", "username for the identity node")
 	flags.StringVar(&metadata, "metadata", "forest", "metadata for the identity node")
 	flags.StringVar(&keyfile, "key", "arbor.privkey", "the openpgp private key for the identity node")
@@ -117,13 +120,7 @@ func createIdentity(args []string) error {
 		return err
 	}
 
-	outfile, err := os.Create(fname)
-	if err != nil {
-		return err
-	}
-	defer outfile.Close()
-
-	if err := save(outfile, identity); err != nil {
+	if err := saveAs(fname, identity); err != nil {
 		return err
 	}
 
@@ -133,7 +130,7 @@ func createIdentity(args []string) error {
 }
 
 func showIdentity(args []string) error {
-	flags := flag.NewFlagSet(commandIdentity+" "+subcommandShow, flag.ContinueOnError)
+	flags := flag.NewFlagSet(commandIdentity+" "+subcommandShow, flag.ExitOnError)
 	usage := func() {
 		flags.PrintDefaults()
 	}
@@ -167,6 +164,126 @@ func showIdentity(args []string) error {
 	return nil
 }
 
+func community(args []string) error {
+	flags := flag.NewFlagSet(commandCommunity, flag.ExitOnError)
+	usage := func() {
+		flags.PrintDefaults()
+		os.Exit(usageError)
+	}
+	err := flags.Parse(args)
+	if err != nil {
+		return err
+	}
+	if len(flags.Args()) < 1 {
+		usage()
+	}
+	var cmdHandler handler
+	switch flags.Arg(0) {
+	case subcommandCreate:
+		cmdHandler = createCommunity
+	case subcommandShow:
+		cmdHandler = showCommunity
+	default:
+		usage()
+	}
+	if err := cmdHandler(flags.Args()[1:]); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+	}
+	return nil
+}
+
+func createCommunity(args []string) error {
+	var (
+		name, metadata, keyfile, identity string
+	)
+	flags := flag.NewFlagSet(commandCommunity+" "+subcommandCreate, flag.ExitOnError)
+	flags.StringVar(&name, "name", "forest", "username for the community node")
+	flags.StringVar(&metadata, "metadata", "forest", "metadata for the community node")
+	flags.StringVar(&keyfile, "key", "arbor.privkey", "the openpgp private key for the signing identity node")
+	flags.StringVar(&identity, "as", "", "[required] the id of the signing identity node")
+	usage := func() {
+		flags.PrintDefaults()
+	}
+	if err := flags.Parse(args); err != nil {
+		usage()
+		return err
+	}
+	qName, err := fields.NewQualifiedContent(fields.ContentTypeUTF8String, []byte(name))
+	if err != nil {
+		return err
+	}
+	qMeta, err := fields.NewQualifiedContent(fields.ContentTypeUTF8String, []byte(metadata))
+	if err != nil {
+		return err
+	}
+	privkey, err := getPrivateKey(keyfile, &PGPKeyConfig{
+		Name:    "Arbor identity key",
+		Comment: "Automatically generated",
+		Email:   "none@arbor.chat",
+	})
+	if err != nil {
+		return err
+	}
+
+	idNode, err := getIdentity(identity)
+	if err != nil {
+		return err
+	}
+
+	community, err := forest.As(idNode, privkey).NewCommunity(qName, qMeta)
+	if err != nil {
+		return err
+	}
+
+	fname, err := filename(community.ID())
+	if err != nil {
+		return err
+	}
+
+	if err := saveAs(fname, community); err != nil {
+		return err
+	}
+
+	fmt.Println(fname)
+
+	return nil
+}
+
+func showCommunity(args []string) error {
+	flags := flag.NewFlagSet(commandCommunity+" "+subcommandShow, flag.ExitOnError)
+	usage := func() {
+		flags.PrintDefaults()
+	}
+	if err := flags.Parse(args); err != nil {
+		usage()
+		return err
+	}
+	if len(flags.Args()) < 1 {
+		return fmt.Errorf("missing required argument [node id]")
+	}
+	idFile, err := os.Open(args[0])
+	if err != nil {
+		return err
+	}
+	b, err := ioutil.ReadAll(idFile)
+	if err != nil {
+		return err
+	}
+	c, err := forest.UnmarshalCommunity(b)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	text, err := json.Marshal(c)
+	if err != nil {
+		return err
+	}
+	if _, err := os.Stdout.Write(text); err != nil {
+		return err
+	}
+	return nil
+}
+
 func filename(desc *fields.QualifiedHash) (string, error) {
 	b, err := desc.MarshalBinary()
 	if err != nil {
@@ -183,7 +300,34 @@ func save(w io.Writer, node encoding.BinaryMarshaler) error {
 	}
 	_, err = w.Write(b)
 	return err
+}
 
+func saveAs(name string, node encoding.BinaryMarshaler) error {
+	outfile, err := os.Create(name)
+	if err != nil {
+		return err
+	}
+	defer outfile.Close()
+
+	return save(outfile, node)
+}
+
+func loadIdentity(r io.Reader) (*forest.Identity, error) {
+	b, err := ioutil.ReadAll(r)
+	if err != nil {
+		return nil, err
+	}
+	return forest.UnmarshalIdentity(b)
+}
+
+func getIdentity(filename string) (*forest.Identity, error) {
+	idFile, err := os.Open(filename)
+	if err != nil {
+		return nil, err
+	}
+	defer idFile.Close()
+
+	return loadIdentity(idFile)
 }
 
 func readKey(in io.Reader) (*openpgp.Entity, error) {
