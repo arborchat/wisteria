@@ -3,9 +3,11 @@ package main
 import (
 	"encoding"
 	"encoding/base64"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 
 	forest "git.sr.ht/~whereswaldon/forest-go"
@@ -20,16 +22,16 @@ const (
 	commandIdentity = "identity"
 
 	subcommandCreate = "create"
+	subcommandShow   = "show"
 )
 
-func usageAbort() {
-	flag.PrintDefaults()
-	os.Exit(usageError)
-}
-
 func main() {
+	flag.Usage = func() {
+		flag.PrintDefaults()
+		os.Exit(usageError)
+	}
 	if len(os.Args) < 2 {
-		usageAbort()
+		flag.Usage()
 	}
 
 	var cmdHandler handler
@@ -37,7 +39,7 @@ func main() {
 	case commandIdentity:
 		cmdHandler = identity
 	default:
-		usageAbort()
+		flag.Usage()
 	}
 	if err := cmdHandler(os.Args[2:]); err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -47,17 +49,28 @@ func main() {
 type handler func(args []string) error
 
 func identity(args []string) error {
-	if len(args) < 1 {
-		usageAbort()
+	flags := flag.NewFlagSet(commandIdentity, flag.ExitOnError)
+	usage := func() {
+		flags.PrintDefaults()
+		os.Exit(usageError)
+	}
+	err := flags.Parse(args)
+	if err != nil {
+		return err
+	}
+	if len(flags.Args()) < 1 {
+		usage()
 	}
 	var cmdHandler handler
-	switch args[0] {
+	switch flags.Arg(0) {
 	case subcommandCreate:
 		cmdHandler = createIdentity
+	case subcommandShow:
+		cmdHandler = showIdentity
 	default:
-		usageAbort()
+		usage()
 	}
-	if err := cmdHandler(os.Args[1:]); err != nil {
+	if err := cmdHandler(flags.Args()[1:]); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 	}
 	return nil
@@ -67,12 +80,15 @@ func createIdentity(args []string) error {
 	var (
 		name, metadata, keyfile string
 	)
-	flags := flag.NewFlagSet("create identity", flag.ContinueOnError)
+	flags := flag.NewFlagSet(commandIdentity+" "+subcommandCreate, flag.ContinueOnError)
 	flags.StringVar(&name, "name", "forest", "username for the identity node")
 	flags.StringVar(&metadata, "metadata", "forest", "metadata for the identity node")
 	flags.StringVar(&keyfile, "key", "arbor.privkey", "the openpgp private key for the identity node")
-	if err := flags.Parse(args); err != nil {
+	usage := func() {
 		flags.PrintDefaults()
+	}
+	if err := flags.Parse(args); err != nil {
+		usage()
 		return err
 	}
 	qName, err := fields.NewQualifiedContent(fields.ContentTypeUTF8String, []byte(name))
@@ -116,13 +132,48 @@ func createIdentity(args []string) error {
 	return nil
 }
 
+func showIdentity(args []string) error {
+	flags := flag.NewFlagSet(commandIdentity+" "+subcommandShow, flag.ContinueOnError)
+	usage := func() {
+		flags.PrintDefaults()
+	}
+	if err := flags.Parse(args); err != nil {
+		usage()
+		return err
+	}
+	if len(flags.Args()) < 1 {
+		return fmt.Errorf("missing required argument [node id]")
+	}
+	idFile, err := os.Open(args[0])
+	if err != nil {
+		return err
+	}
+	b, err := ioutil.ReadAll(idFile)
+	if err != nil {
+		return err
+	}
+	i, err := forest.UnmarshalIdentity(b)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	text, err := json.Marshal(i)
+	if err != nil {
+		return err
+	}
+	if _, err := os.Stdout.Write(text); err != nil {
+		return err
+	}
+	return nil
+}
+
 func filename(desc *fields.QualifiedHash) (string, error) {
 	b, err := desc.MarshalBinary()
 	if err != nil {
 		return "", err
 	}
 
-	return base64.StdEncoding.EncodeToString(b), nil
+	return base64.RawURLEncoding.EncodeToString(b), nil
 }
 
 func save(w io.Writer, node encoding.BinaryMarshaler) error {
