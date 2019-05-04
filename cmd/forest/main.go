@@ -19,8 +19,9 @@ import (
 const (
 	usageError = 1
 
-	commandIdentity  = "identity"
-	commandCommunity = "community"
+	commandIdentity     = "identity"
+	commandCommunity    = "community"
+	commandConversation = "conversation"
 
 	subcommandCreate = "create"
 	subcommandShow   = "show"
@@ -28,6 +29,13 @@ const (
 
 func main() {
 	flag.Usage = func() {
+		fmt.Fprintln(os.Stderr, `forest
+
+A CLI for manipulating nodes in the arbor forest.
+
+Subcommands:
+
+`+commandIdentity+"\n"+commandCommunity)
 		flag.PrintDefaults()
 		os.Exit(usageError)
 	}
@@ -41,6 +49,8 @@ func main() {
 		cmdHandler = identity
 	case commandCommunity:
 		cmdHandler = community
+	case commandConversation:
+		cmdHandler = conversation
 	default:
 		flag.Usage()
 	}
@@ -130,38 +140,10 @@ func createIdentity(args []string) error {
 }
 
 func showIdentity(args []string) error {
-	flags := flag.NewFlagSet(commandIdentity+" "+subcommandShow, flag.ExitOnError)
-	usage := func() {
-		flags.PrintDefaults()
-	}
-	if err := flags.Parse(args); err != nil {
-		usage()
-		return err
-	}
-	if len(flags.Args()) < 1 {
-		return fmt.Errorf("missing required argument [node id]")
-	}
-	idFile, err := os.Open(args[0])
-	if err != nil {
-		return err
-	}
-	b, err := ioutil.ReadAll(idFile)
-	if err != nil {
-		return err
-	}
-	i, err := forest.UnmarshalIdentity(b)
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
-	}
-	text, err := json.Marshal(i)
-	if err != nil {
-		return err
-	}
-	if _, err := os.Stdout.Write(text); err != nil {
-		return err
-	}
-	return nil
+	return showNode(args, commandIdentity, func(b []byte) (interface{}, error) {
+		node, err := forest.UnmarshalIdentity(b)
+		return interface{}(node), err
+	})
 }
 
 func community(args []string) error {
@@ -250,7 +232,116 @@ func createCommunity(args []string) error {
 }
 
 func showCommunity(args []string) error {
-	flags := flag.NewFlagSet(commandCommunity+" "+subcommandShow, flag.ExitOnError)
+	return showNode(args, commandCommunity, func(b []byte) (interface{}, error) {
+		node, err := forest.UnmarshalCommunity(b)
+		return interface{}(node), err
+	})
+}
+
+func conversation(args []string) error {
+	flags := flag.NewFlagSet(commandConversation, flag.ExitOnError)
+	usage := func() {
+		flags.PrintDefaults()
+		os.Exit(usageError)
+	}
+	err := flags.Parse(args)
+	if err != nil {
+		return err
+	}
+	if len(flags.Args()) < 1 {
+		usage()
+	}
+	var cmdHandler handler
+	switch flags.Arg(0) {
+	case subcommandCreate:
+		cmdHandler = createConversation
+	case subcommandShow:
+		cmdHandler = showConversation
+	default:
+		usage()
+	}
+	if err := cmdHandler(flags.Args()[1:]); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+	}
+	return nil
+}
+
+func createConversation(args []string) error {
+	var (
+		content, metadata, community, keyfile, identity string
+	)
+	flags := flag.NewFlagSet(commandConversation+" "+subcommandCreate, flag.ExitOnError)
+	flags.StringVar(&metadata, "metadata", "forest", "metadata for the conversation node")
+	flags.StringVar(&keyfile, "key", "arbor.privkey", "the openpgp private key for the signing identity node")
+	flags.StringVar(&identity, "as", "", "[required] the id of the signing identity node")
+	flags.StringVar(&community, "in", "", "[required] the id of the parent community node")
+	flags.StringVar(&content, "content", "", "[required] content of the conversation node")
+
+	usage := func() {
+		flags.PrintDefaults()
+	}
+	if err := flags.Parse(args); err != nil {
+		usage()
+		return err
+	}
+
+	qContent, err := fields.NewQualifiedContent(fields.ContentTypeUTF8String, []byte(content))
+	if err != nil {
+		return err
+	}
+
+	qMeta, err := fields.NewQualifiedContent(fields.ContentTypeUTF8String, []byte(metadata))
+	if err != nil {
+		return err
+	}
+
+	privkey, err := getPrivateKey(keyfile, &PGPKeyConfig{
+		Name:    "Arbor identity key",
+		Comment: "Automatically generated",
+		Email:   "none@arbor.chat",
+	})
+	if err != nil {
+		return err
+	}
+
+	idNode, err := getIdentity(identity)
+	if err != nil {
+		return err
+	}
+
+	communityNode, err := getCommunity(community)
+	if err != nil {
+		return err
+	}
+
+	conversation, err := forest.As(idNode, privkey).NewConversation(communityNode, qContent, qMeta)
+	if err != nil {
+		return err
+	}
+
+	fname, err := filename(conversation.ID())
+	if err != nil {
+		return err
+	}
+
+	if err := saveAs(fname, conversation); err != nil {
+		return err
+	}
+
+	fmt.Println(fname)
+
+	return nil
+}
+
+func showConversation(args []string) error {
+	return showNode(args, commandConversation, func(b []byte) (interface{}, error) {
+		node, err := forest.UnmarshalConversation(b)
+		return interface{}(node), err
+	})
+}
+
+func showNode(args []string, commandName string, fromBytes func([]byte) (interface{}, error)) error {
+	flags := flag.NewFlagSet(commandName+" "+subcommandShow, flag.ExitOnError)
 	usage := func() {
 		flags.PrintDefaults()
 	}
@@ -261,15 +352,11 @@ func showCommunity(args []string) error {
 	if len(flags.Args()) < 1 {
 		return fmt.Errorf("missing required argument [node id]")
 	}
-	idFile, err := os.Open(args[0])
-	if err != nil {
+	b, err := ioutil.ReadFile(args[0])
+	if err != nil && err != io.EOF {
 		return err
 	}
-	b, err := ioutil.ReadAll(idFile)
-	if err != nil {
-		return err
-	}
-	c, err := forest.UnmarshalCommunity(b)
+	c, err := fromBytes(b)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
@@ -314,7 +401,7 @@ func saveAs(name string, node encoding.BinaryMarshaler) error {
 
 func loadIdentity(r io.Reader) (*forest.Identity, error) {
 	b, err := ioutil.ReadAll(r)
-	if err != nil {
+	if err != nil && err != io.EOF {
 		return nil, err
 	}
 	return forest.UnmarshalIdentity(b)
@@ -328,6 +415,24 @@ func getIdentity(filename string) (*forest.Identity, error) {
 	defer idFile.Close()
 
 	return loadIdentity(idFile)
+}
+
+func loadCommunity(r io.Reader) (*forest.Community, error) {
+	b, err := ioutil.ReadAll(r)
+	if err != nil && err != io.EOF {
+		return nil, err
+	}
+	return forest.UnmarshalCommunity(b)
+}
+
+func getCommunity(filename string) (*forest.Community, error) {
+	idFile, err := os.Open(filename)
+	if err != nil {
+		return nil, err
+	}
+	defer idFile.Close()
+
+	return loadCommunity(idFile)
 }
 
 func readKey(in io.Reader) (*openpgp.Entity, error) {
