@@ -133,7 +133,23 @@ func (q *QualifiedContent) BytesConsumed() int {
 }
 
 func (q *QualifiedContent) MarshalText() ([]byte, error) {
-	return marshalTextQualified(&q.Descriptor, q.Value)
+	switch q.Descriptor.Type {
+	case ContentTypeUTF8String:
+		fallthrough
+	case ContentTypeJSON:
+		descText, err := (&q.Descriptor).MarshalText()
+		if err != nil {
+			return nil, err
+		}
+		buf := bytes.NewBuffer(descText)
+		_, err = buf.Write(q.Value)
+		if err != nil {
+			return nil, err
+		}
+		return buf.Bytes(), nil
+	default:
+		return marshalTextQualified(&q.Descriptor, q.Value)
+	}
 }
 
 type QualifiedKey struct {

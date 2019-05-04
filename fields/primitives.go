@@ -133,8 +133,8 @@ func (v Value) MarshalBinary() ([]byte, error) {
 }
 
 func (v Value) MarshalText() ([]byte, error) {
-	based := base64.StdEncoding.EncodeToString([]byte(v))
-	return []byte("value:" + based), nil
+	based := base64.RawURLEncoding.EncodeToString([]byte(v))
+	return []byte("base64url:" + based), nil
 }
 
 // UnmarshalBinary converts from the binary representation of a Value
