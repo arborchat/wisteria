@@ -5,6 +5,9 @@ sources:
   - https://git.sr.ht/~whereswaldon/forest-go
 environment:
   oses: '"linux darwin openbsd freebsd netbsd windows"'
+  github_mirror_url: "git@github.com:arborchat/forest-go.git"
+secrets:
+  - 08901094-23ba-4278-8b09-a02b7df36f52
 tasks:
   - test: |
       cd forest-go
@@ -12,3 +15,7 @@ tasks:
   - cross_compile: |
       cd forest-go
       for os in $oses ; do env GOOS="$os" go build ; done
+  - mirror_to_github: |
+      cd forest-go
+      GIT_BRANCH=$(git branch --format '%(HEAD)%(refname:lstrip=2)' | grep '*' | tr -d '*')
+      if [ "master" = "$GIT_BRANCH" ]; then git remote add origin "$github_mirror_url"; git push -u origin master; fi
