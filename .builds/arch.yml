@@ -17,5 +17,5 @@ tasks:
       for os in $oses ; do env GOOS="$os" go build ; done
   - mirror_to_github: |
       cd forest-go
-      GIT_BRANCH=$(git branch --format '%(HEAD)%(refname:lstrip=2)' | grep '*' | tr -d '*')
-      if [ "master" = "$GIT_BRANCH" ]; then git remote add origin "$github_mirror_url"; git push -u origin master; fi
+      GIT_COMMIT=$(git rev-parse HEAD)
+      if git branch --format '%(refname:lstrip=2)' --contains "$GIT_COMMIT" | grep 'master'; then git remote add origin "$github_mirror_url"; git checkout master; git push -u origin master; fi
