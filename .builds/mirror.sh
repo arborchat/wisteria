@@ -21,9 +21,11 @@ ensure_ssh() {
 }
 
 # if our current commit is on the master branch, push to GitHub
-if git branch --format '%(refname:lstrip=2)' --contains "$GIT_COMMIT" | grep 'master'; then
+mirror_branch="master"
+if git branch --format '%(refname:lstrip=2)' --contains "$GIT_COMMIT" | grep "$mirror_branch"; then
   ensure_ssh
-  git remote add origin "$GITHUB_MIRROR_URL" && \
-  git checkout master && \
-  git push -u origin master
+  remote_name="mirror"
+  git remote add "$remote_name" "$GITHUB_MIRROR_URL" && \
+  git checkout "$mirror_branch" && \
+  git push -u "$remote_name" "$mirror_branch"
 fi
