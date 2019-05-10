@@ -552,7 +552,7 @@ func loadReplyOrConversation(r io.Reader) (interface{}, error) {
 	case fields.NodeTypeReply:
 		return forest.UnmarshalReply(b)
 	default:
-		return nil, fmt.Errorf("Expected node type of reply or conversation, got %s", nodeType)
+		return nil, fmt.Errorf("Expected node type of reply or conversation, got %v", nodeType)
 	}
 }
 
