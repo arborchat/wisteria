@@ -6,6 +6,22 @@ import (
 	"git.sr.ht/~whereswaldon/forest-go/fields"
 )
 
+// NodeTypeOf returns the NodeType of the provided binary-marshaled node.
+// If the provided bytes are not a forest node or the type cannot be determined,
+// an error will be returned and the first return value must be ignored.
+func NodeTypeOf(b []byte) (fields.NodeType, error) {
+	var (
+		ver   fields.Version
+		t     fields.NodeType
+		order = []fields.BidirectionalBinaryMarshaler{
+			&ver,
+			&t,
+		}
+	)
+	_, err := fields.UnmarshalAll(b, fields.AsUnmarshaler(order)...)
+	return t, err
+}
+
 // generic node
 type commonNode struct {
 	// the ID is deterministically computed from the rest of the values
@@ -310,8 +326,9 @@ func (c *Conversation) Equals(c2 *Conversation) bool {
 
 type Reply struct {
 	commonNode
-	CommunityID fields.QualifiedHash
-	Content     fields.QualifiedContent
+	CommunityID    fields.QualifiedHash
+	ConversationID fields.QualifiedHash
+	Content        fields.QualifiedContent
 }
 
 func newReply() *Reply {
@@ -321,7 +338,7 @@ func newReply() *Reply {
 }
 
 func (r *Reply) nodeSpecificSerializationOrder() []fields.BidirectionalBinaryMarshaler {
-	return []fields.BidirectionalBinaryMarshaler{&r.CommunityID, &r.Content}
+	return []fields.BidirectionalBinaryMarshaler{&r.CommunityID, &r.ConversationID, &r.Content}
 }
 
 func (r *Reply) SerializationOrder() []fields.BidirectionalBinaryMarshaler {

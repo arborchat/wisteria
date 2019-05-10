@@ -22,6 +22,7 @@ const (
 	commandIdentity     = "identity"
 	commandCommunity    = "community"
 	commandConversation = "conversation"
+	commandReply        = "reply"
 
 	subcommandCreate = "create"
 	subcommandShow   = "show"
@@ -51,6 +52,8 @@ Subcommands:
 		cmdHandler = community
 	case commandConversation:
 		cmdHandler = conversation
+	case commandReply:
+		cmdHandler = reply
 	default:
 		flag.Usage()
 	}
@@ -371,6 +374,108 @@ func showNode(args []string, commandName string, fromBytes func([]byte) (interfa
 	return nil
 }
 
+func reply(args []string) error {
+	flags := flag.NewFlagSet(commandReply, flag.ExitOnError)
+	usage := func() {
+		flags.PrintDefaults()
+		os.Exit(usageError)
+	}
+	err := flags.Parse(args)
+	if err != nil {
+		return err
+	}
+	if len(flags.Args()) < 1 {
+		usage()
+	}
+	var cmdHandler handler
+	switch flags.Arg(0) {
+	case subcommandCreate:
+		cmdHandler = createReply
+	case subcommandShow:
+		cmdHandler = showReply
+	default:
+		usage()
+	}
+	if err := cmdHandler(flags.Args()[1:]); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+	}
+	return nil
+}
+
+func createReply(args []string) error {
+	var (
+		content, metadata, parent, keyfile, identity string
+	)
+	flags := flag.NewFlagSet(commandReply+" "+subcommandCreate, flag.ExitOnError)
+	flags.StringVar(&metadata, "metadata", "forest", "metadata for the conversation node")
+	flags.StringVar(&keyfile, "key", "arbor.privkey", "the openpgp private key for the signing identity node")
+	flags.StringVar(&identity, "as", "", "[required] the id of the signing identity node")
+	flags.StringVar(&parent, "to", "", "[required] the id of the parent community node")
+	flags.StringVar(&content, "content", "", "[required] content of the conversation node")
+
+	usage := func() {
+		flags.PrintDefaults()
+	}
+	if err := flags.Parse(args); err != nil {
+		usage()
+		return err
+	}
+
+	qContent, err := fields.NewQualifiedContent(fields.ContentTypeUTF8String, []byte(content))
+	if err != nil {
+		return err
+	}
+
+	qMeta, err := fields.NewQualifiedContent(fields.ContentTypeUTF8String, []byte(metadata))
+	if err != nil {
+		return err
+	}
+
+	privkey, err := getPrivateKey(keyfile, &PGPKeyConfig{
+		Name:    "Arbor identity key",
+		Comment: "Automatically generated",
+		Email:   "none@arbor.chat",
+	})
+	if err != nil {
+		return err
+	}
+
+	idNode, err := getIdentity(identity)
+	if err != nil {
+		return err
+	}
+
+	parentNode, err := getReplyOrConversation(parent)
+	if err != nil {
+		return err
+	}
+
+	reply, err := forest.As(idNode, privkey).NewReply(parentNode, qContent, qMeta)
+	if err != nil {
+		return err
+	}
+
+	fname, err := filename(reply.ID())
+	if err != nil {
+		return err
+	}
+
+	if err := saveAs(fname, reply); err != nil {
+		return err
+	}
+
+	fmt.Println(fname)
+
+	return nil
+}
+
+func showReply(args []string) error {
+	return showNode(args, commandReply, func(b []byte) (interface{}, error) {
+		node, err := forest.UnmarshalReply(b)
+		return interface{}(node), err
+	})
+}
+
 func filename(desc *fields.QualifiedHash) (string, error) {
 	b, err := desc.MarshalBinary()
 	if err != nil {
@@ -433,6 +538,31 @@ func getCommunity(filename string) (*forest.Community, error) {
 	defer idFile.Close()
 
 	return loadCommunity(idFile)
+}
+
+func loadReplyOrConversation(r io.Reader) (interface{}, error) {
+	b, err := ioutil.ReadAll(r)
+	if err != nil && err != io.EOF {
+		return nil, err
+	}
+	nodeType, err := forest.NodeTypeOf(b)
+	switch nodeType {
+	case fields.NodeTypeConversation:
+		return forest.UnmarshalConversation(b)
+	case fields.NodeTypeReply:
+		return forest.UnmarshalReply(b)
+	default:
+		return nil, fmt.Errorf("Expected node type of reply or conversation, got %s", nodeType)
+	}
+}
+
+func getReplyOrConversation(filename string) (interface{}, error) {
+	idFile, err := os.Open(filename)
+	if err != nil {
+		return nil, err
+	}
+	defer idFile.Close()
+	return loadReplyOrConversation(idFile)
 }
 
 func readKey(in io.Reader) (*openpgp.Entity, error) {
