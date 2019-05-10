@@ -8,6 +8,40 @@ import (
 	"golang.org/x/crypto/openpgp"
 )
 
+func TestNewReply(t *testing.T) {
+	identity, privkey, community, conversation := MakeConversationOrSkip(t)
+	content := QualifiedContentOrSkip(t, fields.ContentTypeUTF8String, []byte("test content"))
+	metadata := QualifiedContentOrSkip(t, fields.ContentTypeUTF8String, []byte{})
+	reply, err := forest.As(identity, privkey).NewReply(conversation, content, metadata)
+	if err != nil {
+		t.Error("Failed to create Conversation with valid parameters", err)
+	}
+	if !reply.Parent.Equals(conversation.ID()) {
+		t.Error("Reply's parent is not parent conversation")
+	} else if !reply.ConversationID.Equals(&reply.Parent) {
+		t.Error("Reply's conversation is not parent conversation")
+	} else if !reply.CommunityID.Equals(community.ID()) {
+		t.Error("Reply's community is not owning community")
+	}
+}
+
+func TestNewReplyToReply(t *testing.T) {
+	identity, privkey, community, conversation, reply := MakeReplyOrSkip(t)
+	content := QualifiedContentOrSkip(t, fields.ContentTypeUTF8String, []byte("other test content"))
+	metadata := QualifiedContentOrSkip(t, fields.ContentTypeUTF8String, []byte{})
+	reply2, err := forest.As(identity, privkey).NewReply(reply, content, metadata)
+	if err != nil {
+		t.Error("Failed to create Conversation with valid parameters", err)
+	}
+	if !reply2.Parent.Equals(reply.ID()) {
+		t.Error("Reply's parent is not parent conversation")
+	} else if !reply2.ConversationID.Equals(conversation.ID()) {
+		t.Error("Reply's conversation is not parent conversation")
+	} else if !reply2.CommunityID.Equals(community.ID()) {
+		t.Error("Reply's community is not owning community")
+	}
+}
+
 func MakeReplyOrSkip(t *testing.T) (*forest.Identity, *openpgp.Entity, *forest.Community, *forest.Conversation, *forest.Reply) {
 	identity, privkey, community, conversation := MakeConversationOrSkip(t)
 	content := QualifiedContentOrSkip(t, fields.ContentTypeUTF8String, []byte("test content"))
