@@ -174,10 +174,12 @@ func (n *Builder) NewReply(parent interface{}, content *fields.QualifiedContent,
 	switch concreteParent := parent.(type) {
 	case *Conversation:
 		r.CommunityID = concreteParent.Parent
+		r.ConversationID = *concreteParent.ID()
 		r.Parent = *concreteParent.ID()
 		r.Depth = concreteParent.Depth + 1
 	case *Reply:
 		r.CommunityID = concreteParent.CommunityID
+		r.ConversationID = concreteParent.ConversationID
 		r.Parent = *concreteParent.ID()
 		r.Depth = concreteParent.Depth + 1
 	default:
