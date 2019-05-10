@@ -23,6 +23,7 @@ const (
 	commandCommunity    = "community"
 	commandConversation = "conversation"
 	commandReply        = "reply"
+	commandShow         = "show"
 
 	subcommandCreate = "create"
 	subcommandShow   = "show"
@@ -54,6 +55,8 @@ Subcommands:
 		cmdHandler = conversation
 	case commandReply:
 		cmdHandler = reply
+	case commandShow:
+		cmdHandler = show
 	default:
 		flag.Usage()
 	}
@@ -63,6 +66,24 @@ Subcommands:
 }
 
 type handler func(args []string) error
+
+func show(args []string) error {
+	flags := flag.NewFlagSet(commandShow, flag.ExitOnError)
+	usage := func() {
+		flags.PrintDefaults()
+		os.Exit(usageError)
+	}
+	err := flags.Parse(args)
+	if err != nil {
+		return err
+	}
+	if len(flags.Args()) < 1 {
+		usage()
+	}
+	return showNode(args, commandShow, func(b []byte) (interface{}, error) {
+		return forest.UnmarshalBinaryNode(b)
+	})
+}
 
 func identity(args []string) error {
 	flags := flag.NewFlagSet(commandIdentity, flag.ExitOnError)

@@ -2,6 +2,7 @@ package forest
 
 import (
 	"bytes"
+	"fmt"
 
 	"git.sr.ht/~whereswaldon/forest-go/fields"
 )
@@ -10,16 +11,49 @@ import (
 // If the provided bytes are not a forest node or the type cannot be determined,
 // an error will be returned and the first return value must be ignored.
 func NodeTypeOf(b []byte) (fields.NodeType, error) {
+	_, t, err := VersionAndNodeTypeOf(b)
+	return t, err
+}
+
+func VersionAndNodeTypeOf(b []byte) (fields.Version, fields.NodeType, error) {
 	var (
-		ver   fields.Version
-		t     fields.NodeType
+		ver fields.Version
+		t   fields.NodeType
+		// this array defines the serialization order of the first two fields of
+		// any node. If this order ever changes, it must be updated here and in
+		// commonNode.presignSerializationOrder
 		order = []fields.BidirectionalBinaryMarshaler{
 			&ver,
 			&t,
 		}
 	)
 	_, err := fields.UnmarshalAll(b, fields.AsUnmarshaler(order)...)
-	return t, err
+	return ver, t, err
+}
+
+// UnmarshalBinaryNode unmarshals a node of any type. If it does not return an
+// error, the concrete type of the first return parameter will be one of the
+// node structs declared in this package (e.g. Identity, Community, etc...)
+func UnmarshalBinaryNode(b []byte) (interface{}, error) {
+	v, t, err := VersionAndNodeTypeOf(b)
+	if err != nil {
+		return nil, err
+	}
+	if v > fields.CurrentVersion {
+		return nil, fmt.Errorf("Unable to unmarshal node of version %d, only supports <= %d", v, fields.CurrentVersion)
+	}
+	switch t {
+	case fields.NodeTypeIdentity:
+		return UnmarshalIdentity(b)
+	case fields.NodeTypeCommunity:
+		return UnmarshalCommunity(b)
+	case fields.NodeTypeConversation:
+		return UnmarshalConversation(b)
+	case fields.NodeTypeReply:
+		return UnmarshalReply(b)
+	default:
+		return nil, fmt.Errorf("Unable to unmarshal node of type %d, unknown type", t)
+	}
 }
 
 // generic node
