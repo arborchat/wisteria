@@ -23,10 +23,9 @@ const (
 	commandCommunity    = "community"
 	commandConversation = "conversation"
 	commandReply        = "reply"
-	commandShow         = "show"
 
-	subcommandCreate = "create"
-	subcommandShow   = "show"
+	commandShow   = "show"
+	commandCreate = "create"
 )
 
 func main() {
@@ -37,7 +36,9 @@ A CLI for manipulating nodes in the arbor forest.
 
 Subcommands:
 
-`+commandIdentity+"\n"+commandCommunity)
+`+commandCreate+" ("+commandIdentity+"|"+commandCommunity+"|"+commandCommunity+"|"+commandReply+`)
+show <node-id>
+`)
 		flag.PrintDefaults()
 		os.Exit(usageError)
 	}
@@ -47,14 +48,8 @@ Subcommands:
 
 	var cmdHandler handler
 	switch os.Args[1] {
-	case commandIdentity:
-		cmdHandler = identity
-	case commandCommunity:
-		cmdHandler = community
-	case commandConversation:
-		cmdHandler = conversation
-	case commandReply:
-		cmdHandler = reply
+	case commandCreate:
+		cmdHandler = create
 	case commandShow:
 		cmdHandler = show
 	default:
@@ -85,8 +80,8 @@ func show(args []string) error {
 	})
 }
 
-func identity(args []string) error {
-	flags := flag.NewFlagSet(commandIdentity, flag.ExitOnError)
+func create(args []string) error {
+	flags := flag.NewFlagSet(commandCreate, flag.ExitOnError)
 	usage := func() {
 		flags.PrintDefaults()
 		os.Exit(usageError)
@@ -100,10 +95,14 @@ func identity(args []string) error {
 	}
 	var cmdHandler handler
 	switch flags.Arg(0) {
-	case subcommandCreate:
+	case commandIdentity:
 		cmdHandler = createIdentity
-	case subcommandShow:
-		cmdHandler = showIdentity
+	case commandCommunity:
+		cmdHandler = createCommunity
+	case commandConversation:
+		cmdHandler = createConversation
+	case commandReply:
+		cmdHandler = createReply
 	default:
 		usage()
 	}
@@ -117,7 +116,7 @@ func createIdentity(args []string) error {
 	var (
 		name, metadata, keyfile string
 	)
-	flags := flag.NewFlagSet(commandIdentity+" "+subcommandCreate, flag.ExitOnError)
+	flags := flag.NewFlagSet(commandCreate+" "+commandIdentity, flag.ExitOnError)
 	flags.StringVar(&name, "name", "forest", "username for the identity node")
 	flags.StringVar(&metadata, "metadata", "forest", "metadata for the identity node")
 	flags.StringVar(&keyfile, "key", "arbor.privkey", "the openpgp private key for the identity node")
@@ -163,46 +162,11 @@ func createIdentity(args []string) error {
 	return nil
 }
 
-func showIdentity(args []string) error {
-	return showNode(args, commandIdentity, func(b []byte) (interface{}, error) {
-		node, err := forest.UnmarshalIdentity(b)
-		return interface{}(node), err
-	})
-}
-
-func community(args []string) error {
-	flags := flag.NewFlagSet(commandCommunity, flag.ExitOnError)
-	usage := func() {
-		flags.PrintDefaults()
-		os.Exit(usageError)
-	}
-	err := flags.Parse(args)
-	if err != nil {
-		return err
-	}
-	if len(flags.Args()) < 1 {
-		usage()
-	}
-	var cmdHandler handler
-	switch flags.Arg(0) {
-	case subcommandCreate:
-		cmdHandler = createCommunity
-	case subcommandShow:
-		cmdHandler = showCommunity
-	default:
-		usage()
-	}
-	if err := cmdHandler(flags.Args()[1:]); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-	}
-	return nil
-}
-
 func createCommunity(args []string) error {
 	var (
 		name, metadata, keyfile, identity string
 	)
-	flags := flag.NewFlagSet(commandCommunity+" "+subcommandCreate, flag.ExitOnError)
+	flags := flag.NewFlagSet(commandCreate+" "+commandCommunity, flag.ExitOnError)
 	flags.StringVar(&name, "name", "forest", "username for the community node")
 	flags.StringVar(&metadata, "metadata", "forest", "metadata for the community node")
 	flags.StringVar(&keyfile, "key", "arbor.privkey", "the openpgp private key for the signing identity node")
@@ -255,46 +219,11 @@ func createCommunity(args []string) error {
 	return nil
 }
 
-func showCommunity(args []string) error {
-	return showNode(args, commandCommunity, func(b []byte) (interface{}, error) {
-		node, err := forest.UnmarshalCommunity(b)
-		return interface{}(node), err
-	})
-}
-
-func conversation(args []string) error {
-	flags := flag.NewFlagSet(commandConversation, flag.ExitOnError)
-	usage := func() {
-		flags.PrintDefaults()
-		os.Exit(usageError)
-	}
-	err := flags.Parse(args)
-	if err != nil {
-		return err
-	}
-	if len(flags.Args()) < 1 {
-		usage()
-	}
-	var cmdHandler handler
-	switch flags.Arg(0) {
-	case subcommandCreate:
-		cmdHandler = createConversation
-	case subcommandShow:
-		cmdHandler = showConversation
-	default:
-		usage()
-	}
-	if err := cmdHandler(flags.Args()[1:]); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-	}
-	return nil
-}
-
 func createConversation(args []string) error {
 	var (
 		content, metadata, community, keyfile, identity string
 	)
-	flags := flag.NewFlagSet(commandConversation+" "+subcommandCreate, flag.ExitOnError)
+	flags := flag.NewFlagSet(commandCreate+" "+commandConversation, flag.ExitOnError)
 	flags.StringVar(&metadata, "metadata", "forest", "metadata for the conversation node")
 	flags.StringVar(&keyfile, "key", "arbor.privkey", "the openpgp private key for the signing identity node")
 	flags.StringVar(&identity, "as", "", "[required] the id of the signing identity node")
@@ -357,82 +286,16 @@ func createConversation(args []string) error {
 	return nil
 }
 
-func showConversation(args []string) error {
-	return showNode(args, commandConversation, func(b []byte) (interface{}, error) {
-		node, err := forest.UnmarshalConversation(b)
-		return interface{}(node), err
-	})
-}
-
-func showNode(args []string, commandName string, fromBytes func([]byte) (interface{}, error)) error {
-	flags := flag.NewFlagSet(commandName+" "+subcommandShow, flag.ExitOnError)
-	usage := func() {
-		flags.PrintDefaults()
-	}
-	if err := flags.Parse(args); err != nil {
-		usage()
-		return err
-	}
-	if len(flags.Args()) < 1 {
-		return fmt.Errorf("missing required argument [node id]")
-	}
-	b, err := ioutil.ReadFile(args[0])
-	if err != nil && err != io.EOF {
-		return err
-	}
-	c, err := fromBytes(b)
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
-	}
-	text, err := json.Marshal(c)
-	if err != nil {
-		return err
-	}
-	if _, err := os.Stdout.Write(text); err != nil {
-		return err
-	}
-	return nil
-}
-
-func reply(args []string) error {
-	flags := flag.NewFlagSet(commandReply, flag.ExitOnError)
-	usage := func() {
-		flags.PrintDefaults()
-		os.Exit(usageError)
-	}
-	err := flags.Parse(args)
-	if err != nil {
-		return err
-	}
-	if len(flags.Args()) < 1 {
-		usage()
-	}
-	var cmdHandler handler
-	switch flags.Arg(0) {
-	case subcommandCreate:
-		cmdHandler = createReply
-	case subcommandShow:
-		cmdHandler = showReply
-	default:
-		usage()
-	}
-	if err := cmdHandler(flags.Args()[1:]); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-	}
-	return nil
-}
-
 func createReply(args []string) error {
 	var (
 		content, metadata, parent, keyfile, identity string
 	)
-	flags := flag.NewFlagSet(commandReply+" "+subcommandCreate, flag.ExitOnError)
-	flags.StringVar(&metadata, "metadata", "forest", "metadata for the conversation node")
+	flags := flag.NewFlagSet(commandCreate+" "+commandReply, flag.ExitOnError)
+	flags.StringVar(&metadata, "metadata", "forest", "metadata for the reply node")
 	flags.StringVar(&keyfile, "key", "arbor.privkey", "the openpgp private key for the signing identity node")
 	flags.StringVar(&identity, "as", "", "[required] the id of the signing identity node")
-	flags.StringVar(&parent, "to", "", "[required] the id of the parent community node")
-	flags.StringVar(&content, "content", "", "[required] content of the conversation node")
+	flags.StringVar(&parent, "to", "", "[required] the id of the parent reply or conversation node")
+	flags.StringVar(&content, "content", "", "[required] content of the reply node")
 
 	usage := func() {
 		flags.PrintDefaults()
@@ -490,11 +353,35 @@ func createReply(args []string) error {
 	return nil
 }
 
-func showReply(args []string) error {
-	return showNode(args, commandReply, func(b []byte) (interface{}, error) {
-		node, err := forest.UnmarshalReply(b)
-		return interface{}(node), err
-	})
+func showNode(args []string, commandName string, fromBytes func([]byte) (interface{}, error)) error {
+	flags := flag.NewFlagSet(commandName+" "+commandShow, flag.ExitOnError)
+	usage := func() {
+		flags.PrintDefaults()
+	}
+	if err := flags.Parse(args); err != nil {
+		usage()
+		return err
+	}
+	if len(flags.Args()) < 1 {
+		return fmt.Errorf("missing required argument [node id]")
+	}
+	b, err := ioutil.ReadFile(args[0])
+	if err != nil && err != io.EOF {
+		return err
+	}
+	c, err := fromBytes(b)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	text, err := json.Marshal(c)
+	if err != nil {
+		return err
+	}
+	if _, err := os.Stdout.Write(text); err != nil {
+		return err
+	}
+	return nil
 }
 
 func filename(desc *fields.QualifiedHash) (string, error) {
