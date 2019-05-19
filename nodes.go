@@ -47,8 +47,6 @@ func UnmarshalBinaryNode(b []byte) (interface{}, error) {
 		return UnmarshalIdentity(b)
 	case fields.NodeTypeCommunity:
 		return UnmarshalCommunity(b)
-	case fields.NodeTypeConversation:
-		return UnmarshalConversation(b)
 	case fields.NodeTypeReply:
 		return UnmarshalReply(b)
 	default:
@@ -285,77 +283,6 @@ func (c *Community) UnmarshalBinary(b []byte) error {
 func (c *Community) Equals(c2 *Community) bool {
 	return c.commonNode.Equals(&c2.commonNode) &&
 		c.Name.Equals(&c2.Name)
-}
-
-type Conversation struct {
-	commonNode
-	Content fields.QualifiedContent
-}
-
-func newConversation() *Conversation {
-	c := new(Conversation)
-	// define how to serialize this node type's fields
-	return c
-}
-
-func (c *Conversation) nodeSpecificSerializationOrder() []fields.BidirectionalBinaryMarshaler {
-	return []fields.BidirectionalBinaryMarshaler{&c.Content}
-}
-
-func (c *Conversation) SerializationOrder() []fields.BidirectionalBinaryMarshaler {
-	order := c.commonNode.presignSerializationOrder()
-	order = append(order, c.nodeSpecificSerializationOrder()...)
-	order = append(order, c.commonNode.postsignSerializationOrder()...)
-	return order
-}
-
-func (c Conversation) MarshalSignedData() ([]byte, error) {
-	buf := new(bytes.Buffer)
-	if err := fields.MarshalAllInto(buf, fields.AsMarshaler(c.presignSerializationOrder())...); err != nil {
-		return nil, err
-	}
-	if err := fields.MarshalAllInto(buf, fields.AsMarshaler(c.nodeSpecificSerializationOrder())...); err != nil {
-		return nil, err
-	}
-	return buf.Bytes(), nil
-}
-
-func (c Conversation) MarshalBinary() ([]byte, error) {
-	signed, err := c.MarshalSignedData()
-	if err != nil {
-		return nil, err
-	}
-	buf := bytes.NewBuffer(signed)
-	if err := fields.MarshalAllInto(buf, fields.AsMarshaler(c.postsignSerializationOrder())...); err != nil {
-		return nil, err
-	}
-	return buf.Bytes(), nil
-}
-
-func UnmarshalConversation(b []byte) (*Conversation, error) {
-	c := newConversation()
-	if err := c.UnmarshalBinary(b); err != nil {
-		return nil, err
-	}
-	return c, nil
-}
-
-func (c *Conversation) UnmarshalBinary(b []byte) error {
-	_, err := fields.UnmarshalAll(b, fields.AsUnmarshaler(c.SerializationOrder())...)
-	if err != nil {
-		return err
-	}
-	idBytes, err := computeID(c)
-	if err != nil {
-		return err
-	}
-	c.id = fields.Value(idBytes)
-	return nil
-}
-
-func (c *Conversation) Equals(c2 *Conversation) bool {
-	return c.commonNode.Equals(&c2.commonNode) &&
-		c.Content.Equals(&c2.Content)
 }
 
 type Reply struct {

@@ -9,48 +9,48 @@ import (
 )
 
 func TestNewReply(t *testing.T) {
-	identity, privkey, community, conversation := MakeConversationOrSkip(t)
+	identity, privkey, community := MakeCommunityOrSkip(t)
 	content := QualifiedContentOrSkip(t, fields.ContentTypeUTF8String, []byte("test content"))
 	metadata := QualifiedContentOrSkip(t, fields.ContentTypeUTF8String, []byte{})
-	reply, err := forest.As(identity, privkey).NewReply(conversation, content, metadata)
+	reply, err := forest.As(identity, privkey).NewReply(community, content, metadata)
 	if err != nil {
-		t.Error("Failed to create Conversation with valid parameters", err)
+		t.Error("Failed to create reply with valid parameters", err)
 	}
-	if !reply.Parent.Equals(conversation.ID()) {
-		t.Error("Reply's parent is not parent conversation")
-	} else if !reply.ConversationID.Equals(&reply.Parent) {
-		t.Error("Reply's conversation is not parent conversation")
+	if !reply.Parent.Equals(community.ID()) {
+		t.Error("Root Reply's parent is not parent community")
+	} else if !reply.ConversationID.Equals(fields.NullHash()) {
+		t.Error("Root Reply's conversation is not null hash")
 	} else if !reply.CommunityID.Equals(community.ID()) {
-		t.Error("Reply's community is not owning community")
+		t.Error("Root Reply's community is not owning community")
 	}
 }
 
 func TestNewReplyToReply(t *testing.T) {
-	identity, privkey, community, conversation, reply := MakeReplyOrSkip(t)
+	identity, privkey, community, reply := MakeReplyOrSkip(t)
 	content := QualifiedContentOrSkip(t, fields.ContentTypeUTF8String, []byte("other test content"))
 	metadata := QualifiedContentOrSkip(t, fields.ContentTypeUTF8String, []byte{})
 	reply2, err := forest.As(identity, privkey).NewReply(reply, content, metadata)
 	if err != nil {
-		t.Error("Failed to create Conversation with valid parameters", err)
+		t.Error("Failed to create reply with valid parameters", err)
 	}
 	if !reply2.Parent.Equals(reply.ID()) {
 		t.Error("Reply's parent is not parent conversation")
-	} else if !reply2.ConversationID.Equals(conversation.ID()) {
+	} else if !reply2.ConversationID.Equals(reply.ID()) {
 		t.Error("Reply's conversation is not parent conversation")
 	} else if !reply2.CommunityID.Equals(community.ID()) {
 		t.Error("Reply's community is not owning community")
 	}
 }
 
-func MakeReplyOrSkip(t *testing.T) (*forest.Identity, *openpgp.Entity, *forest.Community, *forest.Conversation, *forest.Reply) {
-	identity, privkey, community, conversation := MakeConversationOrSkip(t)
+func MakeReplyOrSkip(t *testing.T) (*forest.Identity, *openpgp.Entity, *forest.Community, *forest.Reply) {
+	identity, privkey, community := MakeCommunityOrSkip(t)
 	content := QualifiedContentOrSkip(t, fields.ContentTypeUTF8String, []byte("test content"))
 	metadata := QualifiedContentOrSkip(t, fields.ContentTypeUTF8String, []byte{})
-	reply, err := forest.As(identity, privkey).NewReply(conversation, content, metadata)
+	reply, err := forest.As(identity, privkey).NewReply(community, content, metadata)
 	if err != nil {
-		t.Error("Failed to create Conversation with valid parameters", err)
+		t.Error("Failed to create reply with valid parameters", err)
 	}
-	return identity, privkey, community, conversation, reply
+	return identity, privkey, community, reply
 }
 
 func TestReplyValidatesSelf(t *testing.T) {

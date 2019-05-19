@@ -124,66 +124,28 @@ func (n *Builder) NewCommunity(name *fields.QualifiedContent, metadata *fields.Q
 	return c, nil
 }
 
-// NewConversation creates a conversation node as a child of the given community
-func (n *Builder) NewConversation(parent *Community, content *fields.QualifiedContent, metadata *fields.QualifiedContent) (*Conversation, error) {
-	c := newConversation()
-	c.SchemaVersion = fields.CurrentVersion
-	c.Type = fields.NodeTypeConversation
-	c.Parent = *parent.ID()
-	c.Depth = parent.Depth + 1
-	c.Content = *content
-	c.Metadata = *metadata
-	c.SignatureAuthority = *n.User.ID()
-	idDesc, err := fields.NewHashDescriptor(fields.HashTypeSHA512_256, int(fields.HashDigestLengthSHA512_256))
-	if err != nil {
-		return nil, err
-	}
-	c.IDDesc = *idDesc
-
-	// we've defined all pre-signature fields, it's time to sign the data
-	signedDataBytes, err := c.MarshalSignedData()
-	if err != nil {
-		return nil, err
-	}
-	signedData := bytes.NewBuffer(signedDataBytes)
-	signature := new(bytes.Buffer)
-	if err := openpgp.DetachSign(signature, n.Privkey, signedData, nil); err != nil {
-		return nil, err
-	}
-	qs, err := fields.NewQualifiedSignature(fields.SignatureTypeOpenPGP, signature.Bytes())
-	if err != nil {
-		return nil, err
-	}
-	c.commonNode.Signature = *qs
-
-	// determine the node's final hash ID
-	id, err := computeID(c)
-	if err != nil {
-		return nil, err
-	}
-	c.id = fields.Value(id)
-
-	return c, nil
-}
-
-// NewReply creates a reply node  as a child of the given conversation
+// NewReply creates a reply node as a child of the given community or reply
 func (n *Builder) NewReply(parent interface{}, content *fields.QualifiedContent, metadata *fields.QualifiedContent) (*Reply, error) {
 	r := newReply()
 	r.SchemaVersion = fields.CurrentVersion
 	r.Type = fields.NodeTypeReply
 	switch concreteParent := parent.(type) {
-	case *Conversation:
+	case *Community:
 		r.CommunityID = concreteParent.Parent
-		r.ConversationID = *concreteParent.ID()
+		r.ConversationID = *fields.NullHash()
 		r.Parent = *concreteParent.ID()
 		r.Depth = concreteParent.Depth + 1
 	case *Reply:
 		r.CommunityID = concreteParent.CommunityID
+		// if parent is root of a conversation
+		if concreteParent.Depth == 1 && concreteParent.ConversationID.Equals(fields.NullHash()) {
+			r.ConversationID = *concreteParent.ID()
+		}
 		r.ConversationID = concreteParent.ConversationID
 		r.Parent = *concreteParent.ID()
 		r.Depth = concreteParent.Depth + 1
 	default:
-		return nil, fmt.Errorf("parent must be either a conversation or reply node")
+		return nil, fmt.Errorf("parent must be either a community or reply node")
 
 	}
 	r.Content = *content

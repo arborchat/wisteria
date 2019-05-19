@@ -188,25 +188,22 @@ func (v *Version) Equals(v2 *Version) bool {
 type NodeType genericType
 
 const (
-	sizeofNodeType                = sizeofgenericType
-	NodeTypeIdentity     NodeType = 1
-	NodeTypeCommunity    NodeType = 2
-	NodeTypeConversation NodeType = 3
-	NodeTypeReply        NodeType = 4
+	sizeofNodeType            = sizeofgenericType
+	NodeTypeIdentity NodeType = iota
+	NodeTypeCommunity
+	NodeTypeReply
 )
 
 var validNodeTypes = map[NodeType]struct{}{
-	NodeTypeIdentity:     struct{}{},
-	NodeTypeCommunity:    struct{}{},
-	NodeTypeConversation: struct{}{},
-	NodeTypeReply:        struct{}{},
+	NodeTypeIdentity:  struct{}{},
+	NodeTypeCommunity: struct{}{},
+	NodeTypeReply:     struct{}{},
 }
 
 var nodeTypeNames = map[NodeType]string{
-	NodeTypeIdentity:     "identity",
-	NodeTypeCommunity:    "community",
-	NodeTypeConversation: "conversation",
-	NodeTypeReply:        "reply",
+	NodeTypeIdentity:  "identity",
+	NodeTypeCommunity: "community",
+	NodeTypeReply:     "reply",
 }
 
 func (t NodeType) MarshalBinary() ([]byte, error) {
