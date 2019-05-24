@@ -54,7 +54,7 @@ func MakeReplyOrSkip(t *testing.T) (*forest.Identity, *openpgp.Entity, *forest.C
 }
 
 func TestReplyValidatesSelf(t *testing.T) {
-	identity, _, _, _, reply := MakeReplyOrSkip(t)
+	identity, _, _, reply := MakeReplyOrSkip(t)
 	validateReply(t, identity, reply)
 }
 
@@ -77,7 +77,7 @@ func validateReply(t *testing.T, author *forest.Identity, reply *forest.Reply) {
 }
 
 func TestReplyValidationFailsWhenTampered(t *testing.T) {
-	identity, _, _, _, reply := MakeReplyOrSkip(t)
+	identity, _, _, reply := MakeReplyOrSkip(t)
 	reply.Content.Value = fields.Value([]byte("whatever"))
 	failToValidateReply(t, identity, reply)
 }
@@ -97,12 +97,12 @@ func ensureSerializes(t *testing.T, reply *forest.Reply) {
 }
 
 func TestReplySerializes(t *testing.T) {
-	_, _, _, _, reply := MakeReplyOrSkip(t)
+	_, _, _, reply := MakeReplyOrSkip(t)
 	ensureSerializes(t, reply)
 }
 
 func TestReplyToReplyValidates(t *testing.T) {
-	identity, privkey, _, _, reply := MakeReplyOrSkip(t)
+	identity, privkey, _, reply := MakeReplyOrSkip(t)
 	content := QualifiedContentOrSkip(t, fields.ContentTypeUTF8String, []byte("hello"))
 	metadata := QualifiedContentOrSkip(t, fields.ContentTypeUTF8String, []byte(""))
 	r2, err := forest.As(identity, privkey).NewReply(reply, content, metadata)
@@ -113,7 +113,7 @@ func TestReplyToReplyValidates(t *testing.T) {
 }
 
 func TestReplyToReplyFailsWhenTampered(t *testing.T) {
-	identity, privkey, _, _, reply := MakeReplyOrSkip(t)
+	identity, privkey, _, reply := MakeReplyOrSkip(t)
 	content := QualifiedContentOrSkip(t, fields.ContentTypeUTF8String, []byte("hello"))
 	metadata := QualifiedContentOrSkip(t, fields.ContentTypeUTF8String, []byte(""))
 	r2, err := forest.As(identity, privkey).NewReply(reply, content, metadata)
@@ -125,7 +125,7 @@ func TestReplyToReplyFailsWhenTampered(t *testing.T) {
 }
 
 func TestReplyToReplySerializes(t *testing.T) {
-	identity, privkey, _, _, reply := MakeReplyOrSkip(t)
+	identity, privkey, _, reply := MakeReplyOrSkip(t)
 	content := QualifiedContentOrSkip(t, fields.ContentTypeUTF8String, []byte("hello"))
 	metadata := QualifiedContentOrSkip(t, fields.ContentTypeUTF8String, []byte(""))
 	r2, err := forest.As(identity, privkey).NewReply(reply, content, metadata)

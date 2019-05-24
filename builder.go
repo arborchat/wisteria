@@ -131,7 +131,7 @@ func (n *Builder) NewReply(parent interface{}, content *fields.QualifiedContent,
 	r.Type = fields.NodeTypeReply
 	switch concreteParent := parent.(type) {
 	case *Community:
-		r.CommunityID = concreteParent.Parent
+		r.CommunityID = *concreteParent.ID()
 		r.ConversationID = *fields.NullHash()
 		r.Parent = *concreteParent.ID()
 		r.Depth = concreteParent.Depth + 1
@@ -140,8 +140,9 @@ func (n *Builder) NewReply(parent interface{}, content *fields.QualifiedContent,
 		// if parent is root of a conversation
 		if concreteParent.Depth == 1 && concreteParent.ConversationID.Equals(fields.NullHash()) {
 			r.ConversationID = *concreteParent.ID()
+		} else {
+			r.ConversationID = concreteParent.ConversationID
 		}
-		r.ConversationID = concreteParent.ConversationID
 		r.Parent = *concreteParent.ID()
 		r.Depth = concreteParent.Depth + 1
 	default:
