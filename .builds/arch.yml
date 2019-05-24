@@ -12,7 +12,7 @@ tasks:
   - test: |
       cd forest-go
       go test -cover
-      ./sanity-check.sh
+      ./cmd/forest/sanity-check.sh
   - cross_compile: |
       cd forest-go
       for os in $oses ; do env GOOS="$os" go build ; done

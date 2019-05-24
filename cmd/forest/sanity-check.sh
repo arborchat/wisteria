@@ -2,8 +2,11 @@
 
 set -eux
 
-forest_cmd=$(realpath ./forest)
+base_dir=$(dirname "$(realpath "$0")")
 workdir=$(mktemp -d)
+forest_cmd="$workdir/forest"
+
+env --chdir="$base_dir" go build -o "$forest_cmd"
 
 cd "$workdir"
 identity=$("$forest_cmd" create identity)
