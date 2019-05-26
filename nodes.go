@@ -7,6 +7,12 @@ import (
 	"git.sr.ht/~whereswaldon/forest-go/fields"
 )
 
+type Node interface {
+	ID() *fields.QualifiedHash
+	ParentID() *fields.QualifiedHash
+	Equals(interface{}) bool
+}
+
 // NodeTypeOf returns the NodeType of the provided binary-marshaled node.
 // If the provided bytes are not a forest node or the type cannot be determined,
 // an error will be returned and the first return value must be ignored.
@@ -74,6 +80,10 @@ func (n commonNode) ID() *fields.QualifiedHash {
 		Descriptor: n.IDDesc,
 		Value:      n.id,
 	}
+}
+
+func (n commonNode) ParentID() *fields.QualifiedHash {
+	return &fields.QualifiedHash{n.Parent.Descriptor, n.Parent.Value}
 }
 
 func (n *commonNode) presignSerializationOrder() []fields.BidirectionalBinaryMarshaler {
@@ -208,7 +218,11 @@ func (i *Identity) UnmarshalBinary(b []byte) error {
 	return nil
 }
 
-func (i *Identity) Equals(i2 *Identity) bool {
+func (i *Identity) Equals(other interface{}) bool {
+	i2, valid := other.(*Identity)
+	if !valid {
+		return false
+	}
 	return i.commonNode.Equals(&i2.commonNode) &&
 		i.Name.Equals(&i2.Name) &&
 		i.PublicKey.Equals(&i2.PublicKey)
@@ -280,7 +294,11 @@ func (c *Community) UnmarshalBinary(b []byte) error {
 	return nil
 }
 
-func (c *Community) Equals(c2 *Community) bool {
+func (c *Community) Equals(other interface{}) bool {
+	c2, valid := other.(*Community)
+	if !valid {
+		return false
+	}
 	return c.commonNode.Equals(&c2.commonNode) &&
 		c.Name.Equals(&c2.Name)
 }
@@ -353,7 +371,11 @@ func (r *Reply) UnmarshalBinary(b []byte) error {
 	return nil
 }
 
-func (r *Reply) Equals(r2 *Reply) bool {
+func (r *Reply) Equals(other interface{}) bool {
+	r2, valid := other.(*Reply)
+	if !valid {
+		return false
+	}
 	return r.commonNode.Equals(&r2.commonNode) &&
 		r.Content.Equals(&r2.Content)
 }
