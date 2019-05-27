@@ -25,9 +25,14 @@ func TestMemoryStoreAdd(t *testing.T) {
 			t.Errorf("Empty store Get() should err")
 		}
 	}
-	for _, i := range nodes {
+	for count, i := range nodes {
 		if err := s.Add(i); err != nil {
 			t.Errorf("MemoryStore Add() should not err on Add(): %s", err)
+		}
+		if size, err := s.Size(); err != nil {
+			t.Errorf("MemoryStore Size() should never error, got %s", err)
+		} else if size != count+1 {
+			t.Errorf("Expected Size() to be %d after %d Add()s, got %d", count+1, count+1, size)
 		}
 		if has, err := s.Has(i.ID()); !has {
 			t.Errorf("MemoryStore should contain element %v", i.ID())
