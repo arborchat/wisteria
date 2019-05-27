@@ -16,10 +16,12 @@ type Hashable interface {
 
 // computeID determines the correct value of the ID of any hashable entity
 func computeID(h Hashable) ([]byte, error) {
-	// map from HashType to the function that creates an instance of that hash
+	// map from HashType and Length to the function that creates an instance of that hash
 	// algorithm
-	hashType2Func := map[fields.HashType]func() hash.Hash{
-		fields.HashTypeSHA512_256: sha512.New512_256,
+	hashType2Func := map[fields.HashType]map[fields.ContentLength]func() hash.Hash{
+		fields.HashTypeSHA512: map[fields.ContentLength]func() hash.Hash{
+			fields.HashDigestLengthSHA512_256: sha512.New512_256,
+		},
 	}
 	hd := h.HashDescriptor()
 	if hd.Type == fields.HashTypeNullHash {
@@ -29,9 +31,13 @@ func computeID(h Hashable) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	hashFunc, found := hashType2Func[fields.HashType(hd.Type)]
+	hashCategory, found := hashType2Func[fields.HashType(hd.Type)]
 	if !found {
 		return nil, fmt.Errorf("Unknown HashType %d", hd.Type)
+	}
+	hashFunc, found := hashCategory[hd.Length]
+	if !found {
+		return nil, fmt.Errorf("Invalid hash length %d for hash type %d", hd.Length, hd.Type)
 	}
 	hasher := hashFunc()
 	_, _ = hasher.Write(binaryContent) // never errors

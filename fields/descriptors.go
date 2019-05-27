@@ -8,19 +8,18 @@ import (
 const sizeofDescriptor = sizeofgenericType + sizeofContentLength
 
 func marshalTextDescriptor(descriptorType encoding.TextMarshaler, length encoding.TextMarshaler) ([]byte, error) {
-	buf := bytes.NewBufferString("[")
+	buf := new(bytes.Buffer)
 	b, err := descriptorType.MarshalText()
 	if err != nil {
 		return nil, err
 	}
 	_, _ = buf.Write(b)
-	_, _ = buf.Write([]byte(","))
+	_, _ = buf.Write([]byte("_"))
 	b, err = length.MarshalText()
 	if err != nil {
 		return nil, err
 	}
 	_, _ = buf.Write(b)
-	_, _ = buf.Write([]byte("]"))
 	return buf.Bytes(), nil
 }
 

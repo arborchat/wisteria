@@ -22,7 +22,7 @@ func marshalTextQualified(first, second encoding.TextMarshaler) ([]byte, error) 
 		return nil, err
 	}
 	_, _ = buf.Write(b)
-	_, _ = buf.Write([]byte(":"))
+	_, _ = buf.Write([]byte("__"))
 	b, err = second.MarshalText()
 	if err != nil {
 		return nil, err

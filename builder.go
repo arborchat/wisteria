@@ -33,7 +33,7 @@ func NewIdentity(privkey *openpgp.Entity, name *fields.QualifiedContent, metadat
 	}
 	identity.PublicKey = *qKey
 	identity.SignatureAuthority = *fields.NullHash()
-	idDesc, err := fields.NewHashDescriptor(fields.HashTypeSHA512_256, int(fields.HashDigestLengthSHA512_256))
+	idDesc, err := fields.NewHashDescriptor(fields.HashTypeSHA512, int(fields.HashDigestLengthSHA512_256))
 	if err != nil {
 		return nil, err
 	}
@@ -92,7 +92,7 @@ func (n *Builder) NewCommunity(name *fields.QualifiedContent, metadata *fields.Q
 	c.Name = *name
 	c.Metadata = *metadata
 	c.SignatureAuthority = *n.User.ID()
-	idDesc, err := fields.NewHashDescriptor(fields.HashTypeSHA512_256, int(fields.HashDigestLengthSHA512_256))
+	idDesc, err := fields.NewHashDescriptor(fields.HashTypeSHA512, int(fields.HashDigestLengthSHA512_256))
 	if err != nil {
 		return nil, err
 	}
@@ -152,7 +152,7 @@ func (n *Builder) NewReply(parent interface{}, content *fields.QualifiedContent,
 	r.Content = *content
 	r.Metadata = *metadata
 	r.SignatureAuthority = *n.User.ID()
-	idDesc, err := fields.NewHashDescriptor(fields.HashTypeSHA512_256, int(fields.HashDigestLengthSHA512_256))
+	idDesc, err := fields.NewHashDescriptor(fields.HashTypeSHA512, int(fields.HashDigestLengthSHA512_256))
 	if err != nil {
 		return nil, err
 	}

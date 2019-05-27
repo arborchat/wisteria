@@ -75,7 +75,7 @@ func (c ContentLength) MarshalBinary() ([]byte, error) {
 }
 
 func (c ContentLength) MarshalText() ([]byte, error) {
-	return []byte(fmt.Sprintf("length:%d", c)), nil
+	return []byte(fmt.Sprintf("B%d", c)), nil
 }
 
 // UnmarshalBinary converts from the binary representation of a ContentLength
@@ -106,7 +106,7 @@ func (t TreeDepth) MarshalBinary() ([]byte, error) {
 }
 
 func (t TreeDepth) MarshalText() ([]byte, error) {
-	return []byte(fmt.Sprintf("depth:%d", t)), nil
+	return []byte(fmt.Sprintf("L%d", t)), nil
 }
 
 // UnmarshalBinary converts from the binary representation of a TreeDepth
@@ -134,7 +134,7 @@ func (v Value) MarshalBinary() ([]byte, error) {
 
 func (v Value) MarshalText() ([]byte, error) {
 	based := base64.RawURLEncoding.EncodeToString([]byte(v))
-	return []byte("base64url:" + based), nil
+	return []byte(based), nil
 }
 
 // UnmarshalBinary converts from the binary representation of a Value
@@ -166,7 +166,7 @@ func (v Version) MarshalBinary() ([]byte, error) {
 }
 
 func (v Version) MarshalText() ([]byte, error) {
-	return []byte(fmt.Sprintf("version:%d", v)), nil
+	return []byte(fmt.Sprintf("V%d", v)), nil
 }
 
 // UnmarshalBinary converts from the binary representation of a Version
@@ -235,19 +235,19 @@ func (t *NodeType) Equals(t2 *NodeType) bool {
 type HashType genericType
 
 const (
-	sizeofHashType              = sizeofgenericType
-	HashTypeNullHash   HashType = 0
-	HashTypeSHA512_256 HashType = 1
+	sizeofHashType            = sizeofgenericType
+	HashTypeNullHash HashType = iota
+	HashTypeSHA512
 )
 
 var validHashTypes = map[HashType]struct{}{
-	HashTypeNullHash:   struct{}{},
-	HashTypeSHA512_256: struct{}{},
+	HashTypeNullHash: struct{}{},
+	HashTypeSHA512:   struct{}{},
 }
 
 var hashNames = map[HashType]string{
-	HashTypeNullHash:   "null hash",
-	HashTypeSHA512_256: "SHA512/256",
+	HashTypeNullHash: "NullHash",
+	HashTypeSHA512:   "SHA512",
 }
 
 func (t HashType) MarshalBinary() ([]byte, error) {

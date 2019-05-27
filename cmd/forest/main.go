@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding"
-	"encoding/base64"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -315,12 +314,12 @@ func showNode(args []string, commandName string, fromBytes func([]byte) (interfa
 }
 
 func filename(desc *fields.QualifiedHash) (string, error) {
-	b, err := desc.MarshalBinary()
+	b, err := desc.MarshalText()
 	if err != nil {
 		return "", err
 	}
 
-	return base64.RawURLEncoding.EncodeToString(b), nil
+	return string(b), nil
 }
 
 func save(w io.Writer, node encoding.BinaryMarshaler) error {
