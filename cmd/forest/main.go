@@ -144,7 +144,7 @@ func createIdentity(args []string) error {
 		return err
 	}
 
-	fname, err := filename(identity.ID())
+	fname, err := identity.ID().MarshalString()
 	if err != nil {
 		return err
 	}
@@ -201,7 +201,7 @@ func createCommunity(args []string) error {
 		return err
 	}
 
-	fname, err := filename(community.ID())
+	fname, err := community.ID().MarshalString()
 	if err != nil {
 		return err
 	}
@@ -268,7 +268,7 @@ func createReply(args []string) error {
 		return err
 	}
 
-	fname, err := filename(reply.ID())
+	fname, err := reply.ID().MarshalString()
 	if err != nil {
 		return err
 	}
@@ -311,15 +311,6 @@ func showNode(args []string, commandName string, fromBytes func([]byte) (interfa
 		return err
 	}
 	return nil
-}
-
-func filename(desc *fields.QualifiedHash) (string, error) {
-	b, err := desc.MarshalText()
-	if err != nil {
-		return "", err
-	}
-
-	return string(b), nil
 }
 
 func save(w io.Writer, node encoding.BinaryMarshaler) error {

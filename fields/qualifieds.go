@@ -85,6 +85,11 @@ func (q *QualifiedHash) MarshalText() ([]byte, error) {
 	return marshalTextQualified(&q.Descriptor, q.Value)
 }
 
+func (q *QualifiedHash) MarshalString() (string, error) {
+	s, e := q.MarshalText()
+	return string(s), e
+}
+
 type QualifiedContent struct {
 	Descriptor ContentDescriptor
 	Value      Value
