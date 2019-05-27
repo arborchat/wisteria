@@ -7,10 +7,17 @@ import (
 	"git.sr.ht/~whereswaldon/forest-go/fields"
 )
 
+const MaxNameLength = 256
+
+type Validator interface {
+	Validate() error
+}
+
 type Node interface {
 	ID() *fields.QualifiedHash
 	ParentID() *fields.QualifiedHash
 	Equals(interface{}) bool
+	ValidateSelf() error
 }
 
 // NodeTypeOf returns the NodeType of the provided binary-marshaled node.
@@ -145,6 +152,49 @@ func (n *commonNode) Equals(n2 *commonNode) bool {
 		n.Signature.Equals(&n2.Signature)
 }
 
+// ValidateShallow checks all fields for internal validity. It does not check
+// the existence or validity of nodes referenced from this node.
+func (n *commonNode) ValidateShallow() error {
+	if _, validType := fields.ValidNodeTypes[n.Type]; !validType {
+		return fmt.Errorf("%d is not a valid node type", n.Type)
+	}
+	if n.SchemaVersion > fields.CurrentVersion {
+		return fmt.Errorf("%d is higher than than the supported version %d", n.SchemaVersion, fields.CurrentVersion)
+	}
+	id := n.ID()
+	needsValidation := []Validator{id, &n.Parent, &n.Metadata, &n.SignatureAuthority, &n.Signature}
+	for _, nv := range needsValidation {
+		if err := nv.Validate(); err != nil {
+			return err
+		}
+	}
+	if n.Metadata.Descriptor.Type != fields.ContentTypeJSON {
+		return fmt.Errorf("Metadata must be JSON, got content type %d", n.Metadata.Descriptor.Type)
+	}
+	return nil
+}
+
+// ValidateDeep checks for the existence of all referenced nodes within the provided store.
+func (n *commonNode) ValidateDeep(store Store) error {
+	// ensure known parent
+	if !n.Parent.Equals(fields.NullHash()) {
+		if has, err := store.Has(&n.Parent); !has {
+			return fmt.Errorf("Unknown parent %s", n.Parent)
+		} else if err != nil {
+			return err
+		}
+	}
+	// ensure known author
+	if !n.SignatureAuthority.Equals(fields.NullHash()) {
+		if has, err := store.Has(&n.SignatureAuthority); !has {
+			return fmt.Errorf("Unknown SignatureAuthority %s", n.SignatureAuthority)
+		} else if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // concrete nodes
 
 // Identity nodes represent a user. They associate a username with a public key that the user
@@ -226,6 +276,35 @@ func (i *Identity) Equals(other interface{}) bool {
 	return i.commonNode.Equals(&i2.commonNode) &&
 		i.Name.Equals(&i2.Name) &&
 		i.PublicKey.Equals(&i2.PublicKey)
+}
+
+// ValidateShallow checks all fields for internal validity. It does not check
+// the existence or validity of nodes referenced from this node.
+func (i *Identity) ValidateShallow() error {
+	needsValidation := []Validator{&i.Name, &i.PublicKey}
+	for _, nv := range needsValidation {
+		if err := nv.Validate(); err != nil {
+			return err
+		}
+	}
+	if i.Name.Descriptor.Length > MaxNameLength {
+		return fmt.Errorf("Name is longer than maximum of %d", MaxNameLength)
+	}
+	if i.Depth != fields.TreeDepth(0) {
+		return fmt.Errorf("Identity depth must be 0, got %d", i.Depth)
+	}
+	if !i.Parent.Equals(fields.NullHash()) {
+		return fmt.Errorf("Identity parent must be null hash, got %v", i.Parent)
+	}
+	if !i.SignatureAuthority.Equals(fields.NullHash()) {
+		return fmt.Errorf("Identity author must be null hash, got %v", i.SignatureAuthority)
+	}
+	return nil
+}
+
+// ValidateDeep checks all referenced nodes for existence within the store.
+func (i *Identity) ValidateDeep(store Store) error {
+	return nil
 }
 
 type Community struct {

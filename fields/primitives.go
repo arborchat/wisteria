@@ -194,7 +194,7 @@ const (
 	NodeTypeReply
 )
 
-var validNodeTypes = map[NodeType]struct{}{
+var ValidNodeTypes = map[NodeType]struct{}{
 	NodeTypeIdentity:  struct{}{},
 	NodeTypeCommunity: struct{}{},
 	NodeTypeReply:     struct{}{},
@@ -218,7 +218,7 @@ func (t *NodeType) UnmarshalBinary(b []byte) error {
 	if err := (*genericType)(t).UnmarshalBinary(b); err != nil {
 		return err
 	}
-	if _, valid := validNodeTypes[*t]; !valid {
+	if _, valid := ValidNodeTypes[*t]; !valid {
 		return fmt.Errorf("%d is not a valid node type", *t)
 	}
 	return nil
@@ -240,9 +240,10 @@ const (
 	HashTypeSHA512
 )
 
-var validHashTypes = map[HashType]struct{}{
-	HashTypeNullHash: struct{}{},
-	HashTypeSHA512:   struct{}{},
+// map to valid lengths
+var ValidHashTypes = map[HashType][]ContentLength{
+	HashTypeNullHash: []ContentLength{0},
+	HashTypeSHA512:   []ContentLength{HashDigestLengthSHA512_256},
 }
 
 var hashNames = map[HashType]string{
@@ -262,7 +263,7 @@ func (t *HashType) UnmarshalBinary(b []byte) error {
 	if err := (*genericType)(t).UnmarshalBinary(b); err != nil {
 		return err
 	}
-	if _, valid := validHashTypes[*t]; !valid {
+	if _, valid := ValidHashTypes[*t]; !valid {
 		return fmt.Errorf("%d is not a valid hash type", *t)
 	}
 	return nil
@@ -284,7 +285,7 @@ const (
 	ContentTypeJSON       ContentType = 2
 )
 
-var validContentTypes = map[ContentType]struct{}{
+var ValidContentTypes = map[ContentType]struct{}{
 	ContentTypeUTF8String: struct{}{},
 	ContentTypeJSON:       struct{}{},
 }
@@ -306,7 +307,7 @@ func (t *ContentType) UnmarshalBinary(b []byte) error {
 	if err := (*genericType)(t).UnmarshalBinary(b); err != nil {
 		return err
 	}
-	if _, valid := validContentTypes[*t]; !valid {
+	if _, valid := ValidContentTypes[*t]; !valid {
 		return fmt.Errorf("%d is not a valid content type", *t)
 	}
 	return nil
@@ -328,7 +329,7 @@ const (
 	KeyTypeOpenPGP KeyType = 1
 )
 
-var validKeyTypes = map[KeyType]struct{}{
+var ValidKeyTypes = map[KeyType]struct{}{
 	KeyTypeNoKey:   struct{}{},
 	KeyTypeOpenPGP: struct{}{},
 }
@@ -350,7 +351,7 @@ func (t *KeyType) UnmarshalBinary(b []byte) error {
 	if err := (*genericType)(t).UnmarshalBinary(b); err != nil {
 		return err
 	}
-	if _, valid := validKeyTypes[*t]; !valid {
+	if _, valid := ValidKeyTypes[*t]; !valid {
 		return fmt.Errorf("%d is not a valid key type", *t)
 	}
 	return nil
@@ -371,7 +372,7 @@ const (
 	SignatureTypeOpenPGP SignatureType = 1
 )
 
-var validSignatureTypes = map[SignatureType]struct{}{
+var ValidSignatureTypes = map[SignatureType]struct{}{
 	SignatureTypeOpenPGP: struct{}{},
 }
 
@@ -391,7 +392,7 @@ func (t *SignatureType) UnmarshalBinary(b []byte) error {
 	if err := (*genericType)(t).UnmarshalBinary(b); err != nil {
 		return err
 	}
-	if _, valid := validSignatureTypes[*t]; !valid {
+	if _, valid := ValidSignatureTypes[*t]; !valid {
 		return fmt.Errorf("%d is not a valid signature type", *t)
 	}
 	return nil

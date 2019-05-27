@@ -3,6 +3,7 @@ package fields
 import (
 	"bytes"
 	"encoding"
+	"fmt"
 )
 
 const minSizeofQualified = sizeofDescriptor
@@ -90,6 +91,16 @@ func (q *QualifiedHash) MarshalString() (string, error) {
 	return string(s), e
 }
 
+func (q *QualifiedHash) Validate() error {
+	if err := q.Descriptor.Validate(); err != nil {
+		return err
+	}
+	if int(q.Descriptor.Length) != len(q.Value) {
+		return fmt.Errorf("Descriptor length %d does not match value length %d", q.Descriptor.Length, len(q.Value))
+	}
+	return nil
+}
+
 type QualifiedContent struct {
 	Descriptor ContentDescriptor
 	Value      Value
@@ -157,6 +168,16 @@ func (q *QualifiedContent) MarshalText() ([]byte, error) {
 	}
 }
 
+func (q *QualifiedContent) Validate() error {
+	if err := q.Descriptor.Validate(); err != nil {
+		return err
+	}
+	if int(q.Descriptor.Length) != len(q.Value) {
+		return fmt.Errorf("Descriptor length %d does not match value length %d", q.Descriptor.Length, len(q.Value))
+	}
+	return nil
+}
+
 type QualifiedKey struct {
 	Descriptor KeyDescriptor
 	Value      Value
@@ -208,6 +229,16 @@ func (q *QualifiedKey) MarshalText() ([]byte, error) {
 	return marshalTextQualified(&q.Descriptor, q.Value)
 }
 
+func (q *QualifiedKey) Validate() error {
+	if err := q.Descriptor.Validate(); err != nil {
+		return err
+	}
+	if int(q.Descriptor.Length) != len(q.Value) {
+		return fmt.Errorf("Descriptor length %d does not match value length %d", q.Descriptor.Length, len(q.Value))
+	}
+	return nil
+}
+
 type QualifiedSignature struct {
 	Descriptor SignatureDescriptor
 	Value      Value
@@ -257,4 +288,14 @@ func (q *QualifiedSignature) BytesConsumed() int {
 
 func (q *QualifiedSignature) MarshalText() ([]byte, error) {
 	return marshalTextQualified(&q.Descriptor, q.Value)
+}
+
+func (q *QualifiedSignature) Validate() error {
+	if err := q.Descriptor.Validate(); err != nil {
+		return err
+	}
+	if int(q.Descriptor.Length) != len(q.Value) {
+		return fmt.Errorf("Descriptor length %d does not match value length %d", q.Descriptor.Length, len(q.Value))
+	}
+	return nil
 }

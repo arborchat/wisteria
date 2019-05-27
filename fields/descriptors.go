@@ -3,6 +3,7 @@ package fields
 import (
 	"bytes"
 	"encoding"
+	"fmt"
 )
 
 const sizeofDescriptor = sizeofgenericType + sizeofContentLength
@@ -51,6 +52,24 @@ func (d *HashDescriptor) MarshalText() ([]byte, error) {
 	return marshalTextDescriptor(d.Type, d.Length)
 }
 
+func (d *HashDescriptor) Validate() error {
+	validLengths, validType := ValidHashTypes[d.Type]
+	if !validType {
+		return fmt.Errorf("%d is not a valid hash type", d.Type)
+	}
+	found := false
+	for _, length := range validLengths {
+		if length == d.Length {
+			found = true
+			break
+		}
+	}
+	if !found {
+		return fmt.Errorf("%d is not a valid hash length for hash type %d", d.Length, d.Type)
+	}
+	return nil
+}
+
 type ContentDescriptor struct {
 	Type   ContentType
 	Length ContentLength
@@ -76,6 +95,14 @@ func (d *ContentDescriptor) Equals(other *ContentDescriptor) bool {
 
 func (d *ContentDescriptor) MarshalText() ([]byte, error) {
 	return marshalTextDescriptor(d.Type, d.Length)
+}
+
+func (d *ContentDescriptor) Validate() error {
+	_, validType := ValidContentTypes[d.Type]
+	if !validType {
+		return fmt.Errorf("%d is not a valid content type", d.Type)
+	}
+	return nil
 }
 
 type SignatureDescriptor struct {
@@ -105,6 +132,14 @@ func (d *SignatureDescriptor) MarshalText() ([]byte, error) {
 	return marshalTextDescriptor(d.Type, d.Length)
 }
 
+func (d *SignatureDescriptor) Validate() error {
+	_, validType := ValidSignatureTypes[d.Type]
+	if !validType {
+		return fmt.Errorf("%d is not a valid signature type", d.Type)
+	}
+	return nil
+}
+
 type KeyDescriptor struct {
 	Type   KeyType
 	Length ContentLength
@@ -130,4 +165,12 @@ func (d *KeyDescriptor) Equals(other *KeyDescriptor) bool {
 
 func (d *KeyDescriptor) MarshalText() ([]byte, error) {
 	return marshalTextDescriptor(d.Type, d.Length)
+}
+
+func (d *KeyDescriptor) Validate() error {
+	_, validType := ValidKeyTypes[d.Type]
+	if !validType {
+		return fmt.Errorf("%d is not a valid key type", d.Type)
+	}
+	return nil
 }
