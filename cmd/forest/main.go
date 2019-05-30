@@ -73,9 +73,7 @@ func show(args []string) error {
 	if len(flags.Args()) < 1 {
 		usage()
 	}
-	return showNode(args, commandShow, func(b []byte) (interface{}, error) {
-		return forest.UnmarshalBinaryNode(b)
-	})
+	return showNode(args, commandShow, forest.UnmarshalBinaryNode)
 }
 
 func create(args []string) error {
@@ -114,7 +112,7 @@ func createIdentity(args []string) error {
 	)
 	flags := flag.NewFlagSet(commandCreate+" "+commandIdentity, flag.ExitOnError)
 	flags.StringVar(&name, "name", "forest", "username for the identity node")
-	flags.StringVar(&metadata, "metadata", "forest", "metadata for the identity node")
+	flags.StringVar(&metadata, "metadata", "\"forest\"", "metadata for the identity node")
 	flags.StringVar(&keyfile, "key", "arbor.privkey", "the openpgp private key for the identity node")
 	usage := func() {
 		flags.PrintDefaults()
@@ -127,7 +125,7 @@ func createIdentity(args []string) error {
 	if err != nil {
 		return err
 	}
-	qMeta, err := fields.NewQualifiedContent(fields.ContentTypeUTF8String, []byte(metadata))
+	qMeta, err := fields.NewQualifiedContent(fields.ContentTypeJSON, []byte(metadata))
 	if err != nil {
 		return err
 	}
@@ -164,7 +162,7 @@ func createCommunity(args []string) error {
 	)
 	flags := flag.NewFlagSet(commandCreate+" "+commandCommunity, flag.ExitOnError)
 	flags.StringVar(&name, "name", "forest", "username for the community node")
-	flags.StringVar(&metadata, "metadata", "forest", "metadata for the community node")
+	flags.StringVar(&metadata, "metadata", "\"forest\"", "metadata for the community node")
 	flags.StringVar(&keyfile, "key", "arbor.privkey", "the openpgp private key for the signing identity node")
 	flags.StringVar(&identity, "as", "", "[required] the id of the signing identity node")
 	usage := func() {
@@ -178,7 +176,7 @@ func createCommunity(args []string) error {
 	if err != nil {
 		return err
 	}
-	qMeta, err := fields.NewQualifiedContent(fields.ContentTypeUTF8String, []byte(metadata))
+	qMeta, err := fields.NewQualifiedContent(fields.ContentTypeJSON, []byte(metadata))
 	if err != nil {
 		return err
 	}
@@ -220,7 +218,7 @@ func createReply(args []string) error {
 		content, metadata, parent, keyfile, identity string
 	)
 	flags := flag.NewFlagSet(commandCreate+" "+commandReply, flag.ExitOnError)
-	flags.StringVar(&metadata, "metadata", "forest", "metadata for the reply node")
+	flags.StringVar(&metadata, "metadata", "\"forest\"", "metadata for the reply node")
 	flags.StringVar(&keyfile, "key", "arbor.privkey", "the openpgp private key for the signing identity node")
 	flags.StringVar(&identity, "as", "", "[required] the id of the signing identity node")
 	flags.StringVar(&parent, "to", "", "[required] the id of the parent reply or community node")
@@ -239,7 +237,7 @@ func createReply(args []string) error {
 		return err
 	}
 
-	qMeta, err := fields.NewQualifiedContent(fields.ContentTypeUTF8String, []byte(metadata))
+	qMeta, err := fields.NewQualifiedContent(fields.ContentTypeJSON, []byte(metadata))
 	if err != nil {
 		return err
 	}
@@ -282,7 +280,7 @@ func createReply(args []string) error {
 	return nil
 }
 
-func showNode(args []string, commandName string, fromBytes func([]byte) (interface{}, error)) error {
+func showNode(args []string, commandName string, fromBytes func([]byte) (forest.Node, error)) error {
 	flags := flag.NewFlagSet(commandName+" "+commandShow, flag.ExitOnError)
 	usage := func() {
 		flags.PrintDefaults()
@@ -300,8 +298,10 @@ func showNode(args []string, commandName string, fromBytes func([]byte) (interfa
 	}
 	c, err := fromBytes(b)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+		return err
+	}
+	if err := c.ValidateShallow(); err != nil {
+		return err
 	}
 	text, err := json.Marshal(c)
 	if err != nil {

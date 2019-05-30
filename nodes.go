@@ -17,7 +17,8 @@ type Node interface {
 	ID() *fields.QualifiedHash
 	ParentID() *fields.QualifiedHash
 	Equals(interface{}) bool
-	ValidateSelf() error
+	ValidateShallow() error
+	ValidateDeep(Store) error
 }
 
 // NodeTypeOf returns the NodeType of the provided binary-marshaled node.
@@ -47,7 +48,7 @@ func VersionAndNodeTypeOf(b []byte) (fields.Version, fields.NodeType, error) {
 // UnmarshalBinaryNode unmarshals a node of any type. If it does not return an
 // error, the concrete type of the first return parameter will be one of the
 // node structs declared in this package (e.g. Identity, Community, etc...)
-func UnmarshalBinaryNode(b []byte) (interface{}, error) {
+func UnmarshalBinaryNode(b []byte) (Node, error) {
 	v, t, err := VersionAndNodeTypeOf(b)
 	if err != nil {
 		return nil, err
@@ -179,7 +180,7 @@ func (n *commonNode) ValidateDeep(store Store) error {
 	// ensure known parent
 	if !n.Parent.Equals(fields.NullHash()) {
 		if has, err := store.Has(&n.Parent); !has {
-			return fmt.Errorf("Unknown parent %s", n.Parent)
+			return fmt.Errorf("Unknown parent %v", n.Parent)
 		} else if err != nil {
 			return err
 		}
@@ -187,7 +188,7 @@ func (n *commonNode) ValidateDeep(store Store) error {
 	// ensure known author
 	if !n.SignatureAuthority.Equals(fields.NullHash()) {
 		if has, err := store.Has(&n.SignatureAuthority); !has {
-			return fmt.Errorf("Unknown SignatureAuthority %s", n.SignatureAuthority)
+			return fmt.Errorf("Unknown SignatureAuthority %v", n.SignatureAuthority)
 		} else if err != nil {
 			return err
 		}
@@ -281,6 +282,9 @@ func (i *Identity) Equals(other interface{}) bool {
 // ValidateShallow checks all fields for internal validity. It does not check
 // the existence or validity of nodes referenced from this node.
 func (i *Identity) ValidateShallow() error {
+	if err := i.commonNode.ValidateShallow(); err != nil {
+		return err
+	}
 	needsValidation := []Validator{&i.Name, &i.PublicKey}
 	for _, nv := range needsValidation {
 		if err := nv.Validate(); err != nil {
@@ -382,6 +386,43 @@ func (c *Community) Equals(other interface{}) bool {
 		c.Name.Equals(&c2.Name)
 }
 
+// ValidateShallow checks all fields for internal validity. It does not check
+// the existence or validity of nodes referenced from this node.
+func (c *Community) ValidateShallow() error {
+	if err := c.commonNode.ValidateShallow(); err != nil {
+		return err
+	}
+	needsValidation := []Validator{&c.Name}
+	for _, nv := range needsValidation {
+		if err := nv.Validate(); err != nil {
+			return err
+		}
+	}
+	if c.Name.Descriptor.Length > MaxNameLength {
+		return fmt.Errorf("Name is longer than maximum of %d", MaxNameLength)
+	}
+	if c.Depth != fields.TreeDepth(0) {
+		return fmt.Errorf("Community depth must be 0, got %d", c.Depth)
+	}
+	if !c.Parent.Equals(fields.NullHash()) {
+		return fmt.Errorf("Community parent must be null hash, got %v", c.Parent)
+	}
+	if c.SignatureAuthority.Equals(fields.NullHash()) {
+		return fmt.Errorf("Community author must not be null hash")
+	}
+	return nil
+}
+
+// ValidateDeep checks all referenced nodes for existence within the store.
+func (c *Community) ValidateDeep(store Store) error {
+	if has, err := store.Has(&c.SignatureAuthority); !has {
+		return fmt.Errorf("Missing author node %v", c.SignatureAuthority)
+	} else if err != nil {
+		return err
+	}
+	return nil
+}
+
 type Reply struct {
 	commonNode
 	CommunityID    fields.QualifiedHash
@@ -457,4 +498,51 @@ func (r *Reply) Equals(other interface{}) bool {
 	}
 	return r.commonNode.Equals(&r2.commonNode) &&
 		r.Content.Equals(&r2.Content)
+}
+
+// ValidateShallow checks all fields for internal validity. It does not check
+// the existence or validity of nodes referenced from this node.
+func (r *Reply) ValidateShallow() error {
+	if err := r.commonNode.ValidateShallow(); err != nil {
+		return err
+	}
+	needsValidation := []Validator{&r.Content, &r.CommunityID, &r.ConversationID}
+	for _, nv := range needsValidation {
+		if err := nv.Validate(); err != nil {
+			return err
+		}
+	}
+	if r.Depth < fields.TreeDepth(1) {
+		return fmt.Errorf("Reply depth must be at least 1, got %d", r.Depth)
+	} else if r.Depth == fields.TreeDepth(1) && !r.ConversationID.Equals(fields.NullHash()) {
+		return fmt.Errorf("Reply conversation id at depth 1 must be null hash")
+	} else if r.Depth > fields.TreeDepth(1) && r.ConversationID.Equals(fields.NullHash()) {
+		return fmt.Errorf("Reply conversation id at depth > 1 must be null hash, got %v", r.ConversationID)
+	}
+	if r.Parent.Equals(fields.NullHash()) {
+		return fmt.Errorf("Reply parent must not be null hash")
+	}
+	if r.SignatureAuthority.Equals(fields.NullHash()) {
+		return fmt.Errorf("Reply author must not be null hash")
+	}
+	if r.CommunityID.Equals(fields.NullHash()) {
+		return fmt.Errorf("Reply community id must not be null hash")
+	}
+	return nil
+}
+
+// ValidateDeep checks all referenced nodes for existence within the store.
+func (r *Reply) ValidateDeep(store Store) error {
+	needed := []*fields.QualifiedHash{&r.SignatureAuthority, &r.Parent, &r.CommunityID}
+	if r.Depth > fields.TreeDepth(1) {
+		needed = append(needed, &r.ConversationID)
+	}
+	for _, neededNode := range needed {
+		if has, err := store.Has(neededNode); !has {
+			return fmt.Errorf("Missing required node %v", neededNode)
+		} else if err != nil {
+			return err
+		}
+	}
+	return nil
 }
