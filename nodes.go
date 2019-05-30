@@ -179,7 +179,7 @@ func (n *commonNode) ValidateShallow() error {
 func (n *commonNode) ValidateDeep(store Store) error {
 	// ensure known parent
 	if !n.Parent.Equals(fields.NullHash()) {
-		if has, err := store.Has(&n.Parent); !has {
+		if _, has, err := store.Get(&n.Parent); !has {
 			return fmt.Errorf("Unknown parent %v", n.Parent)
 		} else if err != nil {
 			return err
@@ -187,7 +187,7 @@ func (n *commonNode) ValidateDeep(store Store) error {
 	}
 	// ensure known author
 	if !n.SignatureAuthority.Equals(fields.NullHash()) {
-		if has, err := store.Has(&n.SignatureAuthority); !has {
+		if _, has, err := store.Get(&n.SignatureAuthority); !has {
 			return fmt.Errorf("Unknown SignatureAuthority %v", n.SignatureAuthority)
 		} else if err != nil {
 			return err
@@ -415,7 +415,7 @@ func (c *Community) ValidateShallow() error {
 
 // ValidateDeep checks all referenced nodes for existence within the store.
 func (c *Community) ValidateDeep(store Store) error {
-	if has, err := store.Has(&c.SignatureAuthority); !has {
+	if _, has, err := store.Get(&c.SignatureAuthority); !has {
 		return fmt.Errorf("Missing author node %v", c.SignatureAuthority)
 	} else if err != nil {
 		return err
@@ -538,7 +538,7 @@ func (r *Reply) ValidateDeep(store Store) error {
 		needed = append(needed, &r.ConversationID)
 	}
 	for _, neededNode := range needed {
-		if has, err := store.Has(neededNode); !has {
+		if _, has, err := store.Get(neededNode); !has {
 			return fmt.Errorf("Missing required node %v", neededNode)
 		} else if err != nil {
 			return err
