@@ -6,7 +6,7 @@ import (
 	"git.sr.ht/~whereswaldon/forest-go"
 )
 
-func TestMemoryStoreAdd(t *testing.T) {
+func TestMemoryStore(t *testing.T) {
 	s := forest.NewMemoryStore()
 	testStandardStoreInterface(t, s, "MemoryStore")
 }
@@ -47,9 +47,38 @@ func testStandardStoreInterface(t *testing.T, s forest.Store, storeImplName stri
 	}
 }
 
-func TestCacheStoreAdd(t *testing.T) {
+func TestCacheStore(t *testing.T) {
 	s1 := forest.NewMemoryStore()
 	s2 := forest.NewMemoryStore()
-	c := forest.NewCacheStore(s1, s2)
+	c, err := forest.NewCacheStore(s1, s2)
+	if err != nil {
+		t.Errorf("Unexpected error constructing CacheStore: %v", err)
+	}
 	testStandardStoreInterface(t, c, "CacheStore")
+}
+
+func TestCacheStoreDownPropagation(t *testing.T) {
+	s1 := forest.NewMemoryStore()
+	id, _, com, rep := MakeReplyOrSkip(t)
+	nodes := []forest.Node{id, com, rep}
+	subrange := nodes[:len(nodes)-1]
+	for _, node := range subrange {
+		if err := s1.Add(node); err != nil {
+			t.Skipf("Failed adding %v to %v", node, s1)
+		}
+	}
+	s2 := forest.NewMemoryStore()
+	if _, err := forest.NewCacheStore(s1, s2); err != nil {
+		t.Errorf("Unexpected error when constructing CacheStore: %v", err)
+	}
+
+	for _, node := range subrange {
+		if n2, has, err := s2.Get(node.ID()); err != nil {
+			t.Errorf("Unexpected error getting node from cache base layer: %s", err)
+		} else if !has {
+			t.Errorf("Expected cache base layer to contain %v", node.ID())
+		} else if !n2.Equals(node) {
+			t.Errorf("Expected cache base layer to contain the same value for ID %v", node.ID())
+		}
+	}
 }

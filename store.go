@@ -6,6 +6,7 @@ import (
 
 type Store interface {
 	Size() (int, error)
+	CopyInto(Store) error
 	Get(*fields.QualifiedHash) (Node, bool, error)
 	Add(Node) error
 }
@@ -20,6 +21,15 @@ func NewMemoryStore() *MemoryStore {
 
 func (m *MemoryStore) Size() (int, error) {
 	return len(m.Items), nil
+}
+
+func (m *MemoryStore) CopyInto(other Store) error {
+	for _, node := range m.Items {
+		if err := other.Add(node); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (m *MemoryStore) Get(id *fields.QualifiedHash) (Node, bool, error) {
@@ -52,12 +62,27 @@ func (m *MemoryStore) AddID(id string, node Node) error {
 	return nil
 }
 
+// CacheStore combines two other stores into one logical store. It is
+// useful when store implementations have different performance
+// characteristics and one is dramatically faster than the other. Once
+// a CacheStore is created, the individual stores within it should not
+// be directly modified.
 type CacheStore struct {
 	Cache, Back Store
 }
 
-func NewCacheStore(cache, back Store) *CacheStore {
-	return &CacheStore{cache, back}
+// NewCacheStore creates a single logical store from the given two stores.
+// All items from `cache` are automatically copied into `base` during
+// the construction of the CacheStore, and from then on (assuming
+// neither store is modified directly outside of CacheStore) all elements
+// added are guaranteed to be added to `base`. It is recommended to use
+// fast in-memory implementations as the `cache` layer and disk or
+// network-based implementations as the `base` layer.
+func NewCacheStore(cache, back Store) (*CacheStore, error) {
+	if err := cache.CopyInto(back); err != nil {
+		return nil, err
+	}
+	return &CacheStore{cache, back}, nil
 }
 
 // Size returns the effective size of this CacheStore, which is the size of the
@@ -84,6 +109,10 @@ func (m *CacheStore) Get(id *fields.QualifiedHash) (Node, bool, error) {
 		return node, has, nil
 	}
 	return nil, false, nil
+}
+
+func (m *CacheStore) CopyInto(other Store) error {
+	return m.Back.CopyInto(other)
 }
 
 // Add inserts the given node into both stores of the CacheStore
