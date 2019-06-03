@@ -82,3 +82,42 @@ func TestCacheStoreDownPropagation(t *testing.T) {
 		}
 	}
 }
+
+func TestCacheStoreUpPropagation(t *testing.T) {
+	base := forest.NewMemoryStore()
+	id, _, com, rep := MakeReplyOrSkip(t)
+	nodes := []forest.Node{id, com, rep}
+	subrange := nodes[:len(nodes)-1]
+	for _, node := range subrange {
+		if err := base.Add(node); err != nil {
+			t.Skipf("Failed adding %v to %v", node, base)
+		}
+	}
+	cache := forest.NewMemoryStore()
+	combined, err := forest.NewCacheStore(cache, base)
+	if err != nil {
+		t.Errorf("Unexpected error when constructing CacheStore: %v", err)
+	}
+
+	for _, node := range subrange {
+		if _, has, err := cache.Get(node.ID()); err != nil {
+			t.Errorf("Unexpected error getting node from cache layer: %s", err)
+		} else if has {
+			t.Errorf("Expected cache layer not to contain %v", node.ID())
+		}
+		if n2, has, err := combined.Get(node.ID()); err != nil {
+			t.Errorf("Unexpected error getting node from cache store: %s", err)
+		} else if !has {
+			t.Errorf("Expected cache store to contain %v", node.ID())
+		} else if !n2.Equals(node) {
+			t.Errorf("Expected cache store to contain the same value for ID %v", node.ID())
+		}
+		if n2, has, err := cache.Get(node.ID()); err != nil {
+			t.Errorf("Unexpected error getting node from cache layer: %s", err)
+		} else if !has {
+			t.Errorf("Expected cache layer to contain %v after warming cache", node.ID())
+		} else if !n2.Equals(node) {
+			t.Errorf("Expected cache layer to contain the same value for ID %v after warming cache", node.ID())
+		}
+	}
+}
