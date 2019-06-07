@@ -78,7 +78,7 @@ func validateReply(t *testing.T, author *forest.Identity, reply *forest.Reply) {
 
 func TestReplyValidationFailsWhenTampered(t *testing.T) {
 	identity, _, _, reply := MakeReplyOrSkip(t)
-	reply.Content.Value = fields.Value([]byte("whatever"))
+	reply.Content.Blob = fields.Blob([]byte("whatever"))
 	failToValidateReply(t, identity, reply)
 }
 
@@ -120,7 +120,7 @@ func TestReplyToReplyFailsWhenTampered(t *testing.T) {
 	if err != nil {
 		t.Error("Failed to create reply to existing reply", err)
 	}
-	r2.Content.Value = fields.Value([]byte("else"))
+	r2.Content.Blob = fields.Blob([]byte("else"))
 	failToValidateReply(t, identity, r2)
 }
 

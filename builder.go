@@ -60,7 +60,7 @@ func NewIdentity(privkey *openpgp.Entity, name *fields.QualifiedContent, metadat
 	if err != nil {
 		return nil, err
 	}
-	identity.id = fields.Value(id)
+	identity.id = fields.Blob(id)
 
 	return identity, nil
 }
@@ -119,7 +119,7 @@ func (n *Builder) NewCommunity(name *fields.QualifiedContent, metadata *fields.Q
 	if err != nil {
 		return nil, err
 	}
-	c.id = fields.Value(id)
+	c.id = fields.Blob(id)
 
 	return c, nil
 }
@@ -179,7 +179,7 @@ func (n *Builder) NewReply(parent interface{}, content *fields.QualifiedContent,
 	if err != nil {
 		return nil, err
 	}
-	r.id = fields.Value(id)
+	r.id = fields.Blob(id)
 
 	return r, nil
 }

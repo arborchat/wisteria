@@ -37,7 +37,7 @@ func TestCommunityValidatesSelf(t *testing.T) {
 
 func TestCommunityValidationFailsWhenTampered(t *testing.T) {
 	identity, _, community := MakeCommunityOrSkip(t)
-	community.Name.Value = fields.Value([]byte("whatever"))
+	community.Name.Blob = fields.Blob([]byte("whatever"))
 	if correct, err := forest.ValidateID(community, *community.ID()); err == nil && correct {
 		t.Error("ID validation failed on unmodified node", err)
 	}

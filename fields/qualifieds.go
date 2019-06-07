@@ -11,7 +11,7 @@ const minSizeofQualified = sizeofDescriptor
 // concrete qualified data types
 type QualifiedHash struct {
 	Descriptor HashDescriptor
-	Value      Value
+	Blob      Blob
 }
 
 const minSizeofQualifiedHash = sizeofHashDescriptor
@@ -38,7 +38,7 @@ func NewQualifiedHash(t HashType, content []byte) (*QualifiedHash, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &QualifiedHash{*hd, Value(content)}, nil
+	return &QualifiedHash{*hd, Blob(content)}, nil
 }
 
 func NullHash() *QualifiedHash {
@@ -47,7 +47,7 @@ func NullHash() *QualifiedHash {
 			Type:   HashTypeNullHash,
 			Length: 0,
 		},
-		Value: []byte{},
+		Blob: []byte{},
 	}
 }
 
@@ -56,7 +56,7 @@ func (q *QualifiedHash) UnmarshalBinary(b []byte) error {
 	if err != nil {
 		return err
 	}
-	if err := q.Value.UnmarshalBinary(unused[:q.Descriptor.Length]); err != nil {
+	if err := q.Blob.UnmarshalBinary(unused[:q.Descriptor.Length]); err != nil {
 		return err
 	}
 	return nil
@@ -75,15 +75,15 @@ func (q *QualifiedHash) BytesConsumed() int {
 }
 
 func (q *QualifiedHash) SerializationOrder() []BidirectionalBinaryMarshaler {
-	return append(q.Descriptor.SerializationOrder(), &q.Value)
+	return append(q.Descriptor.SerializationOrder(), &q.Blob)
 }
 
 func (q *QualifiedHash) Equals(other *QualifiedHash) bool {
-	return q.Descriptor.Equals(&other.Descriptor) && q.Value.Equals(&other.Value)
+	return q.Descriptor.Equals(&other.Descriptor) && q.Blob.Equals(&other.Blob)
 }
 
 func (q *QualifiedHash) MarshalText() ([]byte, error) {
-	return marshalTextQualified(&q.Descriptor, q.Value)
+	return marshalTextQualified(&q.Descriptor, q.Blob)
 }
 
 func (q *QualifiedHash) MarshalString() (string, error) {
@@ -95,15 +95,15 @@ func (q *QualifiedHash) Validate() error {
 	if err := q.Descriptor.Validate(); err != nil {
 		return err
 	}
-	if int(q.Descriptor.Length) != len(q.Value) {
-		return fmt.Errorf("Descriptor length %d does not match value length %d", q.Descriptor.Length, len(q.Value))
+	if int(q.Descriptor.Length) != len(q.Blob) {
+		return fmt.Errorf("Descriptor length %d does not match value length %d", q.Descriptor.Length, len(q.Blob))
 	}
 	return nil
 }
 
 type QualifiedContent struct {
 	Descriptor ContentDescriptor
-	Value      Value
+	Blob      Blob
 }
 
 const minSizeofQualifiedContent = sizeofContentDescriptor
@@ -114,15 +114,15 @@ func NewQualifiedContent(t ContentType, content []byte) (*QualifiedContent, erro
 	if err != nil {
 		return nil, err
 	}
-	return &QualifiedContent{*hd, Value(content)}, nil
+	return &QualifiedContent{*hd, Blob(content)}, nil
 }
 
 func (q *QualifiedContent) SerializationOrder() []BidirectionalBinaryMarshaler {
-	return append(q.Descriptor.SerializationOrder(), &q.Value)
+	return append(q.Descriptor.SerializationOrder(), &q.Blob)
 }
 
 func (q *QualifiedContent) Equals(other *QualifiedContent) bool {
-	return q.Descriptor.Equals(&other.Descriptor) && q.Value.Equals(&other.Value)
+	return q.Descriptor.Equals(&other.Descriptor) && q.Blob.Equals(&other.Blob)
 }
 
 func (q *QualifiedContent) UnmarshalBinary(b []byte) error {
@@ -130,7 +130,7 @@ func (q *QualifiedContent) UnmarshalBinary(b []byte) error {
 	if err != nil {
 		return err
 	}
-	if err := q.Value.UnmarshalBinary(unused[:q.Descriptor.Length]); err != nil {
+	if err := q.Blob.UnmarshalBinary(unused[:q.Descriptor.Length]); err != nil {
 		return err
 	}
 	return nil
@@ -158,13 +158,13 @@ func (q *QualifiedContent) MarshalText() ([]byte, error) {
 			return nil, err
 		}
 		buf := bytes.NewBuffer(descText)
-		_, err = buf.Write(q.Value)
+		_, err = buf.Write(q.Blob)
 		if err != nil {
 			return nil, err
 		}
 		return buf.Bytes(), nil
 	default:
-		return marshalTextQualified(&q.Descriptor, q.Value)
+		return marshalTextQualified(&q.Descriptor, q.Blob)
 	}
 }
 
@@ -172,15 +172,15 @@ func (q *QualifiedContent) Validate() error {
 	if err := q.Descriptor.Validate(); err != nil {
 		return err
 	}
-	if int(q.Descriptor.Length) != len(q.Value) {
-		return fmt.Errorf("Descriptor length %d does not match value length %d", q.Descriptor.Length, len(q.Value))
+	if int(q.Descriptor.Length) != len(q.Blob) {
+		return fmt.Errorf("Descriptor length %d does not match value length %d", q.Descriptor.Length, len(q.Blob))
 	}
 	return nil
 }
 
 type QualifiedKey struct {
 	Descriptor KeyDescriptor
-	Value      Value
+	Blob      Blob
 }
 
 const minSizeofQualifiedKey = sizeofKeyDescriptor
@@ -191,15 +191,15 @@ func NewQualifiedKey(t KeyType, content []byte) (*QualifiedKey, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &QualifiedKey{*hd, Value(content)}, nil
+	return &QualifiedKey{*hd, Blob(content)}, nil
 }
 
 func (q *QualifiedKey) SerializationOrder() []BidirectionalBinaryMarshaler {
-	return append(q.Descriptor.SerializationOrder(), &q.Value)
+	return append(q.Descriptor.SerializationOrder(), &q.Blob)
 }
 
 func (q *QualifiedKey) Equals(other *QualifiedKey) bool {
-	return q.Descriptor.Equals(&other.Descriptor) && q.Value.Equals(&other.Value)
+	return q.Descriptor.Equals(&other.Descriptor) && q.Blob.Equals(&other.Blob)
 }
 
 func (q *QualifiedKey) UnmarshalBinary(b []byte) error {
@@ -207,7 +207,7 @@ func (q *QualifiedKey) UnmarshalBinary(b []byte) error {
 	if err != nil {
 		return err
 	}
-	if err := q.Value.UnmarshalBinary(unused[:q.Descriptor.Length]); err != nil {
+	if err := q.Blob.UnmarshalBinary(unused[:q.Descriptor.Length]); err != nil {
 		return err
 	}
 	return nil
@@ -226,22 +226,22 @@ func (q *QualifiedKey) BytesConsumed() int {
 }
 
 func (q *QualifiedKey) MarshalText() ([]byte, error) {
-	return marshalTextQualified(&q.Descriptor, q.Value)
+	return marshalTextQualified(&q.Descriptor, q.Blob)
 }
 
 func (q *QualifiedKey) Validate() error {
 	if err := q.Descriptor.Validate(); err != nil {
 		return err
 	}
-	if int(q.Descriptor.Length) != len(q.Value) {
-		return fmt.Errorf("Descriptor length %d does not match value length %d", q.Descriptor.Length, len(q.Value))
+	if int(q.Descriptor.Length) != len(q.Blob) {
+		return fmt.Errorf("Descriptor length %d does not match value length %d", q.Descriptor.Length, len(q.Blob))
 	}
 	return nil
 }
 
 type QualifiedSignature struct {
 	Descriptor SignatureDescriptor
-	Value      Value
+	Blob      Blob
 }
 
 const minSizeofQualifiedSignature = sizeofSignatureDescriptor
@@ -252,15 +252,15 @@ func NewQualifiedSignature(t SignatureType, content []byte) (*QualifiedSignature
 	if err != nil {
 		return nil, err
 	}
-	return &QualifiedSignature{*hd, Value(content)}, nil
+	return &QualifiedSignature{*hd, Blob(content)}, nil
 }
 
 func (q *QualifiedSignature) SerializationOrder() []BidirectionalBinaryMarshaler {
-	return append(q.Descriptor.SerializationOrder(), &q.Value)
+	return append(q.Descriptor.SerializationOrder(), &q.Blob)
 }
 
 func (q *QualifiedSignature) Equals(other *QualifiedSignature) bool {
-	return q.Descriptor.Equals(&other.Descriptor) && q.Value.Equals(&other.Value)
+	return q.Descriptor.Equals(&other.Descriptor) && q.Blob.Equals(&other.Blob)
 }
 
 func (q *QualifiedSignature) UnmarshalBinary(b []byte) error {
@@ -268,7 +268,7 @@ func (q *QualifiedSignature) UnmarshalBinary(b []byte) error {
 	if err != nil {
 		return err
 	}
-	if err := q.Value.UnmarshalBinary(unused[:q.Descriptor.Length]); err != nil {
+	if err := q.Blob.UnmarshalBinary(unused[:q.Descriptor.Length]); err != nil {
 		return err
 	}
 	return nil
@@ -287,15 +287,15 @@ func (q *QualifiedSignature) BytesConsumed() int {
 }
 
 func (q *QualifiedSignature) MarshalText() ([]byte, error) {
-	return marshalTextQualified(&q.Descriptor, q.Value)
+	return marshalTextQualified(&q.Descriptor, q.Blob)
 }
 
 func (q *QualifiedSignature) Validate() error {
 	if err := q.Descriptor.Validate(); err != nil {
 		return err
 	}
-	if int(q.Descriptor.Length) != len(q.Value) {
-		return fmt.Errorf("Descriptor length %d does not match value length %d", q.Descriptor.Length, len(q.Value))
+	if int(q.Descriptor.Length) != len(q.Blob) {
+		return fmt.Errorf("Descriptor length %d does not match value length %d", q.Descriptor.Length, len(q.Blob))
 	}
 	return nil
 }

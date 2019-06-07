@@ -71,7 +71,7 @@ func UnmarshalBinaryNode(b []byte) (Node, error) {
 // generic node
 type commonNode struct {
 	// the ID is deterministically computed from the rest of the values
-	id                 fields.Value
+	id                 fields.Blob
 	Type               fields.NodeType
 	SchemaVersion      fields.Version
 	Parent             fields.QualifiedHash
@@ -86,12 +86,12 @@ type commonNode struct {
 func (n commonNode) ID() *fields.QualifiedHash {
 	return &fields.QualifiedHash{
 		Descriptor: n.IDDesc,
-		Value:      n.id,
+		Blob:      n.id,
 	}
 }
 
 func (n commonNode) ParentID() *fields.QualifiedHash {
-	return &fields.QualifiedHash{n.Parent.Descriptor, n.Parent.Value}
+	return &fields.QualifiedHash{n.Parent.Descriptor, n.Parent.Blob}
 }
 
 func (n *commonNode) presignSerializationOrder() []fields.BidirectionalBinaryMarshaler {
@@ -265,7 +265,7 @@ func (i *Identity) UnmarshalBinary(b []byte) error {
 	if err != nil {
 		return err
 	}
-	i.id = fields.Value(idBytes)
+	i.id = fields.Blob(idBytes)
 	return nil
 }
 
@@ -373,7 +373,7 @@ func (c *Community) UnmarshalBinary(b []byte) error {
 	if err != nil {
 		return err
 	}
-	c.id = fields.Value(idBytes)
+	c.id = fields.Blob(idBytes)
 	return nil
 }
 
@@ -487,7 +487,7 @@ func (r *Reply) UnmarshalBinary(b []byte) error {
 	if err != nil {
 		return err
 	}
-	r.id = fields.Value(idBytes)
+	r.id = fields.Blob(idBytes)
 	return nil
 }
 

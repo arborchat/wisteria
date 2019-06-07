@@ -31,7 +31,7 @@ func ValidateSignature(v SignatureValidator, identity *Identity) (bool, error) {
 		return false, fmt.Errorf("This node was signed by a different identity")
 	}
 	// get the key used to sign this node
-	pubkeyBuf := bytes.NewBuffer([]byte(identity.PublicKey.Value))
+	pubkeyBuf := bytes.NewBuffer([]byte(identity.PublicKey.Blob))
 	pubkeyEntity, err := openpgp.ReadEntity(packet.NewReader(pubkeyBuf))
 	if err != nil {
 		return false, err
@@ -43,7 +43,7 @@ func ValidateSignature(v SignatureValidator, identity *Identity) (bool, error) {
 	}
 	signedContentBuf := bytes.NewBuffer(signedContent)
 
-	signatureBuf := bytes.NewBuffer([]byte(v.GetSignature().Value))
+	signatureBuf := bytes.NewBuffer([]byte(v.GetSignature().Blob))
 	keyring := openpgp.EntityList([]*openpgp.Entity{pubkeyEntity})
 	_, err = openpgp.CheckDetachedSignature(keyring, signedContentBuf, signatureBuf)
 	if err != nil {

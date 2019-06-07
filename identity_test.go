@@ -40,7 +40,7 @@ func TestIdentityValidatesSelf(t *testing.T) {
 
 func TestIdentityValidationFailsWhenTampered(t *testing.T) {
 	identity, _ := MakeIdentityOrSkip(t)
-	identity.Name.Value = fields.Value([]byte("whatever"))
+	identity.Name.Blob = fields.Blob([]byte("whatever"))
 	if correct, err := forest.ValidateID(identity, *identity.ID()); err == nil && correct {
 		t.Error("ID validation succeeded on modified node", err)
 	}

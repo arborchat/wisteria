@@ -124,31 +124,31 @@ func (t *TreeDepth) Equals(t2 *TreeDepth) bool {
 	return *t == *t2
 }
 
-// Value represents a quantity of arbitrary binary data in the Forest
-type Value []byte
+// Blob represents a quantity of arbitrary binary data in the Forest
+type Blob []byte
 
-// MarshalBinary converts the Value into its binary representation
-func (v Value) MarshalBinary() ([]byte, error) {
+// MarshalBinary converts the Blob into its binary representation
+func (v Blob) MarshalBinary() ([]byte, error) {
 	return v, nil
 }
 
-func (v Value) MarshalText() ([]byte, error) {
+func (v Blob) MarshalText() ([]byte, error) {
 	based := base64.RawURLEncoding.EncodeToString([]byte(v))
 	return []byte(based), nil
 }
 
-// UnmarshalBinary converts from the binary representation of a Value
+// UnmarshalBinary converts from the binary representation of a Blob
 // back to its structured form
-func (v *Value) UnmarshalBinary(b []byte) error {
+func (v *Blob) UnmarshalBinary(b []byte) error {
 	*v = b
 	return nil
 }
 
-func (v *Value) BytesConsumed() int {
+func (v *Blob) BytesConsumed() int {
 	return len([]byte(*v))
 }
 
-func (v *Value) Equals(v2 *Value) bool {
+func (v *Blob) Equals(v2 *Blob) bool {
 	return bytes.Equal([]byte(*v), []byte(*v2))
 }
 
