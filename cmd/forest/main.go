@@ -34,7 +34,7 @@ A CLI for manipulating nodes in the arbor forest.
 
 Subcommands:
 
-`+commandCreate+" ("+commandIdentity+"|"+commandCommunity+"|"+commandCommunity+"|"+commandReply+`)
+`+commandCreate+" ("+commandIdentity+"|"+commandCommunity+"|"+commandReply+`)
 show <node-id>
 `)
 		flag.PrintDefaults()

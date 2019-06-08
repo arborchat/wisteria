@@ -80,25 +80,6 @@ forest show <id> | jq .
 
 Substitute the base64url-encoded ID of your community node for `<id>`. `jq` will pretty-print the JSON to make it easier to read.
 
-#### Conversations
-
-To create a conversation, use:
-
-```sh
-forest create conversation --as <id> --in <community-id> --content <your message>
-```
-
-Substitute the base64url-encoded ID of your identity node for `<id>` and the base64url-encoded ID of your community node for `<community-id>`. Substitute `<your message>`
-for the content of your conversation. Usually this will be a question, link, or idea that you're interested in discussing.
-
-To view your conversation in a human-readable format, try the following:
-
-```sh
-forest show <id> | jq .
-```
-
-Substitute the base64url-encoded ID of your conversation node for `<id>`. `jq` will pretty-print the JSON to make it easier to read.
-
 #### Replies
 
 To create a reply, use:
