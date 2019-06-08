@@ -78,7 +78,7 @@ type commonNode struct {
 	IDDesc             fields.HashDescriptor
 	Depth              fields.TreeDepth
 	Metadata           fields.QualifiedContent
-	SignatureAuthority fields.QualifiedHash
+	Author fields.QualifiedHash
 	Signature          fields.QualifiedSignature
 }
 
@@ -103,7 +103,7 @@ func (n *commonNode) presignSerializationOrder() []fields.BidirectionalBinaryMar
 	order = append(order, n.IDDesc.SerializationOrder()...)
 	order = append(order, &n.Depth)
 	order = append(order, &n.Metadata)
-	order = append(order, &n.SignatureAuthority)
+	order = append(order, &n.Author)
 	return order
 }
 
@@ -131,7 +131,7 @@ func (n *commonNode) GetSignature() *fields.QualifiedSignature {
 
 // SignatureIdentityHash returns the node identitifer for the Identity that signed this node.
 func (n *commonNode) SignatureIdentityHash() *fields.QualifiedHash {
-	return &n.SignatureAuthority
+	return &n.Author
 }
 
 func (n commonNode) IsIdentity() bool {
@@ -149,7 +149,7 @@ func (n *commonNode) Equals(n2 *commonNode) bool {
 		n.IDDesc.Equals(&n2.IDDesc) &&
 		n.Depth.Equals(&n2.Depth) &&
 		n.Metadata.Equals(&n2.Metadata) &&
-		n.SignatureAuthority.Equals(&n2.SignatureAuthority) &&
+		n.Author.Equals(&n2.Author) &&
 		n.Signature.Equals(&n2.Signature)
 }
 
@@ -163,7 +163,7 @@ func (n *commonNode) ValidateShallow() error {
 		return fmt.Errorf("%d is higher than than the supported version %d", n.SchemaVersion, fields.CurrentVersion)
 	}
 	id := n.ID()
-	needsValidation := []Validator{id, &n.Parent, &n.Metadata, &n.SignatureAuthority, &n.Signature}
+	needsValidation := []Validator{id, &n.Parent, &n.Metadata, &n.Author, &n.Signature}
 	for _, nv := range needsValidation {
 		if err := nv.Validate(); err != nil {
 			return err
@@ -186,9 +186,9 @@ func (n *commonNode) ValidateDeep(store Store) error {
 		}
 	}
 	// ensure known author
-	if !n.SignatureAuthority.Equals(fields.NullHash()) {
-		if _, has, err := store.Get(&n.SignatureAuthority); !has {
-			return fmt.Errorf("Unknown SignatureAuthority %v", n.SignatureAuthority)
+	if !n.Author.Equals(fields.NullHash()) {
+		if _, has, err := store.Get(&n.Author); !has {
+			return fmt.Errorf("Unknown Author %v", n.Author)
 		} else if err != nil {
 			return err
 		}
@@ -300,8 +300,8 @@ func (i *Identity) ValidateShallow() error {
 	if !i.Parent.Equals(fields.NullHash()) {
 		return fmt.Errorf("Identity parent must be null hash, got %v", i.Parent)
 	}
-	if !i.SignatureAuthority.Equals(fields.NullHash()) {
-		return fmt.Errorf("Identity author must be null hash, got %v", i.SignatureAuthority)
+	if !i.Author.Equals(fields.NullHash()) {
+		return fmt.Errorf("Identity author must be null hash, got %v", i.Author)
 	}
 	return nil
 }
@@ -407,7 +407,7 @@ func (c *Community) ValidateShallow() error {
 	if !c.Parent.Equals(fields.NullHash()) {
 		return fmt.Errorf("Community parent must be null hash, got %v", c.Parent)
 	}
-	if c.SignatureAuthority.Equals(fields.NullHash()) {
+	if c.Author.Equals(fields.NullHash()) {
 		return fmt.Errorf("Community author must not be null hash")
 	}
 	return nil
@@ -415,8 +415,8 @@ func (c *Community) ValidateShallow() error {
 
 // ValidateDeep checks all referenced nodes for existence within the store.
 func (c *Community) ValidateDeep(store Store) error {
-	if _, has, err := store.Get(&c.SignatureAuthority); !has {
-		return fmt.Errorf("Missing author node %v", c.SignatureAuthority)
+	if _, has, err := store.Get(&c.Author); !has {
+		return fmt.Errorf("Missing author node %v", c.Author)
 	} else if err != nil {
 		return err
 	}
@@ -522,7 +522,7 @@ func (r *Reply) ValidateShallow() error {
 	if r.Parent.Equals(fields.NullHash()) {
 		return fmt.Errorf("Reply parent must not be null hash")
 	}
-	if r.SignatureAuthority.Equals(fields.NullHash()) {
+	if r.Author.Equals(fields.NullHash()) {
 		return fmt.Errorf("Reply author must not be null hash")
 	}
 	if r.CommunityID.Equals(fields.NullHash()) {
@@ -533,7 +533,7 @@ func (r *Reply) ValidateShallow() error {
 
 // ValidateDeep checks all referenced nodes for existence within the store.
 func (r *Reply) ValidateDeep(store Store) error {
-	needed := []*fields.QualifiedHash{&r.SignatureAuthority, &r.Parent, &r.CommunityID}
+	needed := []*fields.QualifiedHash{&r.Author, &r.Parent, &r.CommunityID}
 	if r.Depth > fields.TreeDepth(1) {
 		needed = append(needed, &r.ConversationID)
 	}

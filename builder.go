@@ -32,7 +32,7 @@ func NewIdentity(privkey *openpgp.Entity, name *fields.QualifiedContent, metadat
 		return nil, err
 	}
 	identity.PublicKey = *qKey
-	identity.SignatureAuthority = *fields.NullHash()
+	identity.Author = *fields.NullHash()
 	idDesc, err := fields.NewHashDescriptor(fields.HashTypeSHA512, int(fields.HashDigestLengthSHA512_256))
 	if err != nil {
 		return nil, err
@@ -91,7 +91,7 @@ func (n *Builder) NewCommunity(name *fields.QualifiedContent, metadata *fields.Q
 	c.Depth = 0
 	c.Name = *name
 	c.Metadata = *metadata
-	c.SignatureAuthority = *n.User.ID()
+	c.Author = *n.User.ID()
 	idDesc, err := fields.NewHashDescriptor(fields.HashTypeSHA512, int(fields.HashDigestLengthSHA512_256))
 	if err != nil {
 		return nil, err
@@ -151,7 +151,7 @@ func (n *Builder) NewReply(parent interface{}, content *fields.QualifiedContent,
 	}
 	r.Content = *content
 	r.Metadata = *metadata
-	r.SignatureAuthority = *n.User.ID()
+	r.Author = *n.User.ID()
 	idDesc, err := fields.NewHashDescriptor(fields.HashTypeSHA512, int(fields.HashDigestLengthSHA512_256))
 	if err != nil {
 		return nil, err
