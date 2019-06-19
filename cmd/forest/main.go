@@ -108,12 +108,13 @@ func create(args []string) error {
 
 func createIdentity(args []string) error {
 	var (
-		name, metadata, keyfile string
+		name, metadata, keyfile, gpguser string
 	)
 	flags := flag.NewFlagSet(commandCreate+" "+commandIdentity, flag.ExitOnError)
 	flags.StringVar(&name, "name", "forest", "username for the identity node")
 	flags.StringVar(&metadata, "metadata", "\"forest\"", "metadata for the identity node")
 	flags.StringVar(&keyfile, "key", "arbor.privkey", "the openpgp private key for the identity node")
+	flags.StringVar(&gpguser, "gpguser", "", "gpg2 user whose private key should be used to create this node. Supercedes -key.")
 	usage := func() {
 		flags.PrintDefaults()
 	}
@@ -129,15 +130,11 @@ func createIdentity(args []string) error {
 	if err != nil {
 		return err
 	}
-	privkey, err := getPrivateKey(keyfile, &PGPKeyConfig{
-		Name:    "Arbor identity key",
-		Comment: "Automatically generated",
-		Email:   "none@arbor.chat",
-	})
+	signer, err := getSigner(gpguser, keyfile)
 	if err != nil {
 		return err
 	}
-	identity, err := forest.NewIdentity(privkey, qName, qMeta)
+	identity, err := forest.NewIdentity(signer, qName, qMeta)
 	if err != nil {
 		return err
 	}
@@ -158,13 +155,14 @@ func createIdentity(args []string) error {
 
 func createCommunity(args []string) error {
 	var (
-		name, metadata, keyfile, identity string
+		name, metadata, keyfile, identity, gpguser string
 	)
 	flags := flag.NewFlagSet(commandCreate+" "+commandCommunity, flag.ExitOnError)
 	flags.StringVar(&name, "name", "forest", "username for the community node")
 	flags.StringVar(&metadata, "metadata", "\"forest\"", "metadata for the community node")
 	flags.StringVar(&keyfile, "key", "arbor.privkey", "the openpgp private key for the signing identity node")
 	flags.StringVar(&identity, "as", "", "[required] the id of the signing identity node")
+	flags.StringVar(&gpguser, "gpguser", "", "gpg2 user whose private key should be used to create this node. Supercedes -key.")
 	usage := func() {
 		flags.PrintDefaults()
 	}
@@ -180,21 +178,16 @@ func createCommunity(args []string) error {
 	if err != nil {
 		return err
 	}
-	privkey, err := getPrivateKey(keyfile, &PGPKeyConfig{
-		Name:    "Arbor identity key",
-		Comment: "Automatically generated",
-		Email:   "none@arbor.chat",
-	})
+	signer, err := getSigner(gpguser, keyfile)
 	if err != nil {
 		return err
 	}
-
 	idNode, err := getIdentity(identity)
 	if err != nil {
 		return err
 	}
 
-	community, err := forest.As(idNode, privkey).NewCommunity(qName, qMeta)
+	community, err := forest.As(idNode, signer).NewCommunity(qName, qMeta)
 	if err != nil {
 		return err
 	}
@@ -215,11 +208,12 @@ func createCommunity(args []string) error {
 
 func createReply(args []string) error {
 	var (
-		content, metadata, parent, keyfile, identity string
+		content, metadata, parent, keyfile, identity, gpguser string
 	)
 	flags := flag.NewFlagSet(commandCreate+" "+commandReply, flag.ExitOnError)
 	flags.StringVar(&metadata, "metadata", "\"forest\"", "metadata for the reply node")
 	flags.StringVar(&keyfile, "key", "arbor.privkey", "the openpgp private key for the signing identity node")
+	flags.StringVar(&gpguser, "gpguser", "", "gpg2 user whose private key should be used to create this node. Supercedes -key.")
 	flags.StringVar(&identity, "as", "", "[required] the id of the signing identity node")
 	flags.StringVar(&parent, "to", "", "[required] the id of the parent reply or community node")
 	flags.StringVar(&content, "content", "", "[required] content of the reply node")
@@ -242,15 +236,10 @@ func createReply(args []string) error {
 		return err
 	}
 
-	privkey, err := getPrivateKey(keyfile, &PGPKeyConfig{
-		Name:    "Arbor identity key",
-		Comment: "Automatically generated",
-		Email:   "none@arbor.chat",
-	})
+	signer, err := getSigner(gpguser, keyfile)
 	if err != nil {
 		return err
 	}
-
 	idNode, err := getIdentity(identity)
 	if err != nil {
 		return err
@@ -261,7 +250,7 @@ func createReply(args []string) error {
 		return err
 	}
 
-	reply, err := forest.As(idNode, privkey).NewReply(parentNode, qContent, qMeta)
+	reply, err := forest.As(idNode, signer).NewReply(parentNode, qContent, qMeta)
 	if err != nil {
 		return err
 	}
@@ -401,6 +390,30 @@ type PGPKeyConfig struct {
 	Name    string
 	Comment string
 	Email   string
+}
+
+// getSigner returns a Signer. If the gpguser parameter is not the empty string, it
+// uses a GPGSigner with that username. Otherwise, it uses a NativeSigner with the
+// given privkeyFile as the source of the private key.
+func getSigner(gpguser, privkeyFile string) (forest.Signer, error) {
+	var (
+		signer forest.Signer
+		err    error
+	)
+	if gpguser != "" {
+		signer, err = forest.NewGPGSigner(gpguser)
+	} else {
+		privkey, err := getPrivateKey(privkeyFile, &PGPKeyConfig{
+			Name:    "Arbor identity key",
+			Comment: "Automatically generated",
+			Email:   "none@arbor.chat",
+		})
+		if err != nil {
+			return nil, err
+		}
+		return forest.NewNativeSigner(privkey)
+	}
+	return signer, err
 }
 
 // getPrivateKey gets a private key for creating the identity based on the value

@@ -3,15 +3,128 @@ package forest
 import (
 	"bytes"
 	"fmt"
+	"io/ioutil"
+	"os/exec"
 
 	"git.sr.ht/~whereswaldon/forest-go/fields"
 	"golang.org/x/crypto/openpgp"
 )
 
+// Signer can sign any binary data
+type Signer interface {
+	Sign(data []byte) (signature []byte, err error)
+	PublicKey() (key []byte, err error)
+}
+
+// NativeSigner uses golang's native openpgp operation for signing data. It
+// only supports private keys without a passphrase.
+type NativeSigner openpgp.Entity
+
+// Sign signs the input data with the contained private key and returns the resulting signature.
+func (s NativeSigner) Sign(data []byte) ([]byte, error) {
+	signedData := bytes.NewBuffer(data)
+	signature := new(bytes.Buffer)
+	if err := openpgp.DetachSign(signature, (*openpgp.Entity)(&s), signedData, nil); err != nil {
+		return nil, err
+	}
+	return signature.Bytes(), nil
+}
+
+// NewNativeSigner creates a native Golang PGP signer. This will fail if the provided key is
+// encrypted. GPGSigner should be used for all encrypted keys.
+func NewNativeSigner(privatekey *openpgp.Entity) (Signer, error) {
+	if privatekey.PrivateKey.Encrypted {
+		return nil, fmt.Errorf("Cannot build NativeSigner with an encrypted key")
+	}
+	return NativeSigner(*privatekey), nil
+}
+
+// PublicKey returns the raw bytes of the binary openpgp public key used by this signer.
+func (s NativeSigner) PublicKey() ([]byte, error) {
+	keybuf := new(bytes.Buffer)
+	if err := (*openpgp.Entity)(&s).Serialize(keybuf); err != nil {
+		return nil, err
+	}
+	return keybuf.Bytes(), nil
+}
+
+// GPGSigner uses a local gpg2 installation for key management. It will invoke gpg2 as a subprocess
+// to sign data and to acquire the public key for its signing key. The public fields can be used
+// to modify its behavior in order to change how it prompts for passphrases and other details.
+type GPGSigner struct {
+	GPGUserName string
+	// Rewriter is invoked on each invocation of exec.Command that spawns GPG. You can use it to modify
+	// flags or any other property of the subcommand (environment variables). This is especially useful
+	// to control how GPG prompts for key passphrases.
+	Rewriter func(*exec.Cmd) error
+}
+
+// NewGPGSigner wraps the private key so that it can sign using the local system's implementation of GPG.
+func NewGPGSigner(gpgUserName string) (*GPGSigner, error) {
+	return &GPGSigner{GPGUserName: gpgUserName, Rewriter: func(_ *exec.Cmd) error { return nil }}, nil
+}
+
+// Sign invokes gpg2 to sign the data as this Signer's configured PGP user. It returns the signature or
+// an error (if any).
+func (s *GPGSigner) Sign(data []byte) ([]byte, error) {
+	gpg2 := exec.Command("gpg2", "--local-user", s.GPGUserName, "--detach-sign")
+	if err := s.Rewriter(gpg2); err != nil {
+		return nil, fmt.Errorf("Error invoking Rewrite: %v", err)
+	}
+	in, err := gpg2.StdinPipe()
+	if err != nil {
+		return nil, fmt.Errorf("Error getting stdin pipe: %v", err)
+	}
+	out, err := gpg2.StdoutPipe()
+	if err != nil {
+		return nil, fmt.Errorf("Error getting stdout pipe: %v", err)
+	}
+	if _, err := in.Write(data); err != nil {
+		return nil, fmt.Errorf("Error writing data to stdin: %v", err)
+	}
+	if err := gpg2.Start(); err != nil {
+		return nil, fmt.Errorf("Error starting gpg command: %v", err)
+	}
+	if err := in.Close(); err != nil {
+		return nil, fmt.Errorf("Error closing stdin: %v", err)
+	}
+	signature, err := ioutil.ReadAll(out)
+	if err != nil {
+		return nil, fmt.Errorf("Error reading signature data: %v", err)
+	}
+	if err := gpg2.Wait(); err != nil {
+		return nil, fmt.Errorf("Error running gpg: %v", err)
+	}
+	return signature, nil
+}
+
+// PublicKey returns the bytes of the OpenPGP public key used by this signer.
+func (s GPGSigner) PublicKey() ([]byte, error) {
+	gpg2 := exec.Command("gpg2", "--export", s.GPGUserName)
+	if err := s.Rewriter(gpg2); err != nil {
+		return nil, fmt.Errorf("Error invoking Rewrite: %v", err)
+	}
+	out, err := gpg2.StdoutPipe()
+	if err != nil {
+		return nil, fmt.Errorf("Error getting stdout pipe: %v", err)
+	}
+	if err := gpg2.Start(); err != nil {
+		return nil, fmt.Errorf("Error starting gpg command: %v", err)
+	}
+	pubkey, err := ioutil.ReadAll(out)
+	if err != nil {
+		return nil, fmt.Errorf("Error reading pubkey data: %v", err)
+	}
+	if err := gpg2.Wait(); err != nil {
+		return nil, fmt.Errorf("Error running gpg: %v", err)
+	}
+	return pubkey, nil
+}
+
 // NewIdentity builds an Identity node for the user with the given name and metadata, using
 // the OpenPGP Entity privkey to define the Identity. That Entity must contain a
 // private key with no passphrase.
-func NewIdentity(privkey *openpgp.Entity, name *fields.QualifiedContent, metadata *fields.QualifiedContent) (*Identity, error) {
+func NewIdentity(signer Signer, name *fields.QualifiedContent, metadata *fields.QualifiedContent) (*Identity, error) {
 	// make an empty identity and populate all fields that need to be known before
 	// signing the data
 	identity := newIdentity()
@@ -21,13 +134,13 @@ func NewIdentity(privkey *openpgp.Entity, name *fields.QualifiedContent, metadat
 	identity.Depth = 0
 	identity.Name = *name
 	identity.Metadata = *metadata
-	keybuf := new(bytes.Buffer)
-	// serialize the Entity (without the private key) into the node. This will just
-	// be the public key and metadata
-	if err := privkey.Serialize(keybuf); err != nil {
+
+	// get public key
+	pubkey, err := signer.PublicKey()
+	if err != nil {
 		return nil, err
 	}
-	qKey, err := fields.NewQualifiedKey(fields.KeyTypeOpenPGP, keybuf.Bytes())
+	qKey, err := fields.NewQualifiedKey(fields.KeyTypeOpenPGP, pubkey)
 	if err != nil {
 		return nil, err
 	}
@@ -44,12 +157,12 @@ func NewIdentity(privkey *openpgp.Entity, name *fields.QualifiedContent, metadat
 	if err != nil {
 		return nil, err
 	}
-	signedData := bytes.NewBuffer(signedDataBytes)
-	signature := new(bytes.Buffer)
-	if err := openpgp.DetachSign(signature, privkey, signedData, nil); err != nil {
+	signature, err := signer.Sign(signedDataBytes)
+	if err != nil {
 		return nil, err
 	}
-	qs, err := fields.NewQualifiedSignature(fields.SignatureTypeOpenPGP, signature.Bytes())
+
+	qs, err := fields.NewQualifiedSignature(fields.SignatureTypeOpenPGP, signature)
 	if err != nil {
 		return nil, err
 	}
@@ -67,18 +180,18 @@ func NewIdentity(privkey *openpgp.Entity, name *fields.QualifiedContent, metadat
 
 // Builder creates nodes in the forest on behalf of the given user.
 type Builder struct {
-	User    *Identity
-	Privkey *openpgp.Entity
+	User *Identity
+	Signer
 }
 
 // As creates a Builder that can write new nodes on behalf of the provided user.
 // It is intended to be able to be used fluently, like:
 //
 // community, err := forest.As(user, privkey).NewCommunity(name, metatdata)
-func As(user *Identity, privkey *openpgp.Entity) *Builder {
+func As(user *Identity, signer Signer) *Builder {
 	return &Builder{
-		User:    user,
-		Privkey: privkey,
+		User:   user,
+		Signer: signer,
 	}
 }
 
@@ -103,12 +216,11 @@ func (n *Builder) NewCommunity(name *fields.QualifiedContent, metadata *fields.Q
 	if err != nil {
 		return nil, err
 	}
-	signedData := bytes.NewBuffer(signedDataBytes)
-	signature := new(bytes.Buffer)
-	if err := openpgp.DetachSign(signature, n.Privkey, signedData, nil); err != nil {
+	signature, err := n.Sign(signedDataBytes)
+	if err != nil {
 		return nil, err
 	}
-	qs, err := fields.NewQualifiedSignature(fields.SignatureTypeOpenPGP, signature.Bytes())
+	qs, err := fields.NewQualifiedSignature(fields.SignatureTypeOpenPGP, signature)
 	if err != nil {
 		return nil, err
 	}
@@ -163,12 +275,11 @@ func (n *Builder) NewReply(parent interface{}, content *fields.QualifiedContent,
 	if err != nil {
 		return nil, err
 	}
-	signedData := bytes.NewBuffer(signedDataBytes)
-	signature := new(bytes.Buffer)
-	if err := openpgp.DetachSign(signature, n.Privkey, signedData, nil); err != nil {
+	signature, err := n.Sign(signedDataBytes)
+	if err != nil {
 		return nil, err
 	}
-	qs, err := fields.NewQualifiedSignature(fields.SignatureTypeOpenPGP, signature.Bytes())
+	qs, err := fields.NewQualifiedSignature(fields.SignatureTypeOpenPGP, signature)
 	if err != nil {
 		return nil, err
 	}

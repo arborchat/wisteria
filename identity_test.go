@@ -8,11 +8,12 @@ import (
 	"golang.org/x/crypto/openpgp"
 )
 
-func MakeIdentityOrSkip(t *testing.T) (*forest.Identity, *openpgp.Entity) {
+func MakeIdentityOrSkip(t *testing.T) (*forest.Identity, forest.Signer) {
 	privkey, err := openpgp.NewEntity("forest-test", "comment", "email@email.io", nil)
 	if err != nil {
 		t.Skip("Failed to create private key", err)
 	}
+	signer, err := forest.NewNativeSigner(privkey)
 	username, err := fields.NewQualifiedContent(fields.ContentTypeUTF8String, []byte("Test Name"))
 	if err != nil {
 		t.Skip("Failed to qualify username", err)
@@ -21,11 +22,11 @@ func MakeIdentityOrSkip(t *testing.T) (*forest.Identity, *openpgp.Entity) {
 	if err != nil {
 		t.Skip("Failed to qualify metadata", err)
 	}
-	identity, err := forest.NewIdentity(privkey, username, metadata)
+	identity, err := forest.NewIdentity(signer, username, metadata)
 	if err != nil {
 		t.Error("Failed to create Identity with valid parameters", err)
 	}
-	return identity, privkey
+	return identity, signer
 }
 
 func TestIdentityValidatesSelf(t *testing.T) {

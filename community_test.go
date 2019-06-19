@@ -5,10 +5,9 @@ import (
 
 	forest "git.sr.ht/~whereswaldon/forest-go"
 	"git.sr.ht/~whereswaldon/forest-go/fields"
-	"golang.org/x/crypto/openpgp"
 )
 
-func MakeCommunityOrSkip(t *testing.T) (*forest.Identity, *openpgp.Entity, *forest.Community) {
+func MakeCommunityOrSkip(t *testing.T) (*forest.Identity, forest.Signer, *forest.Community) {
 	identity, privkey := MakeIdentityOrSkip(t)
 	name, err := fields.NewQualifiedContent(fields.ContentTypeUTF8String, []byte("Test Name"))
 	if err != nil {

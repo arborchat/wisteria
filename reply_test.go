@@ -5,7 +5,6 @@ import (
 
 	forest "git.sr.ht/~whereswaldon/forest-go"
 	"git.sr.ht/~whereswaldon/forest-go/fields"
-	"golang.org/x/crypto/openpgp"
 )
 
 func TestNewReply(t *testing.T) {
@@ -42,7 +41,7 @@ func TestNewReplyToReply(t *testing.T) {
 	}
 }
 
-func MakeReplyOrSkip(t *testing.T) (*forest.Identity, *openpgp.Entity, *forest.Community, *forest.Reply) {
+func MakeReplyOrSkip(t *testing.T) (*forest.Identity, forest.Signer, *forest.Community, *forest.Reply) {
 	identity, privkey, community := MakeCommunityOrSkip(t)
 	content := QualifiedContentOrSkip(t, fields.ContentTypeUTF8String, []byte("test content"))
 	metadata := QualifiedContentOrSkip(t, fields.ContentTypeUTF8String, []byte{})
