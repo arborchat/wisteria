@@ -51,8 +51,17 @@ current working directory.
 > 
 > Your identity will also use an OpenPGP Private Key. In the above configuration, the CLI will create a new one for you and store it
 > in `./arbor.privkey`. This private key is not encrypted (has no passphrase), and should not be used for anything of importance.
-> You can supply your own OpenPGP private key for an identity, but `forest` does not currently support private keys with passphrases
-> (a major drawback that will be addressed soon). You can use the `--key` flag to supply a key.
+> 
+> If you have `gpg2` installed and have a GPG key that you'd like to use to sign your messages, use the `--gpguser <email>` flag, Substituting the email associated with your GPG key for `<email>`. This is the preferred option, as
+> `gpg2` will handle your keys and passphrases securely.
+> 
+> To create an identity with your existing key, for example, might look like:
+
+```sh
+forest create identity --name "Example" --gpguser example@arbor.chat
+```
+ 
+> You can use the `--gpguser` flag on any `forest create` subcommand.
 
 To view your identity in a human-readable format, try the following (install `jq` if you don't have it, it's really handy):
 
