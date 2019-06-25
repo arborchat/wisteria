@@ -37,31 +37,24 @@ mkdir arbor-forest
 cd arbor-forest
 ```
 
+> **Important: About OpenPGP Keys**
+> 
+> Arbor Forest nodes are signed by OpenPGP private keys. This gives Arbor strong guarantees about the authenticity of messages. The below procedures assume that you have `gpg2` installed and have already [generated a private key](https://fedoraproject.org/wiki/Creating_GPG_Keys#Creating_GPG_Keys_Using_the_Command_Line). Wherever you see `--gpguser <email>` below, substitute the email address associated with your GPG private key for `<email>`.
+> 
+> If you do not have `gpg2` or a key and you do not want to install them, you can omit the `--gpguser <email>` flag in the commands below. If you do this, the CLI will create a new one for you and store it
+> in `./arbor.privkey`. This private key is not encrypted (has no passphrase), and should not be used for anything of importance.
+
 #### Identities
+
 Since all nodes must be signed by an Identity node, you must create one of those before you can create any others.
 
 ```sh
-forest create identity --name <your-name>
+forest create identity --name <your-name> --gpguser <email>
 ```
 
 This will print the base64url-encoded ID of your identity node, which will be stored in a file by that name in your
 current working directory.
 
-> **A note about OpenPGP Keys**
-> 
-> Your identity will also use an OpenPGP Private Key. In the above configuration, the CLI will create a new one for you and store it
-> in `./arbor.privkey`. This private key is not encrypted (has no passphrase), and should not be used for anything of importance.
-> 
-> If you have `gpg2` installed and have a GPG key that you'd like to use to sign your messages, use the `--gpguser <email>` flag, Substituting the email associated with your GPG key for `<email>`. This is the preferred option, as
-> `gpg2` will handle your keys and passphrases securely.
-> 
-> To create an identity with your existing key, for example, might look like:
-
-```sh
-forest create identity --name "Example" --gpguser example@arbor.chat
-```
- 
-> You can use the `--gpguser` flag on any `forest create` subcommand.
 
 To view your identity in a human-readable format, try the following (install `jq` if you don't have it, it's really handy):
 
@@ -76,7 +69,7 @@ Substitute the base64url-encoded ID of your identity node for `<id>`. `jq` will 
 To create a community, use:
 
 ```sh
-forest create community --as <id> --name <community-name>
+forest create community --as <id> --name <community-name> --gpguser <email>
 ```
 
 Substitute the base64url-encoded ID of your identity node for `<id>` and provide appropriate values for name and metadata.
@@ -94,7 +87,7 @@ Substitute the base64url-encoded ID of your community node for `<id>`. `jq` will
 To create a reply, use:
 
 ```sh
-forest create reply --as <id> --to <parent-id> --content <your message>
+forest create reply --as <id> --to <parent-id> --content <your message> --gpguser <email>
 ```
 
 Substitute the base64url-encoded ID of your identity node for `<id>` and the base64url-encoded ID of another reply or conversation node for `<parent-id>`. Substitute `<your message>`
