@@ -27,5 +27,5 @@ if git branch --format '%(refname:lstrip=2)' --contains "$GIT_COMMIT" | grep "$m
   remote_name="mirror"
   git remote add "$remote_name" "$GITHUB_MIRROR_URL" && \
   git checkout "$mirror_branch" && \
-  git push -u "$remote_name" "$mirror_branch"
+  git push -f -u "$remote_name" "$mirror_branch"
 fi
