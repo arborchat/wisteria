@@ -29,7 +29,6 @@ const testData = testPassphrase
 func TestGPGSigner(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping expensive GPG test in short mode")
-		t.SkipNow()
 	}
 	signer, cleanup := getGPGSignerOrFail(t)
 	defer cleanup()
@@ -76,7 +75,6 @@ func getGPGSignerOrFail(t *testing.T) (forest.Signer, func()) {
 func TestGPGSignerAsIdentity(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping expensive GPG test in short mode")
-		t.SkipNow()
 	}
 	signer, cleanup := getGPGSignerOrFail(t)
 	defer cleanup()
@@ -90,8 +88,7 @@ func TestGPGSignerAsIdentity(t *testing.T) {
 	}
 	identity, err := forest.NewIdentity(signer, username, metadata)
 	if err != nil {
-		t.Error("Failed to create Identity with valid parameters", err)
-		t.FailNow()
+		t.Fatal("Failed to create Identity with valid parameters", err)
 	}
 	if correct, err := forest.ValidateID(identity, *identity.ID()); err != nil || !correct {
 		t.Error("ID validation failed on unmodified node", err)
