@@ -36,10 +36,6 @@ func (g *genericType) UnmarshalBinary(b []byte) error {
 	return binary.Read(buf, multiByteSerializationOrder, g)
 }
 
-func (g *genericType) SizeConstraints() (int, bool) {
-	return sizeofgenericType, false
-}
-
 func (g *genericType) BytesConsumed() int {
 	return sizeofgenericType
 }

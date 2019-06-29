@@ -4,6 +4,9 @@ import (
 	"bytes"
 	"encoding"
 	"fmt"
+	"reflect"
+
+	"git.sr.ht/~whereswaldon/forest-go/serialize"
 )
 
 const minSizeofQualified = sizeofDescriptor
@@ -52,30 +55,15 @@ func NullHash() *QualifiedHash {
 }
 
 func (q *QualifiedHash) UnmarshalBinary(b []byte) error {
-	unused, err := UnmarshalAll(b, AsUnmarshaler(q.Descriptor.SerializationOrder())...)
+	unused, err := serialize.ArborDeserialize(reflect.ValueOf(&q.Descriptor), b)
 	if err != nil {
 		return err
 	}
-	if err := q.Blob.UnmarshalBinary(unused[:q.Descriptor.Length]); err != nil {
-		return err
-	}
-	return nil
-}
-
-func (q *QualifiedHash) MarshalBinary() ([]byte, error) {
-	buf := new(bytes.Buffer)
-	if err := MarshalAllInto(buf, AsMarshaler(q.SerializationOrder())...); err != nil {
-		return nil, err
-	}
-	return buf.Bytes(), nil
+	return q.Blob.UnmarshalBinary(unused[:q.Descriptor.Length])
 }
 
 func (q *QualifiedHash) BytesConsumed() int {
-	return TotalBytesConsumed(q.SerializationOrder()...)
-}
-
-func (q *QualifiedHash) SerializationOrder() []BidirectionalBinaryMarshaler {
-	return append(q.Descriptor.SerializationOrder(), &q.Blob)
+	return sizeofHashDescriptor + q.Blob.BytesConsumed()
 }
 
 func (q *QualifiedHash) Equals(other *QualifiedHash) bool {
@@ -117,35 +105,20 @@ func NewQualifiedContent(t ContentType, content []byte) (*QualifiedContent, erro
 	return &QualifiedContent{*hd, Blob(content)}, nil
 }
 
-func (q *QualifiedContent) SerializationOrder() []BidirectionalBinaryMarshaler {
-	return append(q.Descriptor.SerializationOrder(), &q.Blob)
-}
-
 func (q *QualifiedContent) Equals(other *QualifiedContent) bool {
 	return q.Descriptor.Equals(&other.Descriptor) && q.Blob.Equals(&other.Blob)
 }
 
 func (q *QualifiedContent) UnmarshalBinary(b []byte) error {
-	unused, err := UnmarshalAll(b, AsUnmarshaler(q.Descriptor.SerializationOrder())...)
+	unused, err := serialize.ArborDeserialize(reflect.ValueOf(&q.Descriptor), b)
 	if err != nil {
 		return err
 	}
-	if err := q.Blob.UnmarshalBinary(unused[:q.Descriptor.Length]); err != nil {
-		return err
-	}
-	return nil
-}
-
-func (q *QualifiedContent) MarshalBinary() ([]byte, error) {
-	buf := new(bytes.Buffer)
-	if err := MarshalAllInto(buf, AsMarshaler(q.SerializationOrder())...); err != nil {
-		return nil, err
-	}
-	return buf.Bytes(), nil
+	return q.Blob.UnmarshalBinary(unused[:q.Descriptor.Length])
 }
 
 func (q *QualifiedContent) BytesConsumed() int {
-	return TotalBytesConsumed(q.SerializationOrder()...)
+	return sizeofContentDescriptor + q.Blob.BytesConsumed()
 }
 
 func (q *QualifiedContent) MarshalText() ([]byte, error) {
@@ -194,35 +167,20 @@ func NewQualifiedKey(t KeyType, content []byte) (*QualifiedKey, error) {
 	return &QualifiedKey{*hd, Blob(content)}, nil
 }
 
-func (q *QualifiedKey) SerializationOrder() []BidirectionalBinaryMarshaler {
-	return append(q.Descriptor.SerializationOrder(), &q.Blob)
-}
-
 func (q *QualifiedKey) Equals(other *QualifiedKey) bool {
 	return q.Descriptor.Equals(&other.Descriptor) && q.Blob.Equals(&other.Blob)
 }
 
 func (q *QualifiedKey) UnmarshalBinary(b []byte) error {
-	unused, err := UnmarshalAll(b, AsUnmarshaler(q.Descriptor.SerializationOrder())...)
+	unused, err := serialize.ArborDeserialize(reflect.ValueOf(&q.Descriptor), b)
 	if err != nil {
 		return err
 	}
-	if err := q.Blob.UnmarshalBinary(unused[:q.Descriptor.Length]); err != nil {
-		return err
-	}
-	return nil
-}
-
-func (q *QualifiedKey) MarshalBinary() ([]byte, error) {
-	buf := new(bytes.Buffer)
-	if err := MarshalAllInto(buf, AsMarshaler(q.SerializationOrder())...); err != nil {
-		return nil, err
-	}
-	return buf.Bytes(), nil
+	return q.Blob.UnmarshalBinary(unused[:q.Descriptor.Length])
 }
 
 func (q *QualifiedKey) BytesConsumed() int {
-	return TotalBytesConsumed(q.SerializationOrder()...)
+	return sizeofKeyDescriptor + q.Blob.BytesConsumed()
 }
 
 func (q *QualifiedKey) MarshalText() ([]byte, error) {
@@ -255,35 +213,20 @@ func NewQualifiedSignature(t SignatureType, content []byte) (*QualifiedSignature
 	return &QualifiedSignature{*hd, Blob(content)}, nil
 }
 
-func (q *QualifiedSignature) SerializationOrder() []BidirectionalBinaryMarshaler {
-	return append(q.Descriptor.SerializationOrder(), &q.Blob)
-}
-
 func (q *QualifiedSignature) Equals(other *QualifiedSignature) bool {
 	return q.Descriptor.Equals(&other.Descriptor) && q.Blob.Equals(&other.Blob)
 }
 
 func (q *QualifiedSignature) UnmarshalBinary(b []byte) error {
-	unused, err := UnmarshalAll(b, AsUnmarshaler(q.Descriptor.SerializationOrder())...)
+	unused, err := serialize.ArborDeserialize(reflect.ValueOf(&q.Descriptor), b)
 	if err != nil {
 		return err
 	}
-	if err := q.Blob.UnmarshalBinary(unused[:q.Descriptor.Length]); err != nil {
-		return err
-	}
-	return nil
-}
-
-func (q *QualifiedSignature) MarshalBinary() ([]byte, error) {
-	buf := new(bytes.Buffer)
-	if err := MarshalAllInto(buf, AsMarshaler(q.SerializationOrder())...); err != nil {
-		return nil, err
-	}
-	return buf.Bytes(), nil
+	return q.Blob.UnmarshalBinary(unused[:q.Descriptor.Length])
 }
 
 func (q *QualifiedSignature) BytesConsumed() int {
-	return TotalBytesConsumed(q.SerializationOrder()...)
+	return sizeofSignatureDescriptor + q.Blob.BytesConsumed()
 }
 
 func (q *QualifiedSignature) MarshalText() ([]byte, error) {

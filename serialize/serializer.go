@@ -1,4 +1,4 @@
-package forest
+package serialize
 
 import (
 	"bytes"

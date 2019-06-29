@@ -5,6 +5,7 @@ import (
 	"reflect"
 
 	"git.sr.ht/~whereswaldon/forest-go/fields"
+	"git.sr.ht/~whereswaldon/forest-go/serialize"
 )
 
 const MaxNameLength = 256
@@ -31,7 +32,7 @@ func NodeTypeOf(b []byte) (fields.NodeType, error) {
 
 func VersionAndNodeTypeOf(b []byte) (fields.Version, fields.NodeType, error) {
 	var schema SchemaInfo
-	_, err := ArborDeserialize(reflect.ValueOf(&schema), b)
+	_, err := serialize.ArborDeserialize(reflect.ValueOf(&schema), b)
 	return schema.Version, schema.Type, err
 }
 
@@ -194,13 +195,13 @@ func newIdentity() *Identity {
 // MarshalSignedData writes all data that should be signed in the correct order for signing. This
 // can be used both to generate and validate message signatures.
 func (i *Identity) MarshalSignedData() ([]byte, error) {
-	return ArborSerializeConfig(reflect.ValueOf(i), SerializationConfig{
+	return serialize.ArborSerializeConfig(reflect.ValueOf(i), serialize.SerializationConfig{
 		SkipSignatures: true,
 	})
 }
 
 func (i *Identity) MarshalBinary() ([]byte, error) {
-	return ArborSerialize(reflect.ValueOf(i))
+	return serialize.ArborSerialize(reflect.ValueOf(i))
 }
 
 func UnmarshalIdentity(b []byte) (*Identity, error) {
@@ -212,7 +213,7 @@ func UnmarshalIdentity(b []byte) (*Identity, error) {
 }
 
 func (i *Identity) UnmarshalBinary(b []byte) error {
-	_, err := ArborDeserialize(reflect.ValueOf(i), b)
+	_, err := serialize.ArborDeserialize(reflect.ValueOf(i), b)
 	if err != nil {
 		return err
 	}
@@ -276,13 +277,13 @@ func newCommunity() *Community {
 }
 
 func (c *Community) MarshalSignedData() ([]byte, error) {
-	return ArborSerializeConfig(reflect.ValueOf(c), SerializationConfig{
+	return serialize.ArborSerializeConfig(reflect.ValueOf(c), serialize.SerializationConfig{
 		SkipSignatures: true,
 	})
 }
 
 func (c *Community) MarshalBinary() ([]byte, error) {
-	return ArborSerialize(reflect.ValueOf(c))
+	return serialize.ArborSerialize(reflect.ValueOf(c))
 }
 
 func UnmarshalCommunity(b []byte) (*Community, error) {
@@ -294,7 +295,7 @@ func UnmarshalCommunity(b []byte) (*Community, error) {
 }
 
 func (c *Community) UnmarshalBinary(b []byte) error {
-	_, err := ArborDeserialize(reflect.ValueOf(c), b)
+	_, err := serialize.ArborDeserialize(reflect.ValueOf(c), b)
 	if err != nil {
 		return err
 	}
@@ -364,13 +365,13 @@ func newReply() *Reply {
 }
 
 func (r *Reply) MarshalSignedData() ([]byte, error) {
-	return ArborSerializeConfig(reflect.ValueOf(r), SerializationConfig{
+	return serialize.ArborSerializeConfig(reflect.ValueOf(r), serialize.SerializationConfig{
 		SkipSignatures: true,
 	})
 }
 
 func (r *Reply) MarshalBinary() ([]byte, error) {
-	return ArborSerialize(reflect.ValueOf(r))
+	return serialize.ArborSerialize(reflect.ValueOf(r))
 }
 
 func UnmarshalReply(b []byte) (*Reply, error) {
@@ -382,7 +383,7 @@ func UnmarshalReply(b []byte) (*Reply, error) {
 }
 
 func (r *Reply) UnmarshalBinary(b []byte) error {
-	_, err := ArborDeserialize(reflect.ValueOf(r), b)
+	_, err := serialize.ArborDeserialize(reflect.ValueOf(r), b)
 	if err != nil {
 		return err
 	}

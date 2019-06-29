@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	forest "git.sr.ht/~whereswaldon/forest-go"
+	"git.sr.ht/~whereswaldon/forest-go/serialize"
 )
 
 func TestNewArborSerializerSymmetry(t *testing.T) {
@@ -15,11 +16,11 @@ func TestNewArborSerializerSymmetry(t *testing.T) {
 	outNodes := []forest.Node{identity2, community2, reply2}
 	for i, node := range nodes {
 		node2 := outNodes[i]
-		data, err := forest.ArborSerialize(reflect.ValueOf(node))
+		data, err := serialize.ArborSerialize(reflect.ValueOf(node))
 		if err != nil {
 			t.Errorf("Failed to serialize tagged node: %s", err)
 		}
-		excess, err := forest.ArborDeserialize(reflect.ValueOf(node2), data)
+		excess, err := serialize.ArborDeserialize(reflect.ValueOf(node2), data)
 		if err != nil {
 			t.Errorf("Failed to deserialize tagged node: %s", err)
 		}
