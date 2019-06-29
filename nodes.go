@@ -1,8 +1,8 @@
 package forest
 
 import (
-	"bytes"
 	"fmt"
+	"reflect"
 
 	"git.sr.ht/~whereswaldon/forest-go/fields"
 )
@@ -30,19 +30,9 @@ func NodeTypeOf(b []byte) (fields.NodeType, error) {
 }
 
 func VersionAndNodeTypeOf(b []byte) (fields.Version, fields.NodeType, error) {
-	var (
-		ver fields.Version
-		t   fields.NodeType
-		// this array defines the serialization order of the first two fields of
-		// any node. If this order ever changes, it must be updated here and in
-		// CommonNode.presignSerializationOrder
-		order = []fields.BidirectionalBinaryMarshaler{
-			&ver,
-			&t,
-		}
-	)
-	_, err := fields.UnmarshalAll(b, fields.AsUnmarshaler(order)...)
-	return ver, t, err
+	var schema SchemaInfo
+	_, err := ArborDeserialize(reflect.ValueOf(&schema), b)
+	return schema.Version, schema.Type, err
 }
 
 // UnmarshalBinaryNode unmarshals a node of any type. If it does not return an
@@ -68,17 +58,21 @@ func UnmarshalBinaryNode(b []byte) (Node, error) {
 	}
 }
 
+type SchemaInfo struct {
+	Version fields.Version  `arbor:"order=0"`
+	Type    fields.NodeType `arbor:"order=1"`
+}
+
 // generic node
 type CommonNode struct {
 	// the ID is deterministically computed from the rest of the values
-	id            fields.Blob
-	SchemaVersion fields.Version          `arbor:"order=0"`
-	Type          fields.NodeType         `arbor:"order=1"`
-	Parent        fields.QualifiedHash    `arbor:"order=2,recurse=serialize"`
-	IDDesc        fields.HashDescriptor   `arbor:"order=3,recurse=always"`
-	Depth         fields.TreeDepth        `arbor:"order=4"`
-	Metadata      fields.QualifiedContent `arbor:"order=5,recurse=serialize"`
-	Author        fields.QualifiedHash    `arbor:"order=6,recurse=serialize"`
+	id         fields.Blob
+	SchemaInfo `arbor:"order=0,recurse=always"`
+	Parent     fields.QualifiedHash    `arbor:"order=1,recurse=serialize"`
+	IDDesc     fields.HashDescriptor   `arbor:"order=2,recurse=always"`
+	Depth      fields.TreeDepth        `arbor:"order=3"`
+	Metadata   fields.QualifiedContent `arbor:"order=4,recurse=serialize"`
+	Author     fields.QualifiedHash    `arbor:"order=5,recurse=serialize"`
 }
 
 // Compute and return the CommonNode's ID as a fields.Qualified Hash
@@ -91,25 +85,6 @@ func (n CommonNode) ID() *fields.QualifiedHash {
 
 func (n CommonNode) ParentID() *fields.QualifiedHash {
 	return &fields.QualifiedHash{n.Parent.Descriptor, n.Parent.Blob}
-}
-
-func (n *CommonNode) presignSerializationOrder() []fields.BidirectionalBinaryMarshaler {
-	order := []fields.BidirectionalBinaryMarshaler{
-		&n.SchemaVersion,
-		&n.Type,
-	}
-	order = append(order, &n.Parent)
-	order = append(order, n.IDDesc.SerializationOrder()...)
-	order = append(order, &n.Depth)
-	order = append(order, &n.Metadata)
-	order = append(order, &n.Author)
-	return order
-}
-
-// unmarshalBinaryPreamble does the unmarshaling work for all of the common
-// node fields before the node-specific fields and returns the unused data.
-func (n *CommonNode) unmarshalBinaryPreamble(b []byte) ([]byte, error) {
-	return fields.UnmarshalAll(b, fields.AsUnmarshaler(n.presignSerializationOrder())...)
 }
 
 // SignatureIdentityHash returns the node identitifer for the Identity that signed this node.
@@ -126,8 +101,14 @@ func (n CommonNode) HashDescriptor() *fields.HashDescriptor {
 }
 
 func (n *CommonNode) Equals(n2 *CommonNode) bool {
+	if n == n2 {
+		return true
+	}
+	if n == nil || n2 == nil {
+		return false
+	}
 	return n.Type.Equals(&n2.Type) &&
-		n.SchemaVersion.Equals(&n2.SchemaVersion) &&
+		n.Version.Equals(&n2.Version) &&
 		n.Parent.Equals(&n2.Parent) &&
 		n.IDDesc.Equals(&n2.IDDesc) &&
 		n.Depth.Equals(&n2.Depth) &&
@@ -141,8 +122,8 @@ func (n *CommonNode) ValidateShallow() error {
 	if _, validType := fields.ValidNodeTypes[n.Type]; !validType {
 		return fmt.Errorf("%d is not a valid node type", n.Type)
 	}
-	if n.SchemaVersion > fields.CurrentVersion {
-		return fmt.Errorf("%d is higher than than the supported version %d", n.SchemaVersion, fields.CurrentVersion)
+	if n.Version > fields.CurrentVersion {
+		return fmt.Errorf("%d is higher than than the supported version %d", n.Version, fields.CurrentVersion)
 	}
 	id := n.ID()
 	needsValidation := []Validator{id, &n.Parent, &n.Metadata, &n.Author}
@@ -189,16 +170,6 @@ func (t *Trailer) GetSignature() *fields.QualifiedSignature {
 	return &t.Signature
 }
 
-func (t *Trailer) postsignSerializationOrder() []fields.BidirectionalBinaryMarshaler {
-	return []fields.BidirectionalBinaryMarshaler{t.GetSignature()}
-}
-
-// unmarshalBinarySignature does the unmarshaling work for the signature field after the
-// node-specific fields and returns the unused data.
-func (t *Trailer) unmarshalBinarySignature(b []byte) ([]byte, error) {
-	return fields.UnmarshalAll(b, fields.AsUnmarshaler(t.postsignSerializationOrder())...)
-}
-
 func (t *Trailer) Equals(t2 *Trailer) bool {
 	return t.Signature.Equals(&t2.Signature)
 }
@@ -220,44 +191,20 @@ func newIdentity() *Identity {
 	return i
 }
 
-func (i *Identity) nodeSpecificSerializationOrder() []fields.BidirectionalBinaryMarshaler {
-	return []fields.BidirectionalBinaryMarshaler{&i.Name, &i.PublicKey}
-}
-
-func (i *Identity) SerializationOrder() []fields.BidirectionalBinaryMarshaler {
-	order := i.CommonNode.presignSerializationOrder()
-	order = append(order, i.nodeSpecificSerializationOrder()...)
-	order = append(order, i.postsignSerializationOrder()...)
-	return order
-}
-
 // MarshalSignedData writes all data that should be signed in the correct order for signing. This
 // can be used both to generate and validate message signatures.
-func (i Identity) MarshalSignedData() ([]byte, error) {
-	buf := new(bytes.Buffer)
-	if err := fields.MarshalAllInto(buf, fields.AsMarshaler(i.presignSerializationOrder())...); err != nil {
-		return nil, err
-	}
-	if err := fields.MarshalAllInto(buf, fields.AsMarshaler(i.nodeSpecificSerializationOrder())...); err != nil {
-		return nil, err
-	}
-	return buf.Bytes(), nil
+func (i *Identity) MarshalSignedData() ([]byte, error) {
+	return ArborSerializeConfig(reflect.ValueOf(i), SerializationConfig{
+		SkipSignatures: true,
+	})
 }
 
-func (i Identity) MarshalBinary() ([]byte, error) {
-	signed, err := i.MarshalSignedData()
-	if err != nil {
-		return nil, err
-	}
-	buf := bytes.NewBuffer(signed)
-	if err := fields.MarshalAllInto(buf, fields.AsMarshaler(i.postsignSerializationOrder())...); err != nil {
-		return nil, err
-	}
-	return buf.Bytes(), nil
+func (i *Identity) MarshalBinary() ([]byte, error) {
+	return ArborSerialize(reflect.ValueOf(i))
 }
 
 func UnmarshalIdentity(b []byte) (*Identity, error) {
-	i := newIdentity()
+	i := &Identity{}
 	if err := i.UnmarshalBinary(b); err != nil {
 		return nil, err
 	}
@@ -265,16 +212,12 @@ func UnmarshalIdentity(b []byte) (*Identity, error) {
 }
 
 func (i *Identity) UnmarshalBinary(b []byte) error {
-	_, err := fields.UnmarshalAll(b, fields.AsUnmarshaler(i.SerializationOrder())...)
+	_, err := ArborDeserialize(reflect.ValueOf(i), b)
 	if err != nil {
 		return err
 	}
-	idBytes, err := computeID(i)
-	if err != nil {
-		return err
-	}
-	i.id = fields.Blob(idBytes)
-	return nil
+	i.id, err = computeID(i)
+	return err
 }
 
 func (i *Identity) Equals(other interface{}) bool {
@@ -332,42 +275,18 @@ func newCommunity() *Community {
 	return c
 }
 
-func (c *Community) nodeSpecificSerializationOrder() []fields.BidirectionalBinaryMarshaler {
-	return []fields.BidirectionalBinaryMarshaler{&c.Name}
+func (c *Community) MarshalSignedData() ([]byte, error) {
+	return ArborSerializeConfig(reflect.ValueOf(c), SerializationConfig{
+		SkipSignatures: true,
+	})
 }
 
-func (c *Community) SerializationOrder() []fields.BidirectionalBinaryMarshaler {
-	order := c.CommonNode.presignSerializationOrder()
-	order = append(order, c.nodeSpecificSerializationOrder()...)
-	order = append(order, c.postsignSerializationOrder()...)
-	return order
-}
-
-func (c Community) MarshalSignedData() ([]byte, error) {
-	buf := new(bytes.Buffer)
-	if err := fields.MarshalAllInto(buf, fields.AsMarshaler(c.presignSerializationOrder())...); err != nil {
-		return nil, err
-	}
-	if err := fields.MarshalAllInto(buf, fields.AsMarshaler(c.nodeSpecificSerializationOrder())...); err != nil {
-		return nil, err
-	}
-	return buf.Bytes(), nil
-}
-
-func (c Community) MarshalBinary() ([]byte, error) {
-	signed, err := c.MarshalSignedData()
-	if err != nil {
-		return nil, err
-	}
-	buf := bytes.NewBuffer(signed)
-	if err := fields.MarshalAllInto(buf, fields.AsMarshaler(c.postsignSerializationOrder())...); err != nil {
-		return nil, err
-	}
-	return buf.Bytes(), nil
+func (c *Community) MarshalBinary() ([]byte, error) {
+	return ArborSerialize(reflect.ValueOf(c))
 }
 
 func UnmarshalCommunity(b []byte) (*Community, error) {
-	c := newCommunity()
+	c := &Community{}
 	if err := c.UnmarshalBinary(b); err != nil {
 		return nil, err
 	}
@@ -375,16 +294,12 @@ func UnmarshalCommunity(b []byte) (*Community, error) {
 }
 
 func (c *Community) UnmarshalBinary(b []byte) error {
-	_, err := fields.UnmarshalAll(b, fields.AsUnmarshaler(c.SerializationOrder())...)
+	_, err := ArborDeserialize(reflect.ValueOf(c), b)
 	if err != nil {
 		return err
 	}
-	idBytes, err := computeID(c)
-	if err != nil {
-		return err
-	}
-	c.id = fields.Blob(idBytes)
-	return nil
+	c.id, err = computeID(c)
+	return err
 }
 
 func (c *Community) Equals(other interface{}) bool {
@@ -448,42 +363,18 @@ func newReply() *Reply {
 	return r
 }
 
-func (r *Reply) nodeSpecificSerializationOrder() []fields.BidirectionalBinaryMarshaler {
-	return []fields.BidirectionalBinaryMarshaler{&r.CommunityID, &r.ConversationID, &r.Content}
+func (r *Reply) MarshalSignedData() ([]byte, error) {
+	return ArborSerializeConfig(reflect.ValueOf(r), SerializationConfig{
+		SkipSignatures: true,
+	})
 }
 
-func (r *Reply) SerializationOrder() []fields.BidirectionalBinaryMarshaler {
-	order := r.CommonNode.presignSerializationOrder()
-	order = append(order, r.nodeSpecificSerializationOrder()...)
-	order = append(order, r.postsignSerializationOrder()...)
-	return order
-}
-
-func (r Reply) MarshalSignedData() ([]byte, error) {
-	buf := new(bytes.Buffer)
-	if err := fields.MarshalAllInto(buf, fields.AsMarshaler(r.presignSerializationOrder())...); err != nil {
-		return nil, err
-	}
-	if err := fields.MarshalAllInto(buf, fields.AsMarshaler(r.nodeSpecificSerializationOrder())...); err != nil {
-		return nil, err
-	}
-	return buf.Bytes(), nil
-}
-
-func (r Reply) MarshalBinary() ([]byte, error) {
-	signed, err := r.MarshalSignedData()
-	if err != nil {
-		return nil, err
-	}
-	buf := bytes.NewBuffer(signed)
-	if err := fields.MarshalAllInto(buf, fields.AsMarshaler(r.postsignSerializationOrder())...); err != nil {
-		return nil, err
-	}
-	return buf.Bytes(), nil
+func (r *Reply) MarshalBinary() ([]byte, error) {
+	return ArborSerialize(reflect.ValueOf(r))
 }
 
 func UnmarshalReply(b []byte) (*Reply, error) {
-	r := newReply()
+	r := &Reply{}
 	if err := r.UnmarshalBinary(b); err != nil {
 		return nil, err
 	}
@@ -491,16 +382,12 @@ func UnmarshalReply(b []byte) (*Reply, error) {
 }
 
 func (r *Reply) UnmarshalBinary(b []byte) error {
-	_, err := fields.UnmarshalAll(b, fields.AsUnmarshaler(r.SerializationOrder())...)
+	_, err := ArborDeserialize(reflect.ValueOf(r), b)
 	if err != nil {
 		return err
 	}
-	idBytes, err := computeID(r)
-	if err != nil {
-		return err
-	}
-	r.id = fields.Blob(idBytes)
-	return nil
+	r.id, err = computeID(r)
+	return err
 }
 
 func (r *Reply) Equals(other interface{}) bool {
