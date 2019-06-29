@@ -35,6 +35,15 @@ func BytesConsumed(s serializer) int {
 	return fields.TotalBytesConsumed(s.SerializationOrder()...)
 }
 
+// ProgressiveBinaryUnmarshaler is a type that fully describes how to unmarshal itself
+// from a stream of bytes.
+type ProgressiveBinaryUnmarshaler interface {
+	encoding.BinaryUnmarshaler
+	// BytesConsumed can be called after UnmarshalBinary to determine how many bytes of the input to
+	// UnmarshalBinary were consumed in the creation of this type.
+	BytesConsumed() int
+}
+
 /*
 Tag-based serialization algorithm
 
@@ -86,6 +95,11 @@ type satisfyChecker func(reflect.Value) bool
 
 func ensureIsEncodingBinaryMarshaler(in reflect.Value) bool {
 	_, ok := in.Interface().(encoding.BinaryMarshaler)
+	return ok
+}
+
+func ensureIsProgressiveBinaryUnmarshaler(in reflect.Value) bool {
+	_, ok := in.Interface().(ProgressiveBinaryUnmarshaler)
 	return ok
 }
 
@@ -228,4 +242,42 @@ func ArborSerializeConfig(value reflect.Value, config SerializationConfig) ([]by
 		}
 	}
 	return serialized.Bytes(), nil
+}
+
+// ArborDeserialize unpacks the given bytes into the given reflect.Value
+// (corresponding to a struct). It returns any bytes that were not needed
+// to deserialize the struct.
+func ArborDeserialize(value reflect.Value, data []byte) (unused []byte, err error) {
+	structEntries, err := getSerializationFields(value)
+	if err != nil {
+		return nil, err
+	}
+	// serialize all fields in the order specified by their tags
+	for _, field := range structEntries {
+		if field == nil {
+			break
+		}
+		if field.recurse == recurseAlways || field.recurse == recurseDeserialize {
+			data, err = ArborDeserialize(field.value, data)
+			if err != nil {
+				return nil, err
+			}
+			continue
+		}
+		// ensure supports Unmarshaling
+		field.value, err = ensureSatisfies(field.value, ensureIsProgressiveBinaryUnmarshaler)
+		if err != nil {
+			return nil, err
+		}
+		unmarshaler, ok := field.value.Interface().(ProgressiveBinaryUnmarshaler)
+		if !ok {
+			return nil, fmt.Errorf("Tagged non-recursive field does not implement ProgressiveBinaryUnmarshaler")
+		}
+		err := unmarshaler.UnmarshalBinary(data)
+		if err != nil {
+			return nil, err
+		}
+		data = data[unmarshaler.BytesConsumed():]
+	}
+	return data, nil
 }
