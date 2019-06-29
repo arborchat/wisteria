@@ -35,7 +35,7 @@ func VersionAndNodeTypeOf(b []byte) (fields.Version, fields.NodeType, error) {
 		t   fields.NodeType
 		// this array defines the serialization order of the first two fields of
 		// any node. If this order ever changes, it must be updated here and in
-		// commonNode.presignSerializationOrder
+		// CommonNode.presignSerializationOrder
 		order = []fields.BidirectionalBinaryMarshaler{
 			&ver,
 			&t,
@@ -69,32 +69,31 @@ func UnmarshalBinaryNode(b []byte) (Node, error) {
 }
 
 // generic node
-type commonNode struct {
+type CommonNode struct {
 	// the ID is deterministically computed from the rest of the values
-	id                 fields.Blob
-	Type               fields.NodeType
-	SchemaVersion      fields.Version
-	Parent             fields.QualifiedHash
-	IDDesc             fields.HashDescriptor
-	Depth              fields.TreeDepth
-	Metadata           fields.QualifiedContent
-	Author fields.QualifiedHash
-	Signature          fields.QualifiedSignature
+	id            fields.Blob
+	SchemaVersion fields.Version          `arbor:"order=0"`
+	Type          fields.NodeType         `arbor:"order=1"`
+	Parent        fields.QualifiedHash    `arbor:"order=2,recurse=serialize"`
+	IDDesc        fields.HashDescriptor   `arbor:"order=3,recurse=always"`
+	Depth         fields.TreeDepth        `arbor:"order=4"`
+	Metadata      fields.QualifiedContent `arbor:"order=5,recurse=serialize"`
+	Author        fields.QualifiedHash    `arbor:"order=6,recurse=serialize"`
 }
 
-// Compute and return the commonNode's ID as a fields.Qualified Hash
-func (n commonNode) ID() *fields.QualifiedHash {
+// Compute and return the CommonNode's ID as a fields.Qualified Hash
+func (n CommonNode) ID() *fields.QualifiedHash {
 	return &fields.QualifiedHash{
 		Descriptor: n.IDDesc,
-		Blob:      n.id,
+		Blob:       n.id,
 	}
 }
 
-func (n commonNode) ParentID() *fields.QualifiedHash {
+func (n CommonNode) ParentID() *fields.QualifiedHash {
 	return &fields.QualifiedHash{n.Parent.Descriptor, n.Parent.Blob}
 }
 
-func (n *commonNode) presignSerializationOrder() []fields.BidirectionalBinaryMarshaler {
+func (n *CommonNode) presignSerializationOrder() []fields.BidirectionalBinaryMarshaler {
 	order := []fields.BidirectionalBinaryMarshaler{
 		&n.SchemaVersion,
 		&n.Type,
@@ -107,55 +106,38 @@ func (n *commonNode) presignSerializationOrder() []fields.BidirectionalBinaryMar
 	return order
 }
 
-func (n *commonNode) postsignSerializationOrder() []fields.BidirectionalBinaryMarshaler {
-	return []fields.BidirectionalBinaryMarshaler{&n.Signature}
-}
-
 // unmarshalBinaryPreamble does the unmarshaling work for all of the common
 // node fields before the node-specific fields and returns the unused data.
-func (n *commonNode) unmarshalBinaryPreamble(b []byte) ([]byte, error) {
+func (n *CommonNode) unmarshalBinaryPreamble(b []byte) ([]byte, error) {
 	return fields.UnmarshalAll(b, fields.AsUnmarshaler(n.presignSerializationOrder())...)
 }
 
-// unmarshalBinarySignature does the unmarshaling work for the signature field after the
-// node-specific fields and returns the unused data.
-func (n *commonNode) unmarshalBinarySignature(b []byte) ([]byte, error) {
-	return fields.UnmarshalAll(b, fields.AsUnmarshaler(n.postsignSerializationOrder())...)
-}
-
-// GetSignature returns the signature for the node, which must correspond to the Signature Authority for
-// the node in order to be valid.
-func (n *commonNode) GetSignature() *fields.QualifiedSignature {
-	return &n.Signature
-}
-
 // SignatureIdentityHash returns the node identitifer for the Identity that signed this node.
-func (n *commonNode) SignatureIdentityHash() *fields.QualifiedHash {
+func (n *CommonNode) SignatureIdentityHash() *fields.QualifiedHash {
 	return &n.Author
 }
 
-func (n commonNode) IsIdentity() bool {
+func (n CommonNode) IsIdentity() bool {
 	return n.Type == fields.NodeTypeIdentity
 }
 
-func (n commonNode) HashDescriptor() *fields.HashDescriptor {
+func (n CommonNode) HashDescriptor() *fields.HashDescriptor {
 	return &n.IDDesc
 }
 
-func (n *commonNode) Equals(n2 *commonNode) bool {
+func (n *CommonNode) Equals(n2 *CommonNode) bool {
 	return n.Type.Equals(&n2.Type) &&
 		n.SchemaVersion.Equals(&n2.SchemaVersion) &&
 		n.Parent.Equals(&n2.Parent) &&
 		n.IDDesc.Equals(&n2.IDDesc) &&
 		n.Depth.Equals(&n2.Depth) &&
 		n.Metadata.Equals(&n2.Metadata) &&
-		n.Author.Equals(&n2.Author) &&
-		n.Signature.Equals(&n2.Signature)
+		n.Author.Equals(&n2.Author)
 }
 
 // ValidateShallow checks all fields for internal validity. It does not check
 // the existence or validity of nodes referenced from this node.
-func (n *commonNode) ValidateShallow() error {
+func (n *CommonNode) ValidateShallow() error {
 	if _, validType := fields.ValidNodeTypes[n.Type]; !validType {
 		return fmt.Errorf("%d is not a valid node type", n.Type)
 	}
@@ -163,7 +145,7 @@ func (n *commonNode) ValidateShallow() error {
 		return fmt.Errorf("%d is higher than than the supported version %d", n.SchemaVersion, fields.CurrentVersion)
 	}
 	id := n.ID()
-	needsValidation := []Validator{id, &n.Parent, &n.Metadata, &n.Author, &n.Signature}
+	needsValidation := []Validator{id, &n.Parent, &n.Metadata, &n.Author}
 	for _, nv := range needsValidation {
 		if err := nv.Validate(); err != nil {
 			return err
@@ -176,7 +158,7 @@ func (n *commonNode) ValidateShallow() error {
 }
 
 // ValidateDeep checks for the existence of all referenced nodes within the provided store.
-func (n *commonNode) ValidateDeep(store Store) error {
+func (n *CommonNode) ValidateDeep(store Store) error {
 	// ensure known parent
 	if !n.Parent.Equals(fields.NullHash()) {
 		if _, has, err := store.Get(&n.Parent); !has {
@@ -196,14 +178,40 @@ func (n *commonNode) ValidateDeep(store Store) error {
 	return nil
 }
 
+// Trailer is the final set of fields in every arbor node
+type Trailer struct {
+	Signature fields.QualifiedSignature `arbor:"order=0,recurse=serialize,signature"`
+}
+
+// GetSignature returns the signature for the node, which must correspond to the Signature Authority for
+// the node in order to be valid.
+func (t *Trailer) GetSignature() *fields.QualifiedSignature {
+	return &t.Signature
+}
+
+func (t *Trailer) postsignSerializationOrder() []fields.BidirectionalBinaryMarshaler {
+	return []fields.BidirectionalBinaryMarshaler{t.GetSignature()}
+}
+
+// unmarshalBinarySignature does the unmarshaling work for the signature field after the
+// node-specific fields and returns the unused data.
+func (t *Trailer) unmarshalBinarySignature(b []byte) ([]byte, error) {
+	return fields.UnmarshalAll(b, fields.AsUnmarshaler(t.postsignSerializationOrder())...)
+}
+
+func (t *Trailer) Equals(t2 *Trailer) bool {
+	return t.Signature.Equals(&t2.Signature)
+}
+
 // concrete nodes
 
 // Identity nodes represent a user. They associate a username with a public key that the user
 // will sign messages with.
 type Identity struct {
-	commonNode
-	Name      fields.QualifiedContent
-	PublicKey fields.QualifiedKey
+	CommonNode `arbor:"order=0,recurse=always"`
+	Name       fields.QualifiedContent `arbor:"order=1,recurse=serialize"`
+	PublicKey  fields.QualifiedKey     `arbor:"order=2,recurse=serialize"`
+	Trailer    `arbor:"order=3,recurse=always"`
 }
 
 func newIdentity() *Identity {
@@ -217,9 +225,9 @@ func (i *Identity) nodeSpecificSerializationOrder() []fields.BidirectionalBinary
 }
 
 func (i *Identity) SerializationOrder() []fields.BidirectionalBinaryMarshaler {
-	order := i.commonNode.presignSerializationOrder()
+	order := i.CommonNode.presignSerializationOrder()
 	order = append(order, i.nodeSpecificSerializationOrder()...)
-	order = append(order, i.commonNode.postsignSerializationOrder()...)
+	order = append(order, i.postsignSerializationOrder()...)
 	return order
 }
 
@@ -274,15 +282,16 @@ func (i *Identity) Equals(other interface{}) bool {
 	if !valid {
 		return false
 	}
-	return i.commonNode.Equals(&i2.commonNode) &&
+	return i.CommonNode.Equals(&i2.CommonNode) &&
 		i.Name.Equals(&i2.Name) &&
-		i.PublicKey.Equals(&i2.PublicKey)
+		i.PublicKey.Equals(&i2.PublicKey) &&
+		i.Trailer.Equals(&i2.Trailer)
 }
 
 // ValidateShallow checks all fields for internal validity. It does not check
 // the existence or validity of nodes referenced from this node.
 func (i *Identity) ValidateShallow() error {
-	if err := i.commonNode.ValidateShallow(); err != nil {
+	if err := i.CommonNode.ValidateShallow(); err != nil {
 		return err
 	}
 	needsValidation := []Validator{&i.Name, &i.PublicKey}
@@ -312,8 +321,9 @@ func (i *Identity) ValidateDeep(store Store) error {
 }
 
 type Community struct {
-	commonNode
-	Name fields.QualifiedContent
+	CommonNode `arbor:"order=0,recurse=always"`
+	Name       fields.QualifiedContent `arbor:"order=1,recurse=serialize"`
+	Trailer    `arbor:"order=2,recurse=always"`
 }
 
 func newCommunity() *Community {
@@ -327,9 +337,9 @@ func (c *Community) nodeSpecificSerializationOrder() []fields.BidirectionalBinar
 }
 
 func (c *Community) SerializationOrder() []fields.BidirectionalBinaryMarshaler {
-	order := c.commonNode.presignSerializationOrder()
+	order := c.CommonNode.presignSerializationOrder()
 	order = append(order, c.nodeSpecificSerializationOrder()...)
-	order = append(order, c.commonNode.postsignSerializationOrder()...)
+	order = append(order, c.postsignSerializationOrder()...)
 	return order
 }
 
@@ -382,14 +392,15 @@ func (c *Community) Equals(other interface{}) bool {
 	if !valid {
 		return false
 	}
-	return c.commonNode.Equals(&c2.commonNode) &&
-		c.Name.Equals(&c2.Name)
+	return c.CommonNode.Equals(&c2.CommonNode) &&
+		c.Name.Equals(&c2.Name) &&
+		c.Trailer.Equals(&c2.Trailer)
 }
 
 // ValidateShallow checks all fields for internal validity. It does not check
 // the existence or validity of nodes referenced from this node.
 func (c *Community) ValidateShallow() error {
-	if err := c.commonNode.ValidateShallow(); err != nil {
+	if err := c.CommonNode.ValidateShallow(); err != nil {
 		return err
 	}
 	needsValidation := []Validator{&c.Name}
@@ -424,10 +435,11 @@ func (c *Community) ValidateDeep(store Store) error {
 }
 
 type Reply struct {
-	commonNode
-	CommunityID    fields.QualifiedHash
-	ConversationID fields.QualifiedHash
-	Content        fields.QualifiedContent
+	CommonNode     `arbor:"order=0,recurse=always"`
+	CommunityID    fields.QualifiedHash    `arbor:"order=1,recurse=serialize"`
+	ConversationID fields.QualifiedHash    `arbor:"order=2,recurse=serialize"`
+	Content        fields.QualifiedContent `arbor:"order=3,recurse=serialize"`
+	Trailer        `arbor:"order=4,recurse=always"`
 }
 
 func newReply() *Reply {
@@ -441,9 +453,9 @@ func (r *Reply) nodeSpecificSerializationOrder() []fields.BidirectionalBinaryMar
 }
 
 func (r *Reply) SerializationOrder() []fields.BidirectionalBinaryMarshaler {
-	order := r.commonNode.presignSerializationOrder()
+	order := r.CommonNode.presignSerializationOrder()
 	order = append(order, r.nodeSpecificSerializationOrder()...)
-	order = append(order, r.commonNode.postsignSerializationOrder()...)
+	order = append(order, r.postsignSerializationOrder()...)
 	return order
 }
 
@@ -496,14 +508,15 @@ func (r *Reply) Equals(other interface{}) bool {
 	if !valid {
 		return false
 	}
-	return r.commonNode.Equals(&r2.commonNode) &&
-		r.Content.Equals(&r2.Content)
+	return r.CommonNode.Equals(&r2.CommonNode) &&
+		r.Content.Equals(&r2.Content) &&
+		r.Trailer.Equals(&r2.Trailer)
 }
 
 // ValidateShallow checks all fields for internal validity. It does not check
 // the existence or validity of nodes referenced from this node.
 func (r *Reply) ValidateShallow() error {
-	if err := r.commonNode.ValidateShallow(); err != nil {
+	if err := r.CommonNode.ValidateShallow(); err != nil {
 		return err
 	}
 	needsValidation := []Validator{&r.Content, &r.CommunityID, &r.ConversationID}

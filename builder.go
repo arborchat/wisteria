@@ -166,7 +166,7 @@ func NewIdentity(signer Signer, name *fields.QualifiedContent, metadata *fields.
 	if err != nil {
 		return nil, err
 	}
-	identity.commonNode.Signature = *qs
+	identity.Trailer.Signature = *qs
 
 	// determine the node's final hash ID
 	id, err := computeID(identity)
@@ -224,7 +224,7 @@ func (n *Builder) NewCommunity(name *fields.QualifiedContent, metadata *fields.Q
 	if err != nil {
 		return nil, err
 	}
-	c.commonNode.Signature = *qs
+	c.Trailer.Signature = *qs
 
 	// determine the node's final hash ID
 	id, err := computeID(c)
@@ -283,7 +283,7 @@ func (n *Builder) NewReply(parent interface{}, content *fields.QualifiedContent,
 	if err != nil {
 		return nil, err
 	}
-	r.commonNode.Signature = *qs
+	r.Trailer.Signature = *qs
 
 	// determine the node's final hash ID
 	id, err := computeID(r)

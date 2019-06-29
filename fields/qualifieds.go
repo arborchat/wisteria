@@ -10,8 +10,8 @@ const minSizeofQualified = sizeofDescriptor
 
 // concrete qualified data types
 type QualifiedHash struct {
-	Descriptor HashDescriptor
-	Blob      Blob
+	Descriptor HashDescriptor `arbor:"order=0,recurse=serialize"`
+	Blob       Blob           `arbor:"order=1"`
 }
 
 const minSizeofQualifiedHash = sizeofHashDescriptor
@@ -102,8 +102,8 @@ func (q *QualifiedHash) Validate() error {
 }
 
 type QualifiedContent struct {
-	Descriptor ContentDescriptor
-	Blob      Blob
+	Descriptor ContentDescriptor `arbor:"order=0,recurse=serialize"`
+	Blob       Blob              `arbor:"order=1"`
 }
 
 const minSizeofQualifiedContent = sizeofContentDescriptor
@@ -179,8 +179,8 @@ func (q *QualifiedContent) Validate() error {
 }
 
 type QualifiedKey struct {
-	Descriptor KeyDescriptor
-	Blob      Blob
+	Descriptor KeyDescriptor `arbor:"order=0,recurse=serialize"`
+	Blob       Blob          `arbor:"order=1"`
 }
 
 const minSizeofQualifiedKey = sizeofKeyDescriptor
@@ -240,8 +240,8 @@ func (q *QualifiedKey) Validate() error {
 }
 
 type QualifiedSignature struct {
-	Descriptor SignatureDescriptor
-	Blob      Blob
+	Descriptor SignatureDescriptor `arbor:"order=0,recurse=serialize"`
+	Blob       Blob                `arbor:"order=1"`
 }
 
 const minSizeofQualifiedSignature = sizeofSignatureDescriptor

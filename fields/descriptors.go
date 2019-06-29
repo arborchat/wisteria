@@ -26,8 +26,8 @@ func marshalTextDescriptor(descriptorType encoding.TextMarshaler, length encodin
 
 // concrete descriptors
 type HashDescriptor struct {
-	Type   HashType
-	Length ContentLength
+	Type   HashType      `arbor:"order=0"`
+	Length ContentLength `arbor:"order=1"`
 }
 
 const sizeofHashDescriptor = sizeofDescriptor
@@ -71,8 +71,8 @@ func (d *HashDescriptor) Validate() error {
 }
 
 type ContentDescriptor struct {
-	Type   ContentType
-	Length ContentLength
+	Type   ContentType   `arbor:"order=0"`
+	Length ContentLength `arbor:"order=1"`
 }
 
 const sizeofContentDescriptor = sizeofDescriptor
@@ -106,8 +106,8 @@ func (d *ContentDescriptor) Validate() error {
 }
 
 type SignatureDescriptor struct {
-	Type   SignatureType
-	Length ContentLength
+	Type   SignatureType `arbor:"order=0"`
+	Length ContentLength `arbor:"order=1"`
 }
 
 const sizeofSignatureDescriptor = sizeofDescriptor
@@ -141,8 +141,8 @@ func (d *SignatureDescriptor) Validate() error {
 }
 
 type KeyDescriptor struct {
-	Type   KeyType
-	Length ContentLength
+	Type   KeyType       `arbor:"order=0"`
+	Length ContentLength `arbor:"order=1"`
 }
 
 const sizeofKeyDescriptor = sizeofDescriptor
