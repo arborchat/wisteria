@@ -1,52 +1,100 @@
 package main
 
 import (
-	"flag"
+	"fmt"
+	"io"
+	"io/ioutil"
 	"log"
+	"os"
+
+	"github.com/rivo/tview"
 
 	forest "git.sr.ht/~whereswaldon/forest-go"
 )
 
-func main() {
-	var (
-		gpguser string
-	)
-	flag.StringVar(&gpguser, "gpguser", "", "[required] the name of the gpg identity to use")
-	flag.Parse()
-	if gpguser == "" {
-		log.Fatal("--gpguser is required")
-	}
-	signer, err := forest.NewGPGSigner(gpguser)
+func readInto(r io.ReadCloser, store forest.Store) (forest.Node, error) {
+	defer r.Close()
+	b, err := ioutil.ReadAll(r)
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
-	id, err := forest.NewIdentity(signer, "viewer", "")
+	node, err := forest.UnmarshalBinaryNode(b)
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
+	if err := store.Add(node); err != nil {
+		return nil, err
+	}
+	return node, nil
 
-	comm, err := forest.As(id, signer).NewCommunity("viewer", "")
-	if err != nil {
-		log.Fatal(err)
-	}
+}
 
-	reply, err := forest.As(id, signer).NewReply(comm, "Hello, World!", "")
+func readAllInto(store forest.Store) ([]forest.Node, error) {
+	workdir, err := os.Getwd()
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
-
-	store := forest.NewMemoryStore()
-	for _, node := range []forest.Node{id, comm, reply} {
-		if err := store.Add(node); err != nil {
-			log.Fatal(err)
+	dir, err := os.Open(workdir)
+	if err != nil {
+		return nil, err
+	}
+	defer dir.Close()
+	names, err := dir.Readdirnames(0)
+	if err != nil {
+		return nil, err
+	}
+	var nodes []forest.Node
+	for _, name := range names {
+		nodeFile, err := os.Open(name)
+		if err != nil {
+			log.Println(err)
+			continue
 		}
+		node, err := readInto(nodeFile, store)
+		if err != nil {
+			log.Println(err)
+			continue
+		}
+		nodes = append(nodes, node)
 	}
+	return nodes, nil
+}
 
-	if err := render(store); err != nil {
+func main() {
+	store := forest.NewMemoryStore()
+	nodes, err := readAllInto(store)
+	if err != nil {
+		log.Fatal(err)
+	}
+	if err := render(nodes, store); err != nil {
 		log.Fatal(err)
 	}
 }
 
-func render(store forest.Store) error {
-	return nil
+func writeNode(w io.Writer, node forest.Node, store forest.Store) error {
+	var out string
+	switch n := node.(type) {
+	case *forest.Reply:
+		author, present, err := store.Get(&n.Author)
+		if err != nil {
+			return err
+		} else if !present {
+			return fmt.Errorf("Node %v is not in the store", n.Author)
+		}
+		asIdent := author.(*forest.Identity)
+		out = fmt.Sprintf("%s: %s\n", string(asIdent.Name.Blob), string(n.Content.Blob))
+	}
+	_, err := w.Write([]byte(out))
+	return err
+}
+
+func render(nodes []forest.Node, store forest.Store) error {
+	history := tview.NewTextView()
+	for _, n := range nodes {
+		if err := writeNode(history, n, store); err != nil {
+			return err
+		}
+	}
+	app := tview.NewApplication()
+	return app.SetRoot(history, true).Run()
 }
