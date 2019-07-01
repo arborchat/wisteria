@@ -122,19 +122,11 @@ func createIdentity(args []string) error {
 		usage()
 		return err
 	}
-	qName, err := fields.NewQualifiedContent(fields.ContentTypeUTF8String, []byte(name))
-	if err != nil {
-		return err
-	}
-	qMeta, err := fields.NewQualifiedContent(fields.ContentTypeJSON, []byte(metadata))
-	if err != nil {
-		return err
-	}
 	signer, err := getSigner(gpguser, keyfile)
 	if err != nil {
 		return err
 	}
-	identity, err := forest.NewIdentity(signer, qName, qMeta)
+	identity, err := forest.NewIdentity(signer, name, metadata)
 	if err != nil {
 		return err
 	}
@@ -170,14 +162,6 @@ func createCommunity(args []string) error {
 		usage()
 		return err
 	}
-	qName, err := fields.NewQualifiedContent(fields.ContentTypeUTF8String, []byte(name))
-	if err != nil {
-		return err
-	}
-	qMeta, err := fields.NewQualifiedContent(fields.ContentTypeJSON, []byte(metadata))
-	if err != nil {
-		return err
-	}
 	signer, err := getSigner(gpguser, keyfile)
 	if err != nil {
 		return err
@@ -187,7 +171,7 @@ func createCommunity(args []string) error {
 		return err
 	}
 
-	community, err := forest.As(idNode, signer).NewCommunity(qName, qMeta)
+	community, err := forest.As(idNode, signer).NewCommunity(name, metadata)
 	if err != nil {
 		return err
 	}
@@ -226,16 +210,6 @@ func createReply(args []string) error {
 		return err
 	}
 
-	qContent, err := fields.NewQualifiedContent(fields.ContentTypeUTF8String, []byte(content))
-	if err != nil {
-		return err
-	}
-
-	qMeta, err := fields.NewQualifiedContent(fields.ContentTypeJSON, []byte(metadata))
-	if err != nil {
-		return err
-	}
-
 	signer, err := getSigner(gpguser, keyfile)
 	if err != nil {
 		return err
@@ -250,7 +224,7 @@ func createReply(args []string) error {
 		return err
 	}
 
-	reply, err := forest.As(idNode, signer).NewReply(parentNode, qContent, qMeta)
+	reply, err := forest.As(idNode, signer).NewReply(parentNode, content, metadata)
 	if err != nil {
 		return err
 	}
