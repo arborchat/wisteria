@@ -72,8 +72,9 @@ type CommonNode struct {
 	Parent     fields.QualifiedHash    `arbor:"order=1,recurse=serialize"`
 	IDDesc     fields.HashDescriptor   `arbor:"order=2,recurse=always"`
 	Depth      fields.TreeDepth        `arbor:"order=3"`
-	Metadata   fields.QualifiedContent `arbor:"order=4,recurse=serialize"`
-	Author     fields.QualifiedHash    `arbor:"order=5,recurse=serialize"`
+	Created    fields.Timestamp        `arbor:"order=4"`
+	Metadata   fields.QualifiedContent `arbor:"order=5,recurse=serialize"`
+	Author     fields.QualifiedHash    `arbor:"order=6,recurse=serialize"`
 }
 
 // Compute and return the CommonNode's ID as a fields.Qualified Hash
@@ -113,6 +114,7 @@ func (n *CommonNode) Equals(n2 *CommonNode) bool {
 		n.Parent.Equals(&n2.Parent) &&
 		n.IDDesc.Equals(&n2.IDDesc) &&
 		n.Depth.Equals(&n2.Depth) &&
+		n.Created.Equals(&n2.Created) &&
 		n.Metadata.Equals(&n2.Metadata) &&
 		n.Author.Equals(&n2.Author)
 }

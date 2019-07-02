@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os/exec"
+	"time"
 
 	"git.sr.ht/~whereswaldon/forest-go/fields"
 	"golang.org/x/crypto/openpgp"
@@ -146,6 +147,7 @@ func NewIdentityQualified(signer Signer, name *fields.QualifiedContent, metadata
 	identity.Depth = 0
 	identity.Name = *name
 	identity.Metadata = *metadata
+	identity.Created = fields.TimestampFrom(time.Now())
 
 	// get public key
 	pubkey, err := signer.PublicKey()
@@ -229,6 +231,7 @@ func (n *Builder) NewCommunityQualified(name *fields.QualifiedContent, metadata 
 	c.Name = *name
 	c.Metadata = *metadata
 	c.Author = *n.User.ID()
+	c.Created = fields.TimestampFrom(time.Now())
 	idDesc, err := fields.NewHashDescriptor(fields.HashTypeSHA512, int(fields.HashDigestLengthSHA512_256))
 	if err != nil {
 		return nil, err
@@ -277,6 +280,7 @@ func (n *Builder) NewReplyQualified(parent interface{}, content, metadata *field
 	r := newReply()
 	r.Version = fields.CurrentVersion
 	r.Type = fields.NodeTypeReply
+	r.Created = fields.TimestampFrom(time.Now())
 	switch concreteParent := parent.(type) {
 	case *Community:
 		r.CommunityID = *concreteParent.ID()
