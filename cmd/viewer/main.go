@@ -6,10 +6,12 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"sort"
 
 	"github.com/rivo/tview"
 
 	forest "git.sr.ht/~whereswaldon/forest-go"
+	"git.sr.ht/~whereswaldon/forest-go/fields"
 )
 
 func readInto(r io.ReadCloser, store forest.Store) (forest.Node, error) {
@@ -29,7 +31,9 @@ func readInto(r io.ReadCloser, store forest.Store) (forest.Node, error) {
 
 }
 
-func readAllInto(store forest.Store) ([]forest.Node, error) {
+type History []*forest.Reply
+
+func readAllInto(store forest.Store) (History, error) {
 	workdir, err := os.Getwd()
 	if err != nil {
 		return nil, err
@@ -43,7 +47,7 @@ func readAllInto(store forest.Store) ([]forest.Node, error) {
 	if err != nil {
 		return nil, err
 	}
-	var nodes []forest.Node
+	var nodes []*forest.Reply
 	for _, name := range names {
 		nodeFile, err := os.Open(name)
 		if err != nil {
@@ -55,9 +59,33 @@ func readAllInto(store forest.Store) ([]forest.Node, error) {
 			log.Println(err)
 			continue
 		}
-		nodes = append(nodes, node)
+		if r, ok := node.(*forest.Reply); ok {
+			nodes = append(nodes, r)
+		}
 	}
 	return nodes, nil
+}
+
+func (h History) Sort() {
+	sort.SliceStable(h, func(i, j int) bool {
+		return h[i].Created < h[j].Created
+	})
+}
+
+type HistoryView struct {
+	History
+	forest.Store
+	Current fields.QualifiedHash
+	*tview.TextView
+}
+
+func (v *HistoryView) Render() error {
+	for _, n := range v.History {
+		if err := writeNode(v, n, v); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func main() {
@@ -66,7 +94,15 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	if err := render(nodes, store); err != nil {
+	nodes.Sort()
+	history := &HistoryView{
+		Store:    store,
+		TextView: tview.NewTextView(),
+		History:  nodes,
+	}
+	app := tview.NewApplication()
+
+	if err := app.SetRoot(history, true).Run(); err != nil {
 		log.Fatal(err)
 	}
 }
@@ -86,15 +122,4 @@ func writeNode(w io.Writer, node forest.Node, store forest.Store) error {
 	}
 	_, err := w.Write([]byte(out))
 	return err
-}
-
-func render(nodes []forest.Node, store forest.Store) error {
-	history := tview.NewTextView()
-	for _, n := range nodes {
-		if err := writeNode(history, n, store); err != nil {
-			return err
-		}
-	}
-	app := tview.NewApplication()
-	return app.SetRoot(history, true).Run()
 }
