@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"math"
+	"time"
 )
 
 const (
@@ -177,6 +178,50 @@ func (v *Version) BytesConsumed() int {
 }
 
 func (v *Version) Equals(v2 *Version) bool {
+	return *v == *v2
+}
+
+// Timestamp represents the time at which a node was created. It is measured as milliseconds
+// since the start of the UNIX epoch.
+type Timestamp uint64
+
+const sizeofTimestamp = 8
+
+const nanosPerMilli = 1000000
+
+func TimestampFrom(t time.Time) Timestamp {
+	return Timestamp(t.UnixNano() / nanosPerMilli)
+}
+
+func (t Timestamp) Time() time.Time {
+	sec := (uint(t) / 1000)
+	nsec := (uint(t) % 1000) * nanosPerMilli
+	return time.Unix(int64(sec), int64(nsec))
+}
+
+// MarshalBinary converts the Timestamp into its binary representation
+func (v Timestamp) MarshalBinary() ([]byte, error) {
+	b := new(bytes.Buffer)
+	err := binary.Write(b, multiByteSerializationOrder, v)
+	return b.Bytes(), err
+}
+
+func (v Timestamp) MarshalText() ([]byte, error) {
+	return []byte(fmt.Sprintf("V%d", v)), nil
+}
+
+// UnmarshalBinary converts from the binary representation of a Timestamp
+// back to its structured form
+func (v *Timestamp) UnmarshalBinary(b []byte) error {
+	buf := bytes.NewBuffer(b)
+	return binary.Read(buf, multiByteSerializationOrder, v)
+}
+
+func (v *Timestamp) BytesConsumed() int {
+	return sizeofTimestamp
+}
+
+func (v *Timestamp) Equals(v2 *Timestamp) bool {
 	return *v == *v2
 }
 
