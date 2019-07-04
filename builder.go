@@ -128,7 +128,7 @@ func NewIdentity(signer Signer, name *fields.QualifiedContent, metadata *fields.
 	// make an empty identity and populate all fields that need to be known before
 	// signing the data
 	identity := newIdentity()
-	identity.SchemaVersion = fields.CurrentVersion
+	identity.Version = fields.CurrentVersion
 	identity.Type = fields.NodeTypeIdentity
 	identity.Parent = *fields.NullHash()
 	identity.Depth = 0
@@ -166,7 +166,7 @@ func NewIdentity(signer Signer, name *fields.QualifiedContent, metadata *fields.
 	if err != nil {
 		return nil, err
 	}
-	identity.commonNode.Signature = *qs
+	identity.Trailer.Signature = *qs
 
 	// determine the node's final hash ID
 	id, err := computeID(identity)
@@ -198,7 +198,7 @@ func As(user *Identity, signer Signer) *Builder {
 // NewCommunity creates a community node (signed by the given identity with the given privkey).
 func (n *Builder) NewCommunity(name *fields.QualifiedContent, metadata *fields.QualifiedContent) (*Community, error) {
 	c := newCommunity()
-	c.SchemaVersion = fields.CurrentVersion
+	c.Version = fields.CurrentVersion
 	c.Type = fields.NodeTypeCommunity
 	c.Parent = *fields.NullHash()
 	c.Depth = 0
@@ -224,7 +224,7 @@ func (n *Builder) NewCommunity(name *fields.QualifiedContent, metadata *fields.Q
 	if err != nil {
 		return nil, err
 	}
-	c.commonNode.Signature = *qs
+	c.Trailer.Signature = *qs
 
 	// determine the node's final hash ID
 	id, err := computeID(c)
@@ -239,7 +239,7 @@ func (n *Builder) NewCommunity(name *fields.QualifiedContent, metadata *fields.Q
 // NewReply creates a reply node as a child of the given community or reply
 func (n *Builder) NewReply(parent interface{}, content *fields.QualifiedContent, metadata *fields.QualifiedContent) (*Reply, error) {
 	r := newReply()
-	r.SchemaVersion = fields.CurrentVersion
+	r.Version = fields.CurrentVersion
 	r.Type = fields.NodeTypeReply
 	switch concreteParent := parent.(type) {
 	case *Community:
@@ -283,7 +283,7 @@ func (n *Builder) NewReply(parent interface{}, content *fields.QualifiedContent,
 	if err != nil {
 		return nil, err
 	}
-	r.commonNode.Signature = *qs
+	r.Trailer.Signature = *qs
 
 	// determine the node's final hash ID
 	id, err := computeID(r)

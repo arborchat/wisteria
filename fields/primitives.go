@@ -36,10 +36,6 @@ func (g *genericType) UnmarshalBinary(b []byte) error {
 	return binary.Read(buf, multiByteSerializationOrder, g)
 }
 
-func (g *genericType) SizeConstraints() (int, bool) {
-	return sizeofgenericType, false
-}
-
 func (g *genericType) BytesConsumed() int {
 	return sizeofgenericType
 }
@@ -188,10 +184,11 @@ func (v *Version) Equals(v2 *Version) bool {
 type NodeType genericType
 
 const (
-	sizeofNodeType            = sizeofgenericType
 	NodeTypeIdentity NodeType = iota
 	NodeTypeCommunity
 	NodeTypeReply
+
+	sizeofNodeType = sizeofgenericType
 )
 
 var ValidNodeTypes = map[NodeType]struct{}{
@@ -235,9 +232,10 @@ func (t *NodeType) Equals(t2 *NodeType) bool {
 type HashType genericType
 
 const (
-	sizeofHashType            = sizeofgenericType
 	HashTypeNullHash HashType = iota
 	HashTypeSHA512
+
+	sizeofHashType = sizeofgenericType
 )
 
 // map to valid lengths

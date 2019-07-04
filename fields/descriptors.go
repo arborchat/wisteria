@@ -26,8 +26,8 @@ func marshalTextDescriptor(descriptorType encoding.TextMarshaler, length encodin
 
 // concrete descriptors
 type HashDescriptor struct {
-	Type   HashType
-	Length ContentLength
+	Type   HashType      `arbor:"order=0"`
+	Length ContentLength `arbor:"order=1"`
 }
 
 const sizeofHashDescriptor = sizeofDescriptor
@@ -38,10 +38,6 @@ func NewHashDescriptor(t HashType, length int) (*HashDescriptor, error) {
 		return nil, err
 	}
 	return &HashDescriptor{t, *cLength}, nil
-}
-
-func (d *HashDescriptor) SerializationOrder() []BidirectionalBinaryMarshaler {
-	return []BidirectionalBinaryMarshaler{&d.Type, &d.Length}
 }
 
 func (d *HashDescriptor) Equals(other *HashDescriptor) bool {
@@ -71,8 +67,8 @@ func (d *HashDescriptor) Validate() error {
 }
 
 type ContentDescriptor struct {
-	Type   ContentType
-	Length ContentLength
+	Type   ContentType   `arbor:"order=0"`
+	Length ContentLength `arbor:"order=1"`
 }
 
 const sizeofContentDescriptor = sizeofDescriptor
@@ -83,10 +79,6 @@ func NewContentDescriptor(t ContentType, length int) (*ContentDescriptor, error)
 		return nil, err
 	}
 	return &ContentDescriptor{t, *cLength}, nil
-}
-
-func (d *ContentDescriptor) SerializationOrder() []BidirectionalBinaryMarshaler {
-	return []BidirectionalBinaryMarshaler{&d.Type, &d.Length}
 }
 
 func (d *ContentDescriptor) Equals(other *ContentDescriptor) bool {
@@ -106,8 +98,8 @@ func (d *ContentDescriptor) Validate() error {
 }
 
 type SignatureDescriptor struct {
-	Type   SignatureType
-	Length ContentLength
+	Type   SignatureType `arbor:"order=0"`
+	Length ContentLength `arbor:"order=1"`
 }
 
 const sizeofSignatureDescriptor = sizeofDescriptor
@@ -118,10 +110,6 @@ func NewSignatureDescriptor(t SignatureType, length int) (*SignatureDescriptor, 
 		return nil, err
 	}
 	return &SignatureDescriptor{t, *cLength}, nil
-}
-
-func (d *SignatureDescriptor) SerializationOrder() []BidirectionalBinaryMarshaler {
-	return []BidirectionalBinaryMarshaler{&d.Type, &d.Length}
 }
 
 func (d *SignatureDescriptor) Equals(other *SignatureDescriptor) bool {
@@ -141,8 +129,8 @@ func (d *SignatureDescriptor) Validate() error {
 }
 
 type KeyDescriptor struct {
-	Type   KeyType
-	Length ContentLength
+	Type   KeyType       `arbor:"order=0"`
+	Length ContentLength `arbor:"order=1"`
 }
 
 const sizeofKeyDescriptor = sizeofDescriptor
@@ -153,10 +141,6 @@ func NewKeyDescriptor(t KeyType, length int) (*KeyDescriptor, error) {
 		return nil, err
 	}
 	return &KeyDescriptor{t, *cLength}, nil
-}
-
-func (d *KeyDescriptor) SerializationOrder() []BidirectionalBinaryMarshaler {
-	return []BidirectionalBinaryMarshaler{&d.Type, &d.Length}
 }
 
 func (d *KeyDescriptor) Equals(other *KeyDescriptor) bool {
