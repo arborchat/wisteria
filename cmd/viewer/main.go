@@ -8,6 +8,7 @@ import (
 	"os"
 	"sort"
 
+	"github.com/gdamore/tcell"
 	"github.com/rivo/tview"
 
 	forest "git.sr.ht/~whereswaldon/forest-go"
@@ -56,7 +57,7 @@ func readAllInto(store forest.Store) (History, error) {
 		}
 		node, err := readInto(nodeFile, store)
 		if err != nil {
-			log.Println(err)
+			log.Printf("Failed parsing %s: %v", nodeFile.Name(), err)
 			continue
 		}
 		if r, ok := node.(*forest.Reply); ok {
@@ -72,18 +73,122 @@ func (h History) Sort() {
 	})
 }
 
+func (h History) IndexForID(id *fields.QualifiedHash) int {
+	for i, n := range h {
+		if n.ID().Equals(id) {
+			return i
+		}
+	}
+	return -1
+}
+
 type HistoryView struct {
 	History
 	forest.Store
-	Current fields.QualifiedHash
+	Current *fields.QualifiedHash
 	*tview.TextView
 }
 
+func (v *HistoryView) AncestryOf(id *fields.QualifiedHash) ([]*fields.QualifiedHash, error) {
+	node, present, err := v.Store.Get(id)
+	if err != nil {
+		return nil, err
+	} else if !present {
+		return []*fields.QualifiedHash{}, nil
+	}
+	ancestors := make([]*fields.QualifiedHash, 0, node.TreeDepth())
+	next := node.ParentID()
+	for !next.Equals(fields.NullHash()) {
+		parent, present, err := v.Store.Get(next)
+		if err != nil {
+			return nil, err
+		} else if !present {
+			return ancestors, nil
+		}
+		ancestors = append(ancestors, next)
+		next = parent.ParentID()
+	}
+	return ancestors, nil
+}
+
+func index(element *fields.QualifiedHash, group []*fields.QualifiedHash) int {
+	for i, current := range group {
+		if element.Equals(current) {
+			return i
+		}
+	}
+	return -1
+}
+
+func in(element *fields.QualifiedHash, group []*fields.QualifiedHash) bool {
+	return index(element, group) >= 0
+}
+
+func (v *HistoryView) EnsureCurrent() {
+	if v.Current == nil {
+		v.Current = v.History[0].ID()
+	}
+}
+
+func (v *HistoryView) CursorDown() {
+	v.EnsureCurrent()
+	currIndex := v.History.IndexForID(v.Current)
+	switch {
+	case currIndex < 0:
+		return
+	case currIndex >= 0 && currIndex < len(v.History)-1:
+		v.Current = v.History[currIndex+1].ID()
+	}
+	v.Render()
+}
+
+func (v *HistoryView) CursorUp() {
+	v.EnsureCurrent()
+	currIndex := v.History.IndexForID(v.Current)
+	switch {
+	case currIndex < 0:
+		return
+	case currIndex > 0:
+		v.Current = v.History[currIndex-1].ID()
+	}
+	v.Render()
+}
+
 func (v *HistoryView) Render() error {
+	v.TextView.Clear()
+	v.EnsureCurrent()
+	ancestry, err := v.AncestryOf(v.Current)
+	if err != nil {
+		return err
+	}
 	for _, n := range v.History {
-		if err := writeNode(v, n, v); err != nil {
+		config := renderConfig{}
+		if n.ID().Equals(v.Current) {
+			config.state = current
+		} else if in(n.ID(), ancestry) {
+			config.state = ancestor
+		}
+		if err := writeNode(v, n, v, config); err != nil {
 			return err
 		}
+	}
+	return nil
+}
+
+func (v *HistoryView) HandleInput(event *tcell.EventKey) *tcell.EventKey {
+	switch event.Key() {
+	case tcell.KeyRune:
+		// break if it's a normal keypress
+	default:
+		return event
+	}
+	switch event.Rune() {
+	case 'j':
+		v.CursorDown()
+	case 'k':
+		v.CursorUp()
+	default:
+		return event
 	}
 	return nil
 }
@@ -96,9 +201,14 @@ func main() {
 	}
 	nodes.Sort()
 	history := &HistoryView{
-		Store:    store,
-		TextView: tview.NewTextView(),
-		History:  nodes,
+		Store: store,
+		TextView: tview.NewTextView().
+			SetDynamicColors(true),
+		History: nodes,
+	}
+	history.SetInputCapture(history.HandleInput)
+	if err := history.Render(); err != nil {
+		log.Fatal(err)
 	}
 	app := tview.NewApplication()
 
@@ -107,7 +217,25 @@ func main() {
 	}
 }
 
-func writeNode(w io.Writer, node forest.Node, store forest.Store) error {
+type nodeState uint
+
+const (
+	none nodeState = iota
+	ancestor
+	descendant
+	current
+)
+
+type renderConfig struct {
+	state nodeState
+}
+
+func writeNode(w io.Writer, node forest.Node, store forest.Store, config renderConfig) error {
+	const (
+		ancestorColor   = "yellow"
+		descendantColor = "green"
+		currentColor    = "red"
+	)
 	var out string
 	switch n := node.(type) {
 	case *forest.Reply:
@@ -118,7 +246,18 @@ func writeNode(w io.Writer, node forest.Node, store forest.Store) error {
 			return fmt.Errorf("Node %v is not in the store", n.Author)
 		}
 		asIdent := author.(*forest.Identity)
-		out = fmt.Sprintf("%s: %s\n", string(asIdent.Name.Blob), string(n.Content.Blob))
+		var foreground string
+		switch config.state {
+		case ancestor:
+			foreground = ancestorColor
+		case descendant:
+			foreground = descendantColor
+		case current:
+			foreground = currentColor
+		default:
+			foreground = "-"
+		}
+		out = fmt.Sprintf("[%s::]%s: %s\n[-::]", foreground, string(asIdent.Name.Blob), string(n.Content.Blob))
 	}
 	_, err := w.Write([]byte(out))
 	return err
