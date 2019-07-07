@@ -111,6 +111,23 @@ func (v *HistoryView) AncestryOf(id *fields.QualifiedHash) ([]*fields.QualifiedH
 	return ancestors, nil
 }
 
+func (v *HistoryView) DescendantsOf(id *fields.QualifiedHash) ([]*fields.QualifiedHash, error) {
+	descendants := make([]*fields.QualifiedHash, 0)
+	directChildren := []*fields.QualifiedHash{id}
+
+	for len(directChildren) > 0 {
+		target := directChildren[0]
+		directChildren = directChildren[1:]
+		for _, node := range v.History {
+			if node.ParentID().Equals(target) {
+				descendants = append(descendants, node.ID())
+				directChildren = append(directChildren, node.ID())
+			}
+		}
+	}
+	return descendants, nil
+}
+
 func index(element *fields.QualifiedHash, group []*fields.QualifiedHash) int {
 	for i, current := range group {
 		if element.Equals(current) {
@@ -161,12 +178,18 @@ func (v *HistoryView) Render() error {
 	if err != nil {
 		return err
 	}
+	descendants, err := v.DescendantsOf(v.Current)
+	if err != nil {
+		return err
+	}
 	for _, n := range v.History {
 		config := renderConfig{}
 		if n.ID().Equals(v.Current) {
 			config.state = current
 		} else if in(n.ID(), ancestry) {
 			config.state = ancestor
+		} else if in(n.ID(), descendants) {
+			config.state = descendant
 		}
 		if err := writeNode(v, n, v, config); err != nil {
 			return err
