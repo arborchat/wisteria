@@ -8,6 +8,7 @@ environment:
   github_mirror_url: "git@github.com:arborchat/forest-go.git"
 secrets:
   - 08901094-23ba-4278-8b09-a02b7df36f52
+  - 3f11ff14-dff1-45ca-990c-c69873656f63
 tasks:
   - test: |
       cd forest-go
@@ -16,6 +17,11 @@ tasks:
   - cross_compile: |
       cd forest-go
       for os in $oses ; do env GOOS="$os" go build ; done
+  - annotate: |
+      go get git.sr.ht/~sircmpwn/annotatego
+      cd forest-go
+      ~/go/bin/annotatego -v -T git.sr.ht/~whereswaldon/forest-go... > annotations.json
+      ../upload-annotations annotations.json whereswaldon forest-go
   - mirror_to_github: |
       cd forest-go
       ./.builds/mirror.sh "$github_mirror_url"
