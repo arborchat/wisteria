@@ -7,9 +7,10 @@ import (
 	"log"
 	"os"
 	"sort"
+	"strings"
 
 	"github.com/gdamore/tcell"
-	"github.com/rivo/tview"
+	"github.com/gdamore/tcell/views"
 
 	forest "git.sr.ht/~whereswaldon/forest-go"
 	"git.sr.ht/~whereswaldon/forest-go/fields"
@@ -85,8 +86,8 @@ func (h History) IndexForID(id *fields.QualifiedHash) int {
 type HistoryView struct {
 	History
 	forest.Store
-	Current *fields.QualifiedHash
-	*tview.TextView
+	Current  *fields.QualifiedHash
+	rendered []string
 }
 
 func (v *HistoryView) AncestryOf(id *fields.QualifiedHash) ([]*fields.QualifiedHash, error) {
@@ -156,7 +157,7 @@ func (v *HistoryView) CursorDown() {
 	case currIndex >= 0 && currIndex < len(v.History)-1:
 		v.Current = v.History[currIndex+1].ID()
 	}
-	v.Render()
+	_ = v.Render()
 }
 
 func (v *HistoryView) CursorUp() {
@@ -168,11 +169,11 @@ func (v *HistoryView) CursorUp() {
 	case currIndex > 0:
 		v.Current = v.History[currIndex-1].ID()
 	}
-	v.Render()
+	_ = v.Render()
 }
 
 func (v *HistoryView) Render() error {
-	v.TextView.Clear()
+	v.rendered = []string{}
 	v.EnsureCurrent()
 	ancestry, err := v.AncestryOf(v.Current)
 	if err != nil {
@@ -191,11 +192,51 @@ func (v *HistoryView) Render() error {
 		} else if in(n.ID(), descendants) {
 			config.state = descendant
 		}
-		if err := writeNode(v, n, v, config); err != nil {
+		asString, err := renderNode(n, v.Store, config)
+		if err != nil {
 			return err
 		}
+		v.rendered = append(v.rendered, asString...)
 	}
 	return nil
+}
+
+func nth(input string, n int) rune {
+	for i, r := range input {
+		if i == n {
+			return r
+		}
+	}
+	return '?'
+}
+
+func (v *HistoryView) GetCell(x, y int) (rune, tcell.Style, []rune, int) {
+	//	log.Printf("rendering:\n%s\n\n(%d,%d)", strings.Join(v.rendered, "\n"), x, y)
+	if y < len(v.rendered) {
+		return nth(v.rendered[y], x), tcell.StyleDefault, nil, 1
+	}
+	return ' ', tcell.StyleDefault, nil, 1
+}
+
+func (v *HistoryView) GetBounds() (int, int) {
+	width := 0
+	for _, line := range v.rendered {
+		if len(line) > width {
+			width = len(line)
+		}
+	}
+	height := len(v.rendered)
+	return height - 1, width - 1
+}
+
+func (v *HistoryView) SetCursor(x, y int) {
+}
+
+func (v *HistoryView) GetCursor() (int, int, bool, bool) {
+	return 0, 0, false, false
+}
+
+func (v *HistoryView) MoveCursor(offx, offy int) {
 }
 
 func (v *HistoryView) HandleInput(event *tcell.EventKey) *tcell.EventKey {
@@ -224,19 +265,19 @@ func main() {
 	}
 	nodes.Sort()
 	history := &HistoryView{
-		Store: store,
-		TextView: tview.NewTextView().
-			SetDynamicColors(true),
+		Store:   store,
 		History: nodes,
 	}
-	history.SetInputCapture(history.HandleInput)
 	if err := history.Render(); err != nil {
 		log.Fatal(err)
 	}
-	app := tview.NewApplication()
-
-	if err := app.SetRoot(history, true).Run(); err != nil {
-		log.Fatal(err)
+	cv := views.NewCellView()
+	cv.SetModel(history)
+	app := new(views.Application)
+	app.SetRootWidget(cv)
+	if e := app.Run(); e != nil {
+		fmt.Fprintln(os.Stderr, e.Error())
+		os.Exit(1)
 	}
 }
 
@@ -253,20 +294,20 @@ type renderConfig struct {
 	state nodeState
 }
 
-func writeNode(w io.Writer, node forest.Node, store forest.Store, config renderConfig) error {
+func renderNode(node forest.Node, store forest.Store, config renderConfig) ([]string, error) {
 	const (
 		ancestorColor   = "yellow"
 		descendantColor = "green"
 		currentColor    = "red"
 	)
-	var out string
+	var out []string
 	switch n := node.(type) {
 	case *forest.Reply:
 		author, present, err := store.Get(&n.Author)
 		if err != nil {
-			return err
+			return nil, err
 		} else if !present {
-			return fmt.Errorf("Node %v is not in the store", n.Author)
+			return nil, fmt.Errorf("Node %v is not in the store", n.Author)
 		}
 		asIdent := author.(*forest.Identity)
 		var foreground string
@@ -280,8 +321,8 @@ func writeNode(w io.Writer, node forest.Node, store forest.Store, config renderC
 		default:
 			foreground = "-"
 		}
-		out = fmt.Sprintf("[%s::]%s: %s\n[-::]", foreground, string(asIdent.Name.Blob), string(n.Content.Blob))
+		rendered := fmt.Sprintf("[%s::]%s: %s[-::]", foreground, string(asIdent.Name.Blob), string(n.Content.Blob))
+		out = append(out, strings.Split(rendered, "\n")...)
 	}
-	_, err := w.Write([]byte(out))
-	return err
+	return out, nil
 }
