@@ -86,8 +86,9 @@ func (h History) IndexForID(id *fields.QualifiedHash) int {
 type HistoryView struct {
 	History
 	forest.Store
-	Current  *fields.QualifiedHash
-	rendered []string
+	Current    *fields.QualifiedHash
+	rendered   []string
+	lineStyles []tcell.Style
 }
 
 func (v *HistoryView) AncestryOf(id *fields.QualifiedHash) ([]*fields.QualifiedHash, error) {
@@ -174,6 +175,7 @@ func (v *HistoryView) CursorUp() {
 
 func (v *HistoryView) Render() error {
 	v.rendered = []string{}
+	v.lineStyles = []tcell.Style{}
 	v.EnsureCurrent()
 	ancestry, err := v.AncestryOf(v.Current)
 	if err != nil {
@@ -192,11 +194,14 @@ func (v *HistoryView) Render() error {
 		} else if in(n.ID(), descendants) {
 			config.state = descendant
 		}
-		asString, err := renderNode(n, v.Store, config)
+		asString, style, err := renderNode(n, v.Store, config)
 		if err != nil {
 			return err
 		}
 		v.rendered = append(v.rendered, asString...)
+		for i := 0; i < len(asString); i++ {
+			v.lineStyles = append(v.lineStyles, style)
+		}
 	}
 	return nil
 }
@@ -211,9 +216,8 @@ func nth(input string, n int) rune {
 }
 
 func (v *HistoryView) GetCell(x, y int) (rune, tcell.Style, []rune, int) {
-	//	log.Printf("rendering:\n%s\n\n(%d,%d)", strings.Join(v.rendered, "\n"), x, y)
-	if y < len(v.rendered) {
-		return nth(v.rendered[y], x), tcell.StyleDefault, nil, 1
+	if y < len(v.rendered) && x < len(v.rendered[y]) {
+		return nth(v.rendered[y], x), v.lineStyles[y], nil, 1
 	}
 	return ' ', tcell.StyleDefault, nil, 1
 }
@@ -294,35 +298,35 @@ type renderConfig struct {
 	state nodeState
 }
 
-func renderNode(node forest.Node, store forest.Store, config renderConfig) ([]string, error) {
-	const (
-		ancestorColor   = "yellow"
-		descendantColor = "green"
-		currentColor    = "red"
+func renderNode(node forest.Node, store forest.Store, config renderConfig) ([]string, tcell.Style, error) {
+	var (
+		ancestorColor   = tcell.StyleDefault.Foreground(tcell.ColorYellow)
+		descendantColor = tcell.StyleDefault.Foreground(tcell.ColorGreen)
+		currentColor    = tcell.StyleDefault.Foreground(tcell.ColorRed)
 	)
 	var out []string
+	var style tcell.Style
 	switch n := node.(type) {
 	case *forest.Reply:
 		author, present, err := store.Get(&n.Author)
 		if err != nil {
-			return nil, err
+			return nil, tcell.StyleDefault, err
 		} else if !present {
-			return nil, fmt.Errorf("Node %v is not in the store", n.Author)
+			return nil, tcell.StyleDefault, fmt.Errorf("Node %v is not in the store", n.Author)
 		}
 		asIdent := author.(*forest.Identity)
-		var foreground string
 		switch config.state {
 		case ancestor:
-			foreground = ancestorColor
+			style = ancestorColor
 		case descendant:
-			foreground = descendantColor
+			style = descendantColor
 		case current:
-			foreground = currentColor
+			style = currentColor
 		default:
-			foreground = "-"
+			style = tcell.StyleDefault
 		}
-		rendered := fmt.Sprintf("[%s::]%s: %s[-::]", foreground, string(asIdent.Name.Blob), string(n.Content.Blob))
+		rendered := fmt.Sprintf("%s: %s", string(asIdent.Name.Blob), string(n.Content.Blob))
 		out = append(out, strings.Split(rendered, "\n")...)
 	}
-	return out, nil
+	return out, style, nil
 }
