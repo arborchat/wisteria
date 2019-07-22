@@ -55,15 +55,15 @@ func readInto(r io.ReadCloser, store forest.Store) (forest.Node, error) {
 
 }
 
-type History []*forest.Reply
+type NodeList []*forest.Reply
 
-func (h History) Sort() {
+func (h NodeList) Sort() {
 	sort.SliceStable(h, func(i, j int) bool {
 		return h[i].Created < h[j].Created
 	})
 }
 
-func (h History) IndexForID(id *fields.QualifiedHash) int {
+func (h NodeList) IndexForID(id *fields.QualifiedHash) int {
 	for i, n := range h {
 		if n.ID().Equals(id) {
 			return i
@@ -73,7 +73,7 @@ func (h History) IndexForID(id *fields.QualifiedHash) int {
 }
 
 type Archive struct {
-	History
+	NodeList
 	forest.Store
 }
 
@@ -107,7 +107,7 @@ func readAllInto(store forest.Store) (*Archive, error) {
 			nodes = append(nodes, r)
 		}
 	}
-	return &Archive{History: nodes, Store: store}, nil
+	return &Archive{NodeList: nodes, Store: store}, nil
 }
 
 func (v *Archive) AncestryOf(id *fields.QualifiedHash) ([]*fields.QualifiedHash, error) {
@@ -139,7 +139,7 @@ func (v *Archive) DescendantsOf(id *fields.QualifiedHash) ([]*fields.QualifiedHa
 	for len(directChildren) > 0 {
 		target := directChildren[0]
 		directChildren = directChildren[1:]
-		for _, node := range v.History {
+		for _, node := range v.NodeList {
 			if node.ParentID().Equals(target) {
 				descendants = append(descendants, node.ID())
 				directChildren = append(directChildren, node.ID())
@@ -160,30 +160,30 @@ var _ views.CellModel = &HistoryView{}
 
 func (v *HistoryView) EnsureCurrent() {
 	if v.Current == nil {
-		v.Current = v.History[0].ID()
+		v.Current = v.NodeList[0].ID()
 	}
 }
 
 func (v *HistoryView) CursorDown() {
 	v.EnsureCurrent()
-	currIndex := v.History.IndexForID(v.Current)
+	currIndex := v.NodeList.IndexForID(v.Current)
 	switch {
 	case currIndex < 0:
 		return
-	case currIndex >= 0 && currIndex < len(v.History)-1:
-		v.Current = v.History[currIndex+1].ID()
+	case currIndex >= 0 && currIndex < len(v.NodeList)-1:
+		v.Current = v.NodeList[currIndex+1].ID()
 	}
 	_ = v.Render()
 }
 
 func (v *HistoryView) CursorUp() {
 	v.EnsureCurrent()
-	currIndex := v.History.IndexForID(v.Current)
+	currIndex := v.NodeList.IndexForID(v.Current)
 	switch {
 	case currIndex < 0:
 		return
 	case currIndex > 0:
-		v.Current = v.History[currIndex-1].ID()
+		v.Current = v.NodeList[currIndex-1].ID()
 	}
 	_ = v.Render()
 }
@@ -200,7 +200,7 @@ func (v *HistoryView) Render() error {
 	if err != nil {
 		return err
 	}
-	for _, n := range v.History {
+	for _, n := range v.NodeList {
 		config := renderConfig{}
 		if n.ID().Equals(v.Current) {
 			config.state = current
@@ -252,6 +252,7 @@ func (v *HistoryView) MoveCursor(offx, offy int) {
 type HistoryWidget struct {
 	*HistoryView
 	*views.CellView
+	*views.Application
 }
 
 var _ views.Widget = &HistoryWidget{}
@@ -264,7 +265,7 @@ func (v *HistoryWidget) HandleEvent(event tcell.Event) bool {
 	case *tcell.EventKey:
 		switch keyEvent.Key() {
 		case tcell.KeyCtrlC:
-			os.Exit(0)
+			v.Application.Quit()
 		case tcell.KeyRune:
 			// break if it's a normal keypress
 		default:
@@ -297,11 +298,12 @@ func main() {
 	}
 	cv := views.NewCellView()
 	cv.SetModel(historyView)
+	app := new(views.Application)
 	hw := &HistoryWidget{
 		historyView,
 		cv,
+		app,
 	}
-	app := new(views.Application)
 	app.SetRootWidget(hw)
 	if e := app.Run(); e != nil {
 		fmt.Fprintln(os.Stderr, e.Error())
