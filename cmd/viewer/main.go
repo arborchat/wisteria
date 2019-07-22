@@ -16,6 +16,28 @@ import (
 	"git.sr.ht/~whereswaldon/forest-go/fields"
 )
 
+func index(element *fields.QualifiedHash, group []*fields.QualifiedHash) int {
+	for i, current := range group {
+		if element.Equals(current) {
+			return i
+		}
+	}
+	return -1
+}
+
+func in(element *fields.QualifiedHash, group []*fields.QualifiedHash) bool {
+	return index(element, group) >= 0
+}
+
+func nth(input string, n int) rune {
+	for i, r := range input {
+		if i == n {
+			return r
+		}
+	}
+	return '?'
+}
+
 func readInto(r io.ReadCloser, store forest.Store) (forest.Node, error) {
 	defer r.Close()
 	b, err := ioutil.ReadAll(r)
@@ -35,7 +57,27 @@ func readInto(r io.ReadCloser, store forest.Store) (forest.Node, error) {
 
 type History []*forest.Reply
 
-func readAllInto(store forest.Store) (History, error) {
+func (h History) Sort() {
+	sort.SliceStable(h, func(i, j int) bool {
+		return h[i].Created < h[j].Created
+	})
+}
+
+func (h History) IndexForID(id *fields.QualifiedHash) int {
+	for i, n := range h {
+		if n.ID().Equals(id) {
+			return i
+		}
+	}
+	return -1
+}
+
+type Archive struct {
+	History
+	forest.Store
+}
+
+func readAllInto(store forest.Store) (*Archive, error) {
 	workdir, err := os.Getwd()
 	if err != nil {
 		return nil, err
@@ -65,33 +107,10 @@ func readAllInto(store forest.Store) (History, error) {
 			nodes = append(nodes, r)
 		}
 	}
-	return nodes, nil
+	return &Archive{History: nodes, Store: store}, nil
 }
 
-func (h History) Sort() {
-	sort.SliceStable(h, func(i, j int) bool {
-		return h[i].Created < h[j].Created
-	})
-}
-
-func (h History) IndexForID(id *fields.QualifiedHash) int {
-	for i, n := range h {
-		if n.ID().Equals(id) {
-			return i
-		}
-	}
-	return -1
-}
-
-type HistoryView struct {
-	History
-	forest.Store
-	Current    *fields.QualifiedHash
-	rendered   []string
-	lineStyles []tcell.Style
-}
-
-func (v *HistoryView) AncestryOf(id *fields.QualifiedHash) ([]*fields.QualifiedHash, error) {
+func (v *Archive) AncestryOf(id *fields.QualifiedHash) ([]*fields.QualifiedHash, error) {
 	node, present, err := v.Store.Get(id)
 	if err != nil {
 		return nil, err
@@ -113,7 +132,7 @@ func (v *HistoryView) AncestryOf(id *fields.QualifiedHash) ([]*fields.QualifiedH
 	return ancestors, nil
 }
 
-func (v *HistoryView) DescendantsOf(id *fields.QualifiedHash) ([]*fields.QualifiedHash, error) {
+func (v *Archive) DescendantsOf(id *fields.QualifiedHash) ([]*fields.QualifiedHash, error) {
 	descendants := make([]*fields.QualifiedHash, 0)
 	directChildren := []*fields.QualifiedHash{id}
 
@@ -130,18 +149,14 @@ func (v *HistoryView) DescendantsOf(id *fields.QualifiedHash) ([]*fields.Qualifi
 	return descendants, nil
 }
 
-func index(element *fields.QualifiedHash, group []*fields.QualifiedHash) int {
-	for i, current := range group {
-		if element.Equals(current) {
-			return i
-		}
-	}
-	return -1
+type HistoryView struct {
+	*Archive
+	Current    *fields.QualifiedHash
+	rendered   []string
+	lineStyles []tcell.Style
 }
 
-func in(element *fields.QualifiedHash, group []*fields.QualifiedHash) bool {
-	return index(element, group) >= 0
-}
+var _ views.CellModel = &HistoryView{}
 
 func (v *HistoryView) EnsureCurrent() {
 	if v.Current == nil {
@@ -206,15 +221,6 @@ func (v *HistoryView) Render() error {
 	return nil
 }
 
-func nth(input string, n int) rune {
-	for i, r := range input {
-		if i == n {
-			return r
-		}
-	}
-	return '?'
-}
-
 func (v *HistoryView) GetCell(x, y int) (rune, tcell.Style, []rune, int) {
 	if y < len(v.rendered) && x < len(v.rendered[y]) {
 		return nth(v.rendered[y], x), v.lineStyles[y], nil, 1
@@ -243,42 +249,60 @@ func (v *HistoryView) GetCursor() (int, int, bool, bool) {
 func (v *HistoryView) MoveCursor(offx, offy int) {
 }
 
-func (v *HistoryView) HandleInput(event *tcell.EventKey) *tcell.EventKey {
-	switch event.Key() {
-	case tcell.KeyRune:
-		// break if it's a normal keypress
-	default:
-		return event
+type HistoryWidget struct {
+	*HistoryView
+	*views.CellView
+}
+
+var _ views.Widget = &HistoryWidget{}
+
+func (v *HistoryWidget) HandleEvent(event tcell.Event) bool {
+	if v.CellView.HandleEvent(event) {
+		return true
 	}
-	switch event.Rune() {
-	case 'j':
-		v.CursorDown()
-	case 'k':
-		v.CursorUp()
-	default:
-		return event
+	switch keyEvent := event.(type) {
+	case *tcell.EventKey:
+		switch keyEvent.Key() {
+		case tcell.KeyCtrlC:
+			os.Exit(0)
+		case tcell.KeyRune:
+			// break if it's a normal keypress
+		default:
+			return false
+		}
+		switch keyEvent.Rune() {
+		case 'j':
+			v.CursorDown()
+			return true
+		case 'k':
+			v.CursorUp()
+			return true
+		}
 	}
-	return nil
+	return false
 }
 
 func main() {
 	store := forest.NewMemoryStore()
-	nodes, err := readAllInto(store)
+	history, err := readAllInto(store)
 	if err != nil {
 		log.Fatal(err)
 	}
-	nodes.Sort()
-	history := &HistoryView{
-		Store:   store,
-		History: nodes,
+	history.Sort()
+	historyView := &HistoryView{
+		Archive: history,
 	}
-	if err := history.Render(); err != nil {
+	if err := historyView.Render(); err != nil {
 		log.Fatal(err)
 	}
 	cv := views.NewCellView()
-	cv.SetModel(history)
+	cv.SetModel(historyView)
+	hw := &HistoryWidget{
+		historyView,
+		cv,
+	}
 	app := new(views.Application)
-	app.SetRootWidget(cv)
+	app.SetRootWidget(hw)
 	if e := app.Run(); e != nil {
 		fmt.Fprintln(os.Stderr, e.Error())
 		os.Exit(1)
