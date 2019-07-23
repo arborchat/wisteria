@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/fsnotify/fsnotify"
 	"github.com/gdamore/tcell"
 	"github.com/gdamore/tcell/views"
 
@@ -38,23 +39,6 @@ func nth(input string, n int) rune {
 	return '?'
 }
 
-func readInto(r io.ReadCloser, store forest.Store) (forest.Node, error) {
-	defer r.Close()
-	b, err := ioutil.ReadAll(r)
-	if err != nil {
-		return nil, err
-	}
-	node, err := forest.UnmarshalBinaryNode(b)
-	if err != nil {
-		return nil, err
-	}
-	if err := store.Add(node); err != nil {
-		return nil, err
-	}
-	return node, nil
-
-}
-
 type NodeList []*forest.Reply
 
 func (h NodeList) Sort() {
@@ -77,6 +61,26 @@ type Archive struct {
 	forest.Store
 }
 
+func (a *Archive) Read(r io.ReadCloser) error {
+	defer r.Close()
+	b, err := ioutil.ReadAll(r)
+	if err != nil {
+		return err
+	}
+	node, err := forest.UnmarshalBinaryNode(b)
+	if err != nil {
+		return err
+	}
+	if err := a.Store.Add(node); err != nil {
+		return err
+	}
+	if r, ok := node.(*forest.Reply); ok {
+		a.NodeList = append(a.NodeList, r)
+	}
+	return nil
+
+}
+
 func readAllInto(store forest.Store) (*Archive, error) {
 	workdir, err := os.Getwd()
 	if err != nil {
@@ -92,22 +96,20 @@ func readAllInto(store forest.Store) (*Archive, error) {
 		return nil, err
 	}
 	var nodes []*forest.Reply
+	archive := &Archive{NodeList: nodes, Store: store}
 	for _, name := range names {
 		nodeFile, err := os.Open(name)
 		if err != nil {
 			log.Println(err)
 			continue
 		}
-		node, err := readInto(nodeFile, store)
+		err = archive.Read(nodeFile)
 		if err != nil {
 			log.Printf("Failed parsing %s: %v", nodeFile.Name(), err)
 			continue
 		}
-		if r, ok := node.(*forest.Reply); ok {
-			nodes = append(nodes, r)
-		}
 	}
-	return &Archive{NodeList: nodes, Store: store}, nil
+	return archive, nil
 }
 
 func (v *Archive) AncestryOf(id *fields.QualifiedHash) ([]*fields.QualifiedHash, error) {
@@ -305,6 +307,54 @@ func main() {
 		app,
 	}
 	app.SetRootWidget(hw)
+
+	watcher, err := fsnotify.NewWatcher()
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer watcher.Close()
+	go func() {
+		for {
+			select {
+			case event, ok := <-watcher.Events:
+				if !ok {
+					return
+				}
+				if event.Op&fsnotify.Write == fsnotify.Write {
+					app.PostFunc(func() {
+						file, err := os.Open(event.Name)
+						if err != nil {
+							log.Println(err)
+						}
+						defer file.Close()
+						err = historyView.Read(file)
+						if err != nil {
+							log.Println(err)
+						}
+						historyView.Sort()
+						err = historyView.Render()
+						if err != nil {
+							log.Println(err)
+						}
+						app.Update()
+					})
+				}
+			case err, ok := <-watcher.Errors:
+				if !ok {
+					return
+				}
+				log.Println("error:", err)
+			}
+		}
+	}()
+	cwd, err := os.Getwd()
+	if err != nil {
+		log.Fatal(err)
+	}
+	err = watcher.Add(cwd)
+	if err != nil {
+		log.Fatal(err)
+	}
 	if e := app.Run(); e != nil {
 		fmt.Fprintln(os.Stderr, e.Error())
 		os.Exit(1)
