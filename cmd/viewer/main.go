@@ -308,9 +308,42 @@ func main() {
 	}
 	app.SetRootWidget(hw)
 
-	watcher, err := fsnotify.NewWatcher()
+	cwd, err := os.Getwd()
 	if err != nil {
 		log.Fatal(err)
+	}
+	if err := Watch(cwd, func(filename string) {
+		app.PostFunc(func() {
+			file, err := os.Open(filename)
+			if err != nil {
+				log.Println(err)
+			}
+			defer file.Close()
+			err = historyView.Read(file)
+			if err != nil {
+				log.Println(err)
+			}
+			historyView.Sort()
+			err = historyView.Render()
+			if err != nil {
+				log.Println(err)
+			}
+			app.Update()
+		})
+	}); err != nil {
+		log.Fatal(err)
+	}
+
+	if e := app.Run(); e != nil {
+		fmt.Fprintln(os.Stderr, e.Error())
+		os.Exit(1)
+	}
+}
+
+func Watch(dir string, handler func(filename string)) error {
+	watcher, err := fsnotify.NewWatcher()
+	if err != nil {
+		return err
 	}
 	defer watcher.Close()
 	go func() {
@@ -321,23 +354,7 @@ func main() {
 					return
 				}
 				if event.Op&fsnotify.Write == fsnotify.Write {
-					app.PostFunc(func() {
-						file, err := os.Open(event.Name)
-						if err != nil {
-							log.Println(err)
-						}
-						defer file.Close()
-						err = historyView.Read(file)
-						if err != nil {
-							log.Println(err)
-						}
-						historyView.Sort()
-						err = historyView.Render()
-						if err != nil {
-							log.Println(err)
-						}
-						app.Update()
-					})
+					handler(event.Name)
 				}
 			case err, ok := <-watcher.Errors:
 				if !ok {
@@ -347,18 +364,11 @@ func main() {
 			}
 		}
 	}()
-	cwd, err := os.Getwd()
+	err = watcher.Add(dir)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
-	err = watcher.Add(cwd)
-	if err != nil {
-		log.Fatal(err)
-	}
-	if e := app.Run(); e != nil {
-		fmt.Fprintln(os.Stderr, e.Error())
-		os.Exit(1)
-	}
+	return nil
 }
 
 type nodeState uint
