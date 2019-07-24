@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"os/exec"
 	"sort"
 	"strings"
 
@@ -190,6 +191,20 @@ func (v *HistoryView) CursorUp() {
 	_ = v.Render()
 }
 
+/*
+func (v *HistoryView) Current() (*forest.Reply, *forest.Identity, error) {
+	node, has, err := v.Get(v.Current)
+	if err != nil {
+		return nil, nil, err
+	} else if !has {
+		return nil, nil, err
+	} else if reply, ok := node.(*forest.Reply); !ok {
+		return nil, nil, fmt.Errorf("Current node is not a reply: %v", node)
+	}
+
+}
+*/
+
 func (v *HistoryView) Render() error {
 	v.rendered = []string{}
 	v.lineStyles = []tcell.Style{}
@@ -268,6 +283,25 @@ func (v *HistoryWidget) HandleEvent(event tcell.Event) bool {
 		switch keyEvent.Key() {
 		case tcell.KeyCtrlC:
 			v.Application.Quit()
+		case tcell.KeyEnter:
+			file, err := ioutil.TempFile("", "arbor-msg")
+			if err != nil {
+				log.Println(err)
+			}
+			_, err = file.Write([]byte(fmt.Sprintf("# replying to %s\n", "")))
+			if err != nil {
+				file.Close()
+				log.Println(err)
+			}
+			file.Close()
+			editor := exec.Command("gnome-terminal", "-q", "--", os.ExpandEnv("$EDITOR"), file.Name())
+			editor.Stdin = os.Stdin
+			editor.Stdout = os.Stdout
+			editor.Stderr = os.Stderr
+			if err := editor.Run(); err != nil {
+				log.Println(err)
+			}
+
 		case tcell.KeyRune:
 			// break if it's a normal keypress
 		default:
