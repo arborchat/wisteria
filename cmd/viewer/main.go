@@ -1,6 +1,8 @@
 package main
 
 import (
+	"encoding"
+	"flag"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -13,10 +15,33 @@ import (
 	"github.com/fsnotify/fsnotify"
 	"github.com/gdamore/tcell"
 	"github.com/gdamore/tcell/views"
+	"github.com/pkg/profile"
+	"golang.org/x/crypto/openpgp"
+	"golang.org/x/crypto/openpgp/packet"
 
 	forest "git.sr.ht/~whereswaldon/forest-go"
 	"git.sr.ht/~whereswaldon/forest-go/fields"
 )
+
+func save(w io.Writer, node encoding.BinaryMarshaler) error {
+	b, err := node.MarshalBinary()
+	if err != nil {
+		return err
+	}
+	_, err = w.Write(b)
+	return err
+}
+
+func saveAs(name string, node encoding.BinaryMarshaler) error {
+	outfile, err := os.Create(name)
+	if err != nil {
+		return err
+	}
+	log.Printf("saving to %s", outfile.Name())
+	defer outfile.Close()
+
+	return save(outfile, node)
+}
 
 func index(element *fields.QualifiedHash, group []*fields.QualifiedHash) int {
 	for i, current := range group {
@@ -191,19 +216,19 @@ func (v *HistoryView) CursorUp() {
 	_ = v.Render()
 }
 
-/*
-func (v *HistoryView) Current() (*forest.Reply, *forest.Identity, error) {
+func (v *HistoryView) CurrentReply() (*forest.Reply, error) {
 	node, has, err := v.Get(v.Current)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	} else if !has {
-		return nil, nil, err
+		return nil, err
 	} else if reply, ok := node.(*forest.Reply); !ok {
-		return nil, nil, fmt.Errorf("Current node is not a reply: %v", node)
+		return nil, fmt.Errorf("Current node is not a reply: %v", node)
+	} else {
+		return reply, nil
 	}
 
 }
-*/
 
 func (v *HistoryView) Render() error {
 	v.rendered = []string{}
@@ -270,6 +295,7 @@ type HistoryWidget struct {
 	*HistoryView
 	*views.CellView
 	*views.Application
+	*forest.Builder
 }
 
 var _ views.Widget = &HistoryWidget{}
@@ -284,22 +310,51 @@ func (v *HistoryWidget) HandleEvent(event tcell.Event) bool {
 		case tcell.KeyCtrlC:
 			v.Application.Quit()
 		case tcell.KeyEnter:
+			reply, err := v.CurrentReply()
+			if err != nil {
+				log.Println(err)
+				return false
+			}
+			msg := strings.Join(strings.Split(string(reply.Content.Blob), "\n"), "\n#")
 			file, err := ioutil.TempFile("", "arbor-msg")
 			if err != nil {
 				log.Println(err)
+				return false
 			}
-			_, err = file.Write([]byte(fmt.Sprintf("# replying to %s\n", "")))
+			_, err = file.Write([]byte(fmt.Sprintf("# replying to %s\n", msg)))
 			if err != nil {
 				file.Close()
 				log.Println(err)
+				return false
 			}
 			file.Close()
-			editor := exec.Command("gnome-terminal", "-q", "--", os.ExpandEnv("$EDITOR"), file.Name())
-			editor.Stdin = os.Stdin
-			editor.Stdout = os.Stdout
-			editor.Stderr = os.Stderr
+			editor := exec.Command("st", "-e", os.ExpandEnv("$EDITOR"), file.Name())
+			log.Print("starting editor")
 			if err := editor.Run(); err != nil {
 				log.Println(err)
+				return false
+			}
+			log.Print("editor done")
+			replyContent, err := ioutil.ReadFile(file.Name())
+			if err != nil {
+				log.Println(err)
+				return false
+			}
+			log.Print(string(replyContent))
+			reply, err = v.NewReply(reply, string(replyContent), "")
+			if err != nil {
+				log.Println(err)
+				return false
+			}
+			outfile, err := reply.ID().MarshalString()
+			if err != nil {
+				log.Println(err)
+				return false
+			}
+			err = saveAs(outfile, reply)
+			if err != nil {
+				log.Println(err)
+				return false
 			}
 
 		case tcell.KeyRune:
@@ -320,6 +375,44 @@ func (v *HistoryWidget) HandleEvent(event tcell.Event) bool {
 }
 
 func main() {
+	defer profile.Start().Stop()
+	var (
+		signer forest.Signer
+		err    error
+	)
+	cwd, err := os.Getwd()
+	if err != nil {
+		log.Fatal(err)
+	}
+	logFile, err := ioutil.TempFile(cwd, "viewerlog")
+	if err != nil {
+		log.Fatal(err)
+	}
+	log.SetOutput(logFile)
+	log.SetFlags(log.Lshortfile | log.LstdFlags)
+	user := flag.String("gpguser", "", "gpg user to sign new messages with")
+	key := flag.String("key", "arbor.privkey", "PGP key to sign messages with")
+	identityName := flag.String("identity", "", "arbor identity node to sign with")
+	flag.Parse()
+	if *user != "" {
+		signer, err = forest.NewGPGSigner(*user)
+	} else if *key != "" {
+		keyfile, _ := os.Open(*key)
+		defer keyfile.Close()
+		entity, _ := openpgp.ReadEntity(packet.NewReader(keyfile))
+		signer, err = forest.NewNativeSigner(entity)
+	}
+	if err != nil {
+		log.Fatal(err)
+	}
+	idBytes, err := ioutil.ReadFile(*identityName)
+	if err != nil {
+		log.Fatal(err)
+	}
+	identity, err := forest.UnmarshalIdentity(idBytes)
+	if err != nil {
+		log.Fatal(err)
+	}
 	store := forest.NewMemoryStore()
 	history, err := readAllInto(store)
 	if err != nil {
@@ -339,14 +432,12 @@ func main() {
 		historyView,
 		cv,
 		app,
+		forest.As(identity, signer),
 	}
 	app.SetRootWidget(hw)
 
-	cwd, err := os.Getwd()
-	if err != nil {
-		log.Fatal(err)
-	}
-	if err := Watch(cwd, func(filename string) {
+	if _, err := Watch(cwd, func(filename string) {
+		log.Println("Found new file", filename)
 		app.PostFunc(func() {
 			file, err := os.Open(filename)
 			if err != nil {
@@ -366,20 +457,21 @@ func main() {
 		})
 	}); err != nil {
 		log.Fatal(err)
+	} else {
+		//		defer watcher.Close()
 	}
 
 	if e := app.Run(); e != nil {
-		fmt.Fprintln(os.Stderr, e.Error())
+		log.Println(e.Error())
 		os.Exit(1)
 	}
 }
 
-func Watch(dir string, handler func(filename string)) error {
+func Watch(dir string, handler func(filename string)) (*fsnotify.Watcher, error) {
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
-		return err
+		return nil, err
 	}
-	defer watcher.Close()
 	go func() {
 		for {
 			select {
@@ -387,22 +479,24 @@ func Watch(dir string, handler func(filename string)) error {
 				if !ok {
 					return
 				}
-				if event.Op&fsnotify.Write == fsnotify.Write {
+				if event.Op&fsnotify.Create != 0 {
+					log.Println("Got create event for", event.Name)
 					handler(event.Name)
 				}
 			case err, ok := <-watcher.Errors:
 				if !ok {
+					log.Println("Got watch error", err)
 					return
 				}
-				log.Println("error:", err)
 			}
 		}
 	}()
 	err = watcher.Add(dir)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	return nil
+	log.Println("Watching", dir)
+	return watcher, nil
 }
 
 type nodeState uint

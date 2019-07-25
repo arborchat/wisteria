@@ -23,4 +23,5 @@ replyA4=$("$forest_cmd" create reply --as "$identity" --to "$replyA3" --content 
 replyBB2=$("$forest_cmd" create reply --as "$identity" --to "$replyB" --content "BB2")
 replyB3=$("$forest_cmd" create reply --as "$identity" --to "$replyB2" --content "B3")
 
-"$viewer_cmd"
+"$viewer_cmd" -identity $identity
+less viewerlog*
