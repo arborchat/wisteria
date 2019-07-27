@@ -251,11 +251,15 @@ func (v *HistoryView) Render() error {
 	return nil
 }
 
-func (v *HistoryView) GetCell(x, y int) (rune, tcell.Style, []rune, int) {
+func (v *HistoryView) GetCell(x, y int) (cell rune, style tcell.Style, combining []rune, width int) {
+	cell, style, combining, width = ' ', tcell.StyleDefault, nil, 1
 	if y < len(v.rendered) && x < len(v.rendered[y].Text) {
-		return nth(v.rendered[y].Text, x), v.rendered[y].Style, nil, 1
+		cell, style, combining, width = nth(v.rendered[y].Text, x), v.rendered[y].Style, nil, 1
 	}
-	return ' ', tcell.StyleDefault, nil, 1
+	if v.Cursor.X == x && v.Cursor.Y == y {
+		style = tcell.StyleDefault.Reverse(true)
+	}
+	return
 }
 
 func (v *HistoryView) GetBounds() (int, int) {
