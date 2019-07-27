@@ -341,7 +341,7 @@ func (v *HistoryWidget) HandleEvent(event tcell.Event) bool {
 				return false
 			}
 			log.Print(string(replyContent))
-			reply, err = v.NewReply(reply, string(replyContent), "")
+			reply, err = v.NewReply(reply, stripCommentLines(string(replyContent)), "")
 			if err != nil {
 				log.Println(err)
 				return false
@@ -540,7 +540,22 @@ func renderNode(node forest.Node, store forest.Store, config renderConfig) ([]st
 			style = tcell.StyleDefault
 		}
 		rendered := fmt.Sprintf("%s: %s", string(asIdent.Name.Blob), string(n.Content.Blob))
+		// drop all trailing newline characters
+		for rendered[len(rendered)-1] == "\n"[0] {
+			rendered = rendered[:len(rendered)-1]
+		}
 		out = append(out, strings.Split(rendered, "\n")...)
 	}
 	return out, style, nil
+}
+
+func stripCommentLines(input string) string {
+	lines := strings.Split(input, "\n")
+	out := make([]string, 0, len(lines))
+	for _, line := range lines {
+		if !strings.HasPrefix(line, "#") {
+			out = append(out, line)
+		}
+	}
+	return strings.Join(out, "\n")
 }
