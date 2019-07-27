@@ -270,7 +270,7 @@ func (v *HistoryView) GetBounds() (int, int) {
 		}
 	}
 	height := len(v.rendered)
-	return height - 1, width - 1
+	return width - 1, height - 1
 }
 
 func (v *HistoryView) SetCursor(x, y int) {
@@ -282,7 +282,7 @@ func (v *HistoryView) SetCursor(x, y int) {
 }
 
 func (v *HistoryView) GetCursor() (int, int, bool, bool) {
-	return v.Cursor.X, v.Cursor.Y, false, false
+	return v.Cursor.X, v.Cursor.Y, true, false
 }
 
 func (v *HistoryView) MoveCursor(offx, offy int) {
@@ -370,11 +370,21 @@ func (v *HistoryWidget) HandleEvent(event tcell.Event) bool {
 			return false
 		}
 		switch keyEvent.Rune() {
+		case 'h':
+			v.MoveCursor(-1, 0)
+			v.MakeCursorVisible()
+			return true
 		case 'j':
 			v.MoveCursor(0, 1)
+			v.MakeCursorVisible()
 			return true
 		case 'k':
 			v.MoveCursor(0, -1)
+			v.MakeCursorVisible()
+			return true
+		case 'l':
+			v.MoveCursor(1, 0)
+			v.MakeCursorVisible()
 			return true
 		}
 	}
