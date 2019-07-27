@@ -177,47 +177,35 @@ func (v *Archive) DescendantsOf(id *fields.QualifiedHash) ([]*fields.QualifiedHa
 	return descendants, nil
 }
 
+type RenderedLine struct {
+	ID    *fields.QualifiedHash
+	Style tcell.Style
+	Text  string
+}
+
+type Point struct {
+	X, Y int
+}
+
 type HistoryView struct {
 	*Archive
-	Current    *fields.QualifiedHash
-	rendered   []string
-	lineStyles []tcell.Style
+	rendered []RenderedLine
+	Cursor   Point
 }
 
 var _ views.CellModel = &HistoryView{}
 
-func (v *HistoryView) EnsureCurrent() {
-	if v.Current == nil {
-		v.Current = v.NodeList[0].ID()
+func (v *HistoryView) CurrentID() *fields.QualifiedHash {
+	if len(v.rendered) > v.Cursor.Y {
+		return v.rendered[v.Cursor.Y].ID
+	} else if len(v.Archive.NodeList) > 0 {
+		return v.Archive.NodeList[0].ID()
 	}
-}
-
-func (v *HistoryView) CursorDown() {
-	v.EnsureCurrent()
-	currIndex := v.NodeList.IndexForID(v.Current)
-	switch {
-	case currIndex < 0:
-		return
-	case currIndex >= 0 && currIndex < len(v.NodeList)-1:
-		v.Current = v.NodeList[currIndex+1].ID()
-	}
-	_ = v.Render()
-}
-
-func (v *HistoryView) CursorUp() {
-	v.EnsureCurrent()
-	currIndex := v.NodeList.IndexForID(v.Current)
-	switch {
-	case currIndex < 0:
-		return
-	case currIndex > 0:
-		v.Current = v.NodeList[currIndex-1].ID()
-	}
-	_ = v.Render()
+	return fields.NullHash()
 }
 
 func (v *HistoryView) CurrentReply() (*forest.Reply, error) {
-	node, has, err := v.Get(v.Current)
+	node, has, err := v.Get(v.CurrentID())
 	if err != nil {
 		return nil, err
 	} else if !has {
@@ -231,41 +219,41 @@ func (v *HistoryView) CurrentReply() (*forest.Reply, error) {
 }
 
 func (v *HistoryView) Render() error {
-	v.rendered = []string{}
-	v.lineStyles = []tcell.Style{}
-	v.EnsureCurrent()
-	ancestry, err := v.AncestryOf(v.Current)
+	currentID := v.CurrentID()
+	currentIDText, _ := currentID.MarshalString()
+	log.Printf("Starting Render() with %s as current", currentIDText)
+	v.rendered = []RenderedLine{}
+	ancestry, err := v.AncestryOf(currentID)
 	if err != nil {
 		return err
 	}
-	descendants, err := v.DescendantsOf(v.Current)
+	log.Printf("len(ancestry) = %d", len(ancestry))
+	descendants, err := v.DescendantsOf(currentID)
 	if err != nil {
 		return err
 	}
+	log.Printf("len(descendants) = %d", len(descendants))
 	for _, n := range v.NodeList {
 		config := renderConfig{}
-		if n.ID().Equals(v.Current) {
+		if n.ID().Equals(currentID) {
 			config.state = current
 		} else if in(n.ID(), ancestry) {
 			config.state = ancestor
 		} else if in(n.ID(), descendants) {
 			config.state = descendant
 		}
-		asString, style, err := renderNode(n, v.Store, config)
+		lines, err := renderNode(n, v.Store, config)
 		if err != nil {
 			return err
 		}
-		v.rendered = append(v.rendered, asString...)
-		for i := 0; i < len(asString); i++ {
-			v.lineStyles = append(v.lineStyles, style)
-		}
+		v.rendered = append(v.rendered, lines...)
 	}
 	return nil
 }
 
 func (v *HistoryView) GetCell(x, y int) (rune, tcell.Style, []rune, int) {
-	if y < len(v.rendered) && x < len(v.rendered[y]) {
-		return nth(v.rendered[y], x), v.lineStyles[y], nil, 1
+	if y < len(v.rendered) && x < len(v.rendered[y].Text) {
+		return nth(v.rendered[y].Text, x), v.rendered[y].Style, nil, 1
 	}
 	return ' ', tcell.StyleDefault, nil, 1
 }
@@ -273,8 +261,8 @@ func (v *HistoryView) GetCell(x, y int) (rune, tcell.Style, []rune, int) {
 func (v *HistoryView) GetBounds() (int, int) {
 	width := 0
 	for _, line := range v.rendered {
-		if len(line) > width {
-			width = len(line)
+		if len(line.Text) > width {
+			width = len(line.Text)
 		}
 	}
 	height := len(v.rendered)
@@ -282,13 +270,28 @@ func (v *HistoryView) GetBounds() (int, int) {
 }
 
 func (v *HistoryView) SetCursor(x, y int) {
+	v.Cursor.X = x
+	v.Cursor.Y = y
+	if err := v.Render(); err != nil {
+		log.Println("Error rendering after SetCursor():", err)
+	}
 }
 
 func (v *HistoryView) GetCursor() (int, int, bool, bool) {
-	return 0, 0, false, false
+	return v.Cursor.X, v.Cursor.Y, false, false
 }
 
 func (v *HistoryView) MoveCursor(offx, offy int) {
+	if v.Cursor.X+offx >= 0 {
+		v.Cursor.X += offx
+	}
+	if v.Cursor.Y+offy >= 0 {
+		v.Cursor.Y += offy
+	}
+	log.Printf("Moved cursor to (%d,%d)", v.Cursor.X, v.Cursor.Y)
+	if err := v.Render(); err != nil {
+		log.Printf("Error during post-cursor move render: %v", err)
+	}
 }
 
 type HistoryWidget struct {
@@ -364,10 +367,10 @@ func (v *HistoryWidget) HandleEvent(event tcell.Event) bool {
 		}
 		switch keyEvent.Rune() {
 		case 'j':
-			v.CursorDown()
+			v.MoveCursor(0, 1)
 			return true
 		case 'k':
-			v.CursorUp()
+			v.MoveCursor(0, -1)
 			return true
 		}
 	}
@@ -384,7 +387,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	logFile, err := ioutil.TempFile(cwd, "viewerlog")
+	logFile, err := os.OpenFile("viewer.log", os.O_APPEND|os.O_RDWR|os.O_CREATE, 0660)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -427,6 +430,7 @@ func main() {
 	}
 	cv := views.NewCellView()
 	cv.SetModel(historyView)
+	cv.MakeCursorVisible()
 	app := new(views.Application)
 	hw := &HistoryWidget{
 		historyView,
@@ -512,21 +516,23 @@ type renderConfig struct {
 	state nodeState
 }
 
-func renderNode(node forest.Node, store forest.Store, config renderConfig) ([]string, tcell.Style, error) {
+func renderNode(node forest.Node, store forest.Store, config renderConfig) ([]RenderedLine, error) {
 	var (
 		ancestorColor   = tcell.StyleDefault.Foreground(tcell.ColorYellow)
 		descendantColor = tcell.StyleDefault.Foreground(tcell.ColorGreen)
 		currentColor    = tcell.StyleDefault.Foreground(tcell.ColorRed)
 	)
-	var out []string
+	idstring, _ := node.ID().MarshalString()
+	log.Printf("%s => %d", idstring, config.state)
+	var out []RenderedLine
 	var style tcell.Style
 	switch n := node.(type) {
 	case *forest.Reply:
 		author, present, err := store.Get(&n.Author)
 		if err != nil {
-			return nil, tcell.StyleDefault, err
+			return nil, err
 		} else if !present {
-			return nil, tcell.StyleDefault, fmt.Errorf("Node %v is not in the store", n.Author)
+			return nil, fmt.Errorf("Node %v is not in the store", n.Author)
 		}
 		asIdent := author.(*forest.Identity)
 		switch config.state {
@@ -544,9 +550,15 @@ func renderNode(node forest.Node, store forest.Store, config renderConfig) ([]st
 		for rendered[len(rendered)-1] == "\n"[0] {
 			rendered = rendered[:len(rendered)-1]
 		}
-		out = append(out, strings.Split(rendered, "\n")...)
+		for _, line := range strings.Split(rendered, "\n") {
+			out = append(out, RenderedLine{
+				ID:    n.ID(),
+				Style: style,
+				Text:  line,
+			})
+		}
 	}
-	return out, style, nil
+	return out, nil
 }
 
 func stripCommentLines(input string) string {
