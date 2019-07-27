@@ -328,7 +328,7 @@ func (v *HistoryWidget) HandleEvent(event tcell.Event) bool {
 				return false
 			}
 			file.Close()
-			editor := exec.Command("st", "-e", os.ExpandEnv("$EDITOR"), file.Name())
+			editor := exec.Command("gnome-terminal", "--wait", "--", os.ExpandEnv("$EDITOR"), file.Name())
 			log.Print("starting editor")
 			if err := editor.Run(); err != nil {
 				log.Println(err)
