@@ -391,12 +391,62 @@ func (v *HistoryWidget) HandleEvent(event tcell.Event) bool {
 	return false
 }
 
-func main() {
-	defer profile.Start().Stop()
+type Config struct {
+	// a PGP key ID for the user's private key that controls their arbor identity.
+	// Mutually exclusive with PGPKey
+	PGPUser string
+	// an unencrypted PGP private key file that controls the user's identity. Insecure,
+	// and mutually exclusive with PGPUser
+	PGPKey string
+	// the file name of the user's arbor identity node
+	IdentityName string
+}
+
+// Validate errors if the configuration is invalid
+func (c *Config) Validate() error {
+	switch {
+	case c.PGPUser != "" && c.PGPKey != "":
+		return fmt.Errorf("PGPUser and PGPKey cannot both be set")
+	case c.PGPUser == "" && c.PGPKey == "":
+		return fmt.Errorf("One of PGPUser and PGPKey must be set")
+	case c.IdentityName == "":
+		return fmt.Errorf("IdentityName must be set")
+	}
+	return nil
+}
+
+// Builder creates a forest.Builder based on the configuration. This allows the client
+// to create nodes on this user's behalf.
+func (c *Config) Builder() (*forest.Builder, error) {
 	var (
 		signer forest.Signer
 		err    error
 	)
+	if c.PGPUser != "" {
+		signer, err = forest.NewGPGSigner(c.PGPUser)
+	} else if c.PGPKey != "" {
+		keyfile, _ := os.Open(c.PGPKey)
+		defer keyfile.Close()
+		entity, _ := openpgp.ReadEntity(packet.NewReader(keyfile))
+		signer, err = forest.NewNativeSigner(entity)
+	}
+	if err != nil {
+		log.Fatal(err)
+	}
+	idBytes, err := ioutil.ReadFile(c.IdentityName)
+	if err != nil {
+		log.Fatal(err)
+	}
+	identity, err := forest.UnmarshalIdentity(idBytes)
+	if err != nil && err != io.EOF {
+		log.Fatal(err)
+	}
+	return forest.As(identity, signer), nil
+}
+
+func main() {
+	defer profile.Start().Stop()
+	config := &Config{}
 	cwd, err := os.Getwd()
 	if err != nil {
 		log.Fatal(err)
@@ -407,28 +457,16 @@ func main() {
 	}
 	log.SetOutput(logFile)
 	log.SetFlags(log.Lshortfile | log.LstdFlags)
-	user := flag.String("gpguser", "", "gpg user to sign new messages with")
-	key := flag.String("key", "arbor.privkey", "PGP key to sign messages with")
-	identityName := flag.String("identity", "", "arbor identity node to sign with")
+	flag.StringVar(&config.PGPUser, "gpguser", "", "gpg user to sign new messages with")
+	flag.StringVar(&config.PGPKey, "key", "", "PGP key to sign messages with")
+	flag.StringVar(&config.IdentityName, "identity", "", "arbor identity node to sign with")
 	flag.Parse()
-	if *user != "" {
-		signer, err = forest.NewGPGSigner(*user)
-	} else if *key != "" {
-		keyfile, _ := os.Open(*key)
-		defer keyfile.Close()
-		entity, _ := openpgp.ReadEntity(packet.NewReader(keyfile))
-		signer, err = forest.NewNativeSigner(entity)
+	if err := config.Validate(); err != nil {
+		log.Fatal("Error validating configuration:", err)
 	}
+	builder, err := config.Builder()
 	if err != nil {
-		log.Fatal(err)
-	}
-	idBytes, err := ioutil.ReadFile(*identityName)
-	if err != nil {
-		log.Fatal(err)
-	}
-	identity, err := forest.UnmarshalIdentity(idBytes)
-	if err != nil {
-		log.Fatal(err)
+		log.Fatal("Unable to construct builder using configuration:", err)
 	}
 	store := forest.NewMemoryStore()
 	history, err := readAllInto(store)
@@ -450,7 +488,7 @@ func main() {
 		historyView,
 		cv,
 		app,
-		forest.As(identity, signer),
+		builder,
 	}
 	app.SetRootWidget(hw)
 
