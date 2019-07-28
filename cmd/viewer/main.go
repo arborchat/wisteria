@@ -9,6 +9,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"path"
 	"sort"
 	"strings"
 
@@ -303,6 +304,7 @@ type HistoryWidget struct {
 	*views.CellView
 	*views.Application
 	*forest.Builder
+	*Config
 }
 
 var _ views.Widget = &HistoryWidget{}
@@ -335,9 +337,8 @@ func (v *HistoryWidget) HandleEvent(event tcell.Event) bool {
 				return false
 			}
 			file.Close()
-			editor := exec.Command("gnome-terminal", "--wait", "--", os.ExpandEnv("$EDITOR"), file.Name())
 			log.Print("starting editor")
-			if err := editor.Run(); err != nil {
+			if err := v.Config.EditFile(file.Name()).Run(); err != nil {
 				log.Println(err)
 				return false
 			}
@@ -400,6 +401,22 @@ type Config struct {
 	PGPKey string
 	// the file name of the user's arbor identity node
 	IdentityName string
+	// where to store log and profile data
+	RuntimeDirectory string
+	// The command to launch an editor for composing new messages
+	EditorCmd []string
+}
+
+func NewConfig() *Config {
+	dir, err := ioutil.TempDir("", "arbor")
+	if err != nil {
+		log.Println("Failed to create temporary runtime directory, falling back to os-global temp dir")
+		dir = os.TempDir()
+	}
+	return &Config{
+		RuntimeDirectory: dir,
+		EditorCmd:        []string{"xterm", "-e", os.ExpandEnv("$EDITOR"), "{}"},
+	}
 }
 
 // Validate errors if the configuration is invalid
@@ -411,8 +428,24 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("One of PGPUser and PGPKey must be set")
 	case c.IdentityName == "":
 		return fmt.Errorf("IdentityName must be set")
+	case len(c.EditorCmd) < 2:
+		return fmt.Errorf("Editor Command %v is impossibly short", c.EditorCmd)
 	}
 	return nil
+}
+
+// EditFile returns an exec.Cmd that will open the provided filename, edit it, and block until the
+// edit is completed.
+func (c *Config) EditFile(filename string) *exec.Cmd {
+	out := make([]string, 0, len(c.EditorCmd))
+	for _, part := range c.EditorCmd {
+		if part == "{}" {
+			out = append(out, filename)
+		} else {
+			out = append(out, part)
+		}
+	}
+	return exec.Command(out[0], out[1:]...)
 }
 
 // Builder creates a forest.Builder based on the configuration. This allows the client
@@ -445,13 +478,11 @@ func (c *Config) Builder() (*forest.Builder, error) {
 }
 
 func main() {
-	defer profile.Start().Stop()
-	config := &Config{}
-	cwd, err := os.Getwd()
-	if err != nil {
-		log.Fatal(err)
-	}
-	logFile, err := os.OpenFile("viewer.log", os.O_APPEND|os.O_RDWR|os.O_CREATE, 0660)
+	config := NewConfig()
+	defer profile.Start(profile.ProfilePath(config.RuntimeDirectory)).Stop()
+	logPath := path.Join(config.RuntimeDirectory, "viewer.log")
+	log.Println("Logging to", logPath)
+	logFile, err := os.OpenFile(logPath, os.O_APPEND|os.O_RDWR|os.O_CREATE, 0660)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -461,6 +492,9 @@ func main() {
 	flag.StringVar(&config.PGPKey, "key", "", "PGP key to sign messages with")
 	flag.StringVar(&config.IdentityName, "identity", "", "arbor identity node to sign with")
 	flag.Parse()
+	if flag.NArg() > 0 {
+		config.EditorCmd = flag.Args()
+	}
 	if err := config.Validate(); err != nil {
 		log.Fatal("Error validating configuration:", err)
 	}
@@ -489,9 +523,14 @@ func main() {
 		cv,
 		app,
 		builder,
+		config,
 	}
 	app.SetRootWidget(hw)
 
+	cwd, err := os.Getwd()
+	if err != nil {
+		log.Fatal(err)
+	}
 	if _, err := Watch(cwd, func(filename string) {
 		log.Println("Found new file", filename)
 		app.PostFunc(func() {
