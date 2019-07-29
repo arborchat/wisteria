@@ -24,6 +24,7 @@ import (
 	"git.sr.ht/~whereswaldon/forest-go/fields"
 )
 
+// save encodes the binary form of the given BinaryMarshaler into `w`
 func save(w io.Writer, node encoding.BinaryMarshaler) error {
 	b, err := node.MarshalBinary()
 	if err != nil {
@@ -33,6 +34,7 @@ func save(w io.Writer, node encoding.BinaryMarshaler) error {
 	return err
 }
 
+// saveAs stores the binary form of the given BinaryMarshaler into a new file called `name`
 func saveAs(name string, node encoding.BinaryMarshaler) error {
 	outfile, err := os.Create(name)
 	if err != nil {
@@ -44,6 +46,7 @@ func saveAs(name string, node encoding.BinaryMarshaler) error {
 	return save(outfile, node)
 }
 
+// index returns the index of `element` within `group`, or -1 if it is not present
 func index(element *fields.QualifiedHash, group []*fields.QualifiedHash) int {
 	for i, current := range group {
 		if element.Equals(current) {
@@ -53,10 +56,13 @@ func index(element *fields.QualifiedHash, group []*fields.QualifiedHash) int {
 	return -1
 }
 
+// in returns whether `element` is in `group`
 func in(element *fields.QualifiedHash, group []*fields.QualifiedHash) bool {
 	return index(element, group) >= 0
 }
 
+// nth returns the `n`th rune in the input string. Note that this is not the same as the
+// Nth byte of data, as unicode runes can take multiple bytes.
 func nth(input string, n int) rune {
 	for i, r := range input {
 		if i == n {
@@ -66,15 +72,18 @@ func nth(input string, n int) rune {
 	return '?'
 }
 
-type NodeList []*forest.Reply
+// ReplyList holds a sortable list of replies
+type ReplyList []*forest.Reply
 
-func (h NodeList) Sort() {
+func (h ReplyList) Sort() {
 	sort.SliceStable(h, func(i, j int) bool {
 		return h[i].Created < h[j].Created
 	})
 }
 
-func (h NodeList) IndexForID(id *fields.QualifiedHash) int {
+// IndexForID returns the position of the node with the given `id` inside of the ReplyList,
+// or -1 if it is not present.
+func (h ReplyList) IndexForID(id *fields.QualifiedHash) int {
 	for i, n := range h {
 		if n.ID().Equals(id) {
 			return i
@@ -83,37 +92,16 @@ func (h NodeList) IndexForID(id *fields.QualifiedHash) int {
 	return -1
 }
 
+// Archive manages a group of known arbor nodes
 type Archive struct {
-	NodeList
+	ReplyList
 	forest.Store
 }
 
-func (a *Archive) Read(r io.ReadCloser) error {
-	defer r.Close()
-	b, err := ioutil.ReadAll(r)
-	if err != nil {
-		return err
-	}
-	node, err := forest.UnmarshalBinaryNode(b)
-	if err != nil {
-		return err
-	}
-	if err := a.Store.Add(node); err != nil {
-		return err
-	}
-	if r, ok := node.(*forest.Reply); ok {
-		a.NodeList = append(a.NodeList, r)
-	}
-	return nil
-
-}
-
-func readAllInto(store forest.Store) (*Archive, error) {
-	workdir, err := os.Getwd()
-	if err != nil {
-		return nil, err
-	}
-	dir, err := os.Open(workdir)
+// NewArchiveFromDir creates an archive populated with the contents of `dirname` and
+// using `store` as the storage back-end.
+func NewArchiveFromDir(dirname string, store forest.Store) (*Archive, error) {
+	dir, err := os.Open(dirname)
 	if err != nil {
 		return nil, err
 	}
@@ -123,7 +111,7 @@ func readAllInto(store forest.Store) (*Archive, error) {
 		return nil, err
 	}
 	var nodes []*forest.Reply
-	archive := &Archive{NodeList: nodes, Store: store}
+	archive := &Archive{ReplyList: nodes, Store: store}
 	for _, name := range names {
 		nodeFile, err := os.Open(name)
 		if err != nil {
@@ -139,6 +127,29 @@ func readAllInto(store forest.Store) (*Archive, error) {
 	return archive, nil
 }
 
+// Read unmarshals a binary arbor node from `r` and stores it in the Archive. If it is
+// a Reply node, it will be added to the ReplyList
+func (a *Archive) Read(r io.ReadCloser) error {
+	defer r.Close()
+	b, err := ioutil.ReadAll(r)
+	if err != nil {
+		return err
+	}
+	node, err := forest.UnmarshalBinaryNode(b)
+	if err != nil {
+		return err
+	}
+	if err := a.Store.Add(node); err != nil {
+		return err
+	}
+	if r, ok := node.(*forest.Reply); ok {
+		a.ReplyList = append(a.ReplyList, r)
+	}
+	return nil
+
+}
+
+// AncestryOf returns the IDs of all known ancestors of the node with the given `id`
 func (v *Archive) AncestryOf(id *fields.QualifiedHash) ([]*fields.QualifiedHash, error) {
 	node, present, err := v.Store.Get(id)
 	if err != nil {
@@ -161,6 +172,7 @@ func (v *Archive) AncestryOf(id *fields.QualifiedHash) ([]*fields.QualifiedHash,
 	return ancestors, nil
 }
 
+// DescendantsOf returns the IDs of all known descendants of the node with the given `id`
 func (v *Archive) DescendantsOf(id *fields.QualifiedHash) ([]*fields.QualifiedHash, error) {
 	descendants := make([]*fields.QualifiedHash, 0)
 	directChildren := []*fields.QualifiedHash{id}
@@ -168,7 +180,7 @@ func (v *Archive) DescendantsOf(id *fields.QualifiedHash) ([]*fields.QualifiedHa
 	for len(directChildren) > 0 {
 		target := directChildren[0]
 		directChildren = directChildren[1:]
-		for _, node := range v.NodeList {
+		for _, node := range v.ReplyList {
 			if node.ParentID().Equals(target) {
 				descendants = append(descendants, node.ID())
 				directChildren = append(directChildren, node.ID())
@@ -178,33 +190,35 @@ func (v *Archive) DescendantsOf(id *fields.QualifiedHash) ([]*fields.QualifiedHa
 	return descendants, nil
 }
 
+// RenderedLine represents a single line of text in the terminal UI
 type RenderedLine struct {
 	ID    *fields.QualifiedHash
 	Style tcell.Style
 	Text  string
 }
 
-type Point struct {
-	X, Y int
-}
-
+// HistoryView models the visible contents of the chat history. It implements tcell.CellModel
 type HistoryView struct {
 	*Archive
 	rendered []RenderedLine
-	Cursor   Point
+	Cursor   struct {
+		X, Y int
+	}
 }
 
 var _ views.CellModel = &HistoryView{}
 
+// CurrentID returns the ID of the currently-selected node
 func (v *HistoryView) CurrentID() *fields.QualifiedHash {
 	if len(v.rendered) > v.Cursor.Y {
 		return v.rendered[v.Cursor.Y].ID
-	} else if len(v.Archive.NodeList) > 0 {
-		return v.Archive.NodeList[0].ID()
+	} else if len(v.Archive.ReplyList) > 0 {
+		return v.Archive.ReplyList[0].ID()
 	}
 	return fields.NullHash()
 }
 
+// CurrentReply returns the currently-selected node
 func (v *HistoryView) CurrentReply() (*forest.Reply, error) {
 	node, has, err := v.Get(v.CurrentID())
 	if err != nil {
@@ -219,6 +233,8 @@ func (v *HistoryView) CurrentReply() (*forest.Reply, error) {
 
 }
 
+// Render recomputes the contents of this view, taking any changes in the nodes in the underlying
+// Archive and position of the cursor into account.
 func (v *HistoryView) Render() error {
 	currentID := v.CurrentID()
 	currentIDText, _ := currentID.MarshalString()
@@ -234,7 +250,7 @@ func (v *HistoryView) Render() error {
 		return err
 	}
 	log.Printf("len(descendants) = %d", len(descendants))
-	for _, n := range v.NodeList {
+	for _, n := range v.ReplyList {
 		config := renderConfig{}
 		if n.ID().Equals(currentID) {
 			config.state = current
@@ -252,6 +268,7 @@ func (v *HistoryView) Render() error {
 	return nil
 }
 
+// GetCell returns the contents of a single cell of the view
 func (v *HistoryView) GetCell(x, y int) (cell rune, style tcell.Style, combining []rune, width int) {
 	cell, style, combining, width = ' ', tcell.StyleDefault, nil, 1
 	if y < len(v.rendered) && x < len(v.rendered[y].Text) {
@@ -263,6 +280,7 @@ func (v *HistoryView) GetCell(x, y int) (cell rune, style tcell.Style, combining
 	return
 }
 
+// GetBounds returns the dimensions of the view
 func (v *HistoryView) GetBounds() (int, int) {
 	width := 0
 	for _, line := range v.rendered {
@@ -274,6 +292,7 @@ func (v *HistoryView) GetBounds() (int, int) {
 	return width - 1, height - 1
 }
 
+// SetCursor warps the cursor to the given coordinates
 func (v *HistoryView) SetCursor(x, y int) {
 	v.Cursor.X = x
 	v.Cursor.Y = y
@@ -282,10 +301,12 @@ func (v *HistoryView) SetCursor(x, y int) {
 	}
 }
 
+// GetCursor returns the position of the cursor, whether it is enabled, and whether it is hidden
 func (v *HistoryView) GetCursor() (int, int, bool, bool) {
 	return v.Cursor.X, v.Cursor.Y, true, false
 }
 
+// MoveCursor moves the cursor relative to its current position
 func (v *HistoryView) MoveCursor(offx, offy int) {
 	if v.Cursor.X+offx >= 0 {
 		v.Cursor.X += offx
@@ -299,6 +320,7 @@ func (v *HistoryView) MoveCursor(offx, offy int) {
 	}
 }
 
+// HistoryWidget is the controller for the chat history TUI
 type HistoryWidget struct {
 	*HistoryView
 	*views.CellView
@@ -392,6 +414,7 @@ func (v *HistoryWidget) HandleEvent(event tcell.Event) bool {
 	return false
 }
 
+// Config holds the user's runtime configuration
 type Config struct {
 	// a PGP key ID for the user's private key that controls their arbor identity.
 	// Mutually exclusive with PGPKey
@@ -407,6 +430,8 @@ type Config struct {
 	EditorCmd []string
 }
 
+// NewConfig creates a config that is prepopulated with a runtime directory and an editor command that
+// will work on many Linux systems
 func NewConfig() *Config {
 	dir, err := ioutil.TempDir("", "arbor")
 	if err != nil {
@@ -503,7 +528,11 @@ func main() {
 		log.Fatal("Unable to construct builder using configuration:", err)
 	}
 	store := forest.NewMemoryStore()
-	history, err := readAllInto(store)
+	cwd, err := os.Getwd()
+	if err != nil {
+		log.Fatal(err)
+	}
+	history, err := NewArchiveFromDir(cwd, store)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -527,10 +556,6 @@ func main() {
 	}
 	app.SetRootWidget(hw)
 
-	cwd, err := os.Getwd()
-	if err != nil {
-		log.Fatal(err)
-	}
 	if _, err := Watch(cwd, func(filename string) {
 		log.Println("Found new file", filename)
 		app.PostFunc(func() {
@@ -562,6 +587,7 @@ func main() {
 	}
 }
 
+// Watch watches for file creation events in `dir`. It executes `handler` on each event.
 func Watch(dir string, handler func(filename string)) (*fsnotify.Watcher, error) {
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
@@ -594,6 +620,7 @@ func Watch(dir string, handler func(filename string)) (*fsnotify.Watcher, error)
 	return watcher, nil
 }
 
+// nodeState represents possible render states for nodes
 type nodeState uint
 
 const (
@@ -603,10 +630,13 @@ const (
 	current
 )
 
+// renderConfig holds information about how a particular node should be rendered
 type renderConfig struct {
 	state nodeState
 }
 
+// renderNode transforms `node` into a slice of rendered lines, using `store` to look up nodes referenced
+// by `node` and `config` to make style choices.
 func renderNode(node forest.Node, store forest.Store, config renderConfig) ([]RenderedLine, error) {
 	var (
 		ancestorColor   = tcell.StyleDefault.Foreground(tcell.ColorYellow)
@@ -652,6 +682,7 @@ func renderNode(node forest.Node, store forest.Store, config renderConfig) ([]Re
 	return out, nil
 }
 
+// stripCommentLines removes all lines in `input` that begin with "#"
 func stripCommentLines(input string) string {
 	lines := strings.Split(input, "\n")
 	out := make([]string, 0, len(lines))
