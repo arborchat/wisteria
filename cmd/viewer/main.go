@@ -340,6 +340,29 @@ type HistoryWidget struct {
 
 var _ views.Widget = &HistoryWidget{}
 
+func (v *HistoryWidget) ReadMessageFile(filename string) {
+	v.Application.PostFunc(func() {
+		file, err := os.Open(filename)
+		if err != nil {
+			log.Println(err)
+			return
+		}
+		defer file.Close()
+		err = v.Read(file)
+		if err != nil {
+			log.Println(err)
+			return
+		}
+		v.Sort()
+		err = v.Render()
+		if err != nil {
+			log.Println(err)
+			return
+		}
+		v.Application.Update()
+	})
+}
+
 func (v *HistoryWidget) HandleEvent(event tcell.Event) bool {
 	if v.CellView.HandleEvent(event) {
 		return true
@@ -565,26 +588,7 @@ func main() {
 	}
 	app.SetRootWidget(hw)
 
-	if _, err := Watch(cwd, func(filename string) {
-		log.Println("Found new file", filename)
-		app.PostFunc(func() {
-			file, err := os.Open(filename)
-			if err != nil {
-				log.Println(err)
-			}
-			defer file.Close()
-			err = historyView.Read(file)
-			if err != nil {
-				log.Println(err)
-			}
-			historyView.Sort()
-			err = historyView.Render()
-			if err != nil {
-				log.Println(err)
-			}
-			app.Update()
-		})
-	}); err != nil {
+	if _, err := Watch(cwd, hw.ReadMessageFile); err != nil {
 		log.Fatal(err)
 	} else {
 		//		defer watcher.Close()
