@@ -308,11 +308,20 @@ func (v *HistoryView) GetCursor() (int, int, bool, bool) {
 
 // MoveCursor moves the cursor relative to its current position
 func (v *HistoryView) MoveCursor(offx, offy int) {
+	w, h := v.GetBounds()
 	if v.Cursor.X+offx >= 0 {
-		v.Cursor.X += offx
+		if v.Cursor.X+offx <= w {
+			v.Cursor.X += offx
+		} else {
+			v.Cursor.X = w
+		}
 	}
 	if v.Cursor.Y+offy >= 0 {
-		v.Cursor.Y += offy
+		if v.Cursor.Y+offy <= h {
+			v.Cursor.Y += offy
+		} else {
+			v.Cursor.Y = h
+		}
 	}
 	log.Printf("Moved cursor to (%d,%d)", v.Cursor.X, v.Cursor.Y)
 	if err := v.Render(); err != nil {
