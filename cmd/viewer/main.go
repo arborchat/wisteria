@@ -1,6 +1,8 @@
 package main
 
 import (
+	"bufio"
+	"bytes"
 	"encoding"
 	"flag"
 	"fmt"
@@ -11,6 +13,7 @@ import (
 	"os/exec"
 	"path"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/fsnotify/fsnotify"
@@ -98,47 +101,53 @@ type Archive struct {
 	forest.Store
 }
 
-// NewArchiveFromDir creates an archive populated with the contents of `dirname` and
-// using `store` as the storage back-end.
-func NewArchiveFromDir(dirname string, store forest.Store) (*Archive, error) {
+// NodesFromDir reads all files in the directory and returns all of them that contained
+// arbor nodes in a slice
+func NodesFromDir(dirname string) []forest.Node {
 	dir, err := os.Open(dirname)
 	if err != nil {
-		return nil, err
+		return nil
 	}
 	defer dir.Close()
 	names, err := dir.Readdirnames(0)
 	if err != nil {
-		return nil, err
+		return nil
 	}
-	var nodes []*forest.Reply
-	archive := &Archive{ReplyList: nodes, Store: store}
+	var nodes []forest.Node
 	for _, name := range names {
-		nodeFile, err := os.Open(name)
+		b, err := ioutil.ReadFile(name)
 		if err != nil {
 			log.Println(err)
 			continue
 		}
-		err = archive.Read(nodeFile)
+		node, err := forest.UnmarshalBinaryNode(b)
 		if err != nil {
-			log.Printf("Failed parsing %s: %v", nodeFile.Name(), err)
+			log.Printf("Failed parsing %s: %v", name, err)
 			continue
+		}
+		nodes = append(nodes, node)
+	}
+	return nodes
+}
+
+// NewArchiveFromDir creates an archive populated with the contents of `dirname` and
+// using `store` as the storage back-end.
+func NewArchiveFromDir(dirname string, store forest.Store) (*Archive, error) {
+	nodes := NodesFromDir(dirname)
+	var replies []*forest.Reply
+	archive := &Archive{ReplyList: replies, Store: store}
+	for _, n := range nodes {
+		err := archive.Add(n)
+		if err != nil {
+			return nil, err
 		}
 	}
 	return archive, nil
 }
 
-// Read unmarshals a binary arbor node from `r` and stores it in the Archive. If it is
+// Add accepts an arbor node and stores it in the Archive. If it is
 // a Reply node, it will be added to the ReplyList
-func (a *Archive) Read(r io.ReadCloser) error {
-	defer r.Close()
-	b, err := ioutil.ReadAll(r)
-	if err != nil {
-		return err
-	}
-	node, err := forest.UnmarshalBinaryNode(b)
-	if err != nil {
-		return err
-	}
+func (a *Archive) Add(node forest.Node) error {
 	if err := a.Store.Add(node); err != nil {
 		return err
 	}
@@ -342,13 +351,17 @@ var _ views.Widget = &HistoryWidget{}
 
 func (v *HistoryWidget) ReadMessageFile(filename string) {
 	v.Application.PostFunc(func() {
-		file, err := os.Open(filename)
+		b, err := ioutil.ReadFile(filename)
 		if err != nil {
 			log.Println(err)
 			return
 		}
-		defer file.Close()
-		err = v.Read(file)
+		node, err := forest.UnmarshalBinaryNode(b)
+		if err != nil {
+			log.Println(err)
+			return
+		}
+		err = v.Add(node)
 		if err != nil {
 			log.Println(err)
 			return
@@ -534,6 +547,62 @@ func (c *Config) Builder() (*forest.Builder, error) {
 	return forest.As(identity, signer), nil
 }
 
+// RunWizard populates the config by asking the user for information and
+// inferring from the runtime environment
+func RunWizard(cwd string, config *Config) error {
+	in := bufio.NewReader(os.Stdin)
+	prompt := func(out string) (int, error) {
+		fmt.Print(out)
+		s, err := in.ReadString("\n"[0])
+		if err != nil {
+			return 0, err
+		}
+		index, err := strconv.Atoi(strings.TrimSuffix(s, "\n"))
+		if err != nil {
+			return 0, fmt.Errorf("Error decoding user response to integer: %v", err)
+		}
+		return index, nil
+	}
+	identities := []*forest.Identity{}
+	for _, node := range NodesFromDir(cwd) {
+		if id, ok := node.(*forest.Identity); ok {
+			identities = append(identities, id)
+		}
+	}
+	keys := make([]*openpgp.Entity, len(identities))
+	for i, id := range identities {
+		buf := bytes.NewBuffer(id.PublicKey.Blob)
+		entity, err := openpgp.ReadEntity(packet.NewReader(buf))
+		if err != nil {
+			return fmt.Errorf("Error reading public key from %v: %v", id.ID(), err)
+		}
+		keys[i] = entity
+	}
+	fmt.Println("Please choose an identity:")
+	for i, id := range identities {
+		idString, err := id.ID().MarshalString()
+		if err != nil {
+			return fmt.Errorf("Error formatting ID() into string: %v", err)
+		}
+		fmt.Printf("%4d) %16s %60s\n", i, string(id.Name.Blob), idString)
+	}
+	index, err := prompt("Your choice: ")
+	if err != nil {
+		return fmt.Errorf("Error reading user response: %v", err)
+	}
+	name, err := identities[index].ID().MarshalString()
+	if err != nil {
+		return fmt.Errorf("Error marshalling identity string: %v", err)
+	}
+	config.IdentityName = name
+	pgpIds := []string{}
+	for key := range keys[index].Identities {
+		pgpIds = append(pgpIds, key)
+	}
+	config.PGPUser = pgpIds[0]
+	return nil
+}
+
 func main() {
 	config := NewConfig()
 	defer profile.Start(profile.ProfilePath(config.RuntimeDirectory)).Stop()
@@ -552,6 +621,13 @@ func main() {
 	if flag.NArg() > 0 {
 		config.EditorCmd = flag.Args()
 	}
+	cwd, err := os.Getwd()
+	if err != nil {
+		log.Fatal(err)
+	}
+	if err := RunWizard(cwd, config); err != nil {
+		log.Fatal("Error running configuration wizard", err)
+	}
 	if err := config.Validate(); err != nil {
 		log.Fatal("Error validating configuration:", err)
 	}
@@ -560,10 +636,6 @@ func main() {
 		log.Fatal("Unable to construct builder using configuration:", err)
 	}
 	store := forest.NewMemoryStore()
-	cwd, err := os.Getwd()
-	if err != nil {
-		log.Fatal(err)
-	}
 	history, err := NewArchiveFromDir(cwd, store)
 	if err != nil {
 		log.Fatal(err)
