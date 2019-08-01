@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	forest "git.sr.ht/~whereswaldon/forest-go"
-	"git.sr.ht/~whereswaldon/forest-go/fields"
 )
 
 // ensureGPGInstalled will cause the calling test to be skipped if GPG
@@ -85,15 +84,7 @@ func TestGPGSignerAsIdentity(t *testing.T) {
 	}
 	signer, cleanup := getGPGSignerOrFail(t)
 	defer cleanup()
-	username, err := fields.NewQualifiedContent(fields.ContentTypeUTF8String, []byte("Test Name"))
-	if err != nil {
-		t.Skip("Failed to qualify username", err)
-	}
-	metadata, err := fields.NewQualifiedContent(fields.ContentTypeUTF8String, []byte{})
-	if err != nil {
-		t.Skip("Failed to qualify metadata", err)
-	}
-	identity, err := forest.NewIdentity(signer, username, metadata)
+	identity, err := forest.NewIdentity(signer, "test name", "")
 	if err != nil {
 		t.Fatal("Failed to create Identity with valid parameters", err)
 	}

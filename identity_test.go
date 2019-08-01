@@ -31,15 +31,7 @@ func MakeIdentityFromKeyOrSkip(t *testing.T, privKey, passphrase string) (*fores
 		t.Skip("Failed to create private key", err)
 	}
 	signer, err := forest.NewNativeSigner(privkey)
-	username, err := fields.NewQualifiedContent(fields.ContentTypeUTF8String, []byte("Test Name"))
-	if err != nil {
-		t.Skip("Failed to qualify username", err)
-	}
-	metadata, err := fields.NewQualifiedContent(fields.ContentTypeUTF8String, []byte{})
-	if err != nil {
-		t.Skip("Failed to qualify metadata", err)
-	}
-	identity, err := forest.NewIdentity(signer, username, metadata)
+	identity, err := forest.NewIdentity(signer, "test-username", "")
 	if err != nil {
 		t.Error("Failed to create Identity with valid parameters", err)
 	}

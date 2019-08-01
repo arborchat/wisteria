@@ -1,6 +1,7 @@
 package forest
 
 import (
+	"encoding"
 	"fmt"
 	"reflect"
 
@@ -18,8 +19,11 @@ type Node interface {
 	ID() *fields.QualifiedHash
 	ParentID() *fields.QualifiedHash
 	Equals(interface{}) bool
+	TreeDepth() fields.TreeDepth
 	ValidateShallow() error
 	ValidateDeep(Store) error
+	encoding.BinaryMarshaler
+	encoding.BinaryUnmarshaler
 }
 
 // NodeTypeOf returns the NodeType of the provided binary-marshaled node.
@@ -87,6 +91,10 @@ func (n CommonNode) ID() *fields.QualifiedHash {
 
 func (n CommonNode) ParentID() *fields.QualifiedHash {
 	return &fields.QualifiedHash{n.Parent.Descriptor, n.Parent.Blob}
+}
+
+func (n CommonNode) TreeDepth() fields.TreeDepth {
+	return n.Depth
 }
 
 // SignatureIdentityHash returns the node identitifer for the Identity that signed this node.

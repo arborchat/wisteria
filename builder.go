@@ -125,7 +125,19 @@ func (s GPGSigner) PublicKey() ([]byte, error) {
 // NewIdentity builds an Identity node for the user with the given name and metadata, using
 // the OpenPGP Entity privkey to define the Identity. That Entity must contain a
 // private key with no passphrase.
-func NewIdentity(signer Signer, name *fields.QualifiedContent, metadata *fields.QualifiedContent) (*Identity, error) {
+func NewIdentity(signer Signer, name, metadata string) (*Identity, error) {
+	qname, err := fields.NewQualifiedContent(fields.ContentTypeUTF8String, []byte(name))
+	if err != nil {
+		return nil, fmt.Errorf("Failed to create qualified content of type %d from %s", fields.ContentTypeUTF8String, name)
+	}
+	qmeta, err := fields.NewQualifiedContent(fields.ContentTypeJSON, []byte(name))
+	if err != nil {
+		return nil, fmt.Errorf("Failed to create qualified content of type %d from %s", fields.ContentTypeJSON, metadata)
+	}
+	return NewIdentityQualified(signer, qname, qmeta)
+}
+
+func NewIdentityQualified(signer Signer, name *fields.QualifiedContent, metadata *fields.QualifiedContent) (*Identity, error) {
 	// make an empty identity and populate all fields that need to be known before
 	// signing the data
 	identity := newIdentity()
@@ -198,7 +210,19 @@ func As(user *Identity, signer Signer) *Builder {
 }
 
 // NewCommunity creates a community node (signed by the given identity with the given privkey).
-func (n *Builder) NewCommunity(name *fields.QualifiedContent, metadata *fields.QualifiedContent) (*Community, error) {
+func (n *Builder) NewCommunity(name, metadata string) (*Community, error) {
+	qname, err := fields.NewQualifiedContent(fields.ContentTypeUTF8String, []byte(name))
+	if err != nil {
+		return nil, fmt.Errorf("Failed to create qualified content of type %d from %s", fields.ContentTypeUTF8String, name)
+	}
+	qmeta, err := fields.NewQualifiedContent(fields.ContentTypeJSON, []byte(name))
+	if err != nil {
+		return nil, fmt.Errorf("Failed to create qualified content of type %d from %s", fields.ContentTypeJSON, metadata)
+	}
+	return n.NewCommunityQualified(qname, qmeta)
+}
+
+func (n *Builder) NewCommunityQualified(name *fields.QualifiedContent, metadata *fields.QualifiedContent) (*Community, error) {
 	c := newCommunity()
 	c.Version = fields.CurrentVersion
 	c.Type = fields.NodeTypeCommunity
@@ -240,7 +264,19 @@ func (n *Builder) NewCommunity(name *fields.QualifiedContent, metadata *fields.Q
 }
 
 // NewReply creates a reply node as a child of the given community or reply
-func (n *Builder) NewReply(parent interface{}, content *fields.QualifiedContent, metadata *fields.QualifiedContent) (*Reply, error) {
+func (n *Builder) NewReply(parent interface{}, content, metadata string) (*Reply, error) {
+	qcontent, err := fields.NewQualifiedContent(fields.ContentTypeUTF8String, []byte(content))
+	if err != nil {
+		return nil, fmt.Errorf("Failed to create qualified content of type %d from %s", fields.ContentTypeUTF8String, content)
+	}
+	qmeta, err := fields.NewQualifiedContent(fields.ContentTypeJSON, []byte(metadata))
+	if err != nil {
+		return nil, fmt.Errorf("Failed to create qualified content of type %d from %s", fields.ContentTypeJSON, metadata)
+	}
+	return n.NewReplyQualified(parent, qcontent, qmeta)
+}
+
+func (n *Builder) NewReplyQualified(parent interface{}, content, metadata *fields.QualifiedContent) (*Reply, error) {
 	r := newReply()
 	r.Version = fields.CurrentVersion
 	r.Type = fields.NodeTypeReply

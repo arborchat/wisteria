@@ -9,9 +9,7 @@ import (
 
 func TestNewReply(t *testing.T) {
 	identity, privkey, community := MakeCommunityOrSkip(t)
-	content := QualifiedContentOrSkip(t, fields.ContentTypeUTF8String, []byte("test content"))
-	metadata := QualifiedContentOrSkip(t, fields.ContentTypeUTF8String, []byte{})
-	reply, err := forest.As(identity, privkey).NewReply(community, content, metadata)
+	reply, err := forest.As(identity, privkey).NewReply(community, "test content", "")
 	if err != nil {
 		t.Error("Failed to create reply with valid parameters", err)
 	}
@@ -28,10 +26,8 @@ func getReplyToReplyOrFail(t *testing.T) (identity1, identity2 *forest.Identity,
 	var privkey forest.Signer
 	var err error
 	identity1, privkey, community, reply1 = MakeReplyOrSkip(t)
-	content := QualifiedContentOrSkip(t, fields.ContentTypeUTF8String, []byte("other test content"))
-	metadata := QualifiedContentOrSkip(t, fields.ContentTypeUTF8String, []byte{})
 	identity2, privkey = MakeIdentityFromKeyOrSkip(t, privKey2, testKeyPassphrase)
-	reply2, err = forest.As(identity2, privkey).NewReply(reply1, content, metadata)
+	reply2, err = forest.As(identity2, privkey).NewReply(reply1, "other test content", "")
 	if err != nil {
 		t.Error("Failed to create reply with valid parameters", err)
 	}
@@ -52,9 +48,7 @@ func TestNewReplyToReply(t *testing.T) {
 
 func MakeReplyOrSkip(t *testing.T) (*forest.Identity, forest.Signer, *forest.Community, *forest.Reply) {
 	identity, privkey, community := MakeCommunityOrSkip(t)
-	content := QualifiedContentOrSkip(t, fields.ContentTypeUTF8String, []byte("test content"))
-	metadata := QualifiedContentOrSkip(t, fields.ContentTypeUTF8String, []byte{})
-	reply, err := forest.As(identity, privkey).NewReply(community, content, metadata)
+	reply, err := forest.As(identity, privkey).NewReply(community, "more test content", "")
 	if err != nil {
 		t.Error("Failed to create reply with valid parameters", err)
 	}

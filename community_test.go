@@ -9,15 +9,7 @@ import (
 
 func MakeCommunityOrSkip(t *testing.T) (*forest.Identity, forest.Signer, *forest.Community) {
 	identity, privkey := MakeIdentityOrSkip(t)
-	name, err := fields.NewQualifiedContent(fields.ContentTypeUTF8String, []byte("Test Name"))
-	if err != nil {
-		t.Skip("Failed to qualify username", err)
-	}
-	metadata, err := fields.NewQualifiedContent(fields.ContentTypeUTF8String, []byte{})
-	if err != nil {
-		t.Skip("Failed to qualify metadata", err)
-	}
-	community, err := forest.As(identity, privkey).NewCommunity(name, metadata)
+	community, err := forest.As(identity, privkey).NewCommunity("test community", "")
 	if err != nil {
 		t.Error("Failed to create Community with valid parameters", err)
 	}
