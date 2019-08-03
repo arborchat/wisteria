@@ -416,8 +416,12 @@ func (v *HistoryWidget) HandleEvent(event tcell.Event) bool {
 				log.Println(err)
 				return false
 			}
-			log.Print(string(replyContent))
-			reply, err = v.NewReply(reply, stripCommentLines(string(replyContent)), "")
+			replyContentString := strings.Trim(stripCommentLines(string(replyContent)), "\n")
+			if len(replyContentString) == 0 {
+				log.Println("Message is empty, not sending")
+				return false
+			}
+			reply, err = v.NewReply(reply, replyContentString, "")
 			if err != nil {
 				log.Println(err)
 				return false
