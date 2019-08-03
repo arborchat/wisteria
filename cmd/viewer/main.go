@@ -297,8 +297,8 @@ func (v *HistoryView) GetBounds() (int, int) {
 			width = len(line.Text)
 		}
 	}
-	height := len(v.rendered)
-	return width - 1, height - 1
+	height := len(v.rendered) + MaxEmtpyVisibleLines
+	return width, height
 }
 
 // SetCursor warps the cursor to the given coordinates
@@ -315,24 +315,25 @@ func (v *HistoryView) GetCursor() (int, int, bool, bool) {
 	return v.Cursor.X, v.Cursor.Y, true, false
 }
 
+const MaxEmtpyVisibleLines = 15
+
 // MoveCursor moves the cursor relative to its current position
 func (v *HistoryView) MoveCursor(offx, offy int) {
 	w, h := v.GetBounds()
 	if v.Cursor.X+offx >= 0 {
-		if v.Cursor.X+offx <= w {
+		if v.Cursor.X+offx < w {
 			v.Cursor.X += offx
 		} else {
-			v.Cursor.X = w
+			v.Cursor.X = w - 1
 		}
 	}
 	if v.Cursor.Y+offy >= 0 {
-		if v.Cursor.Y+offy <= h {
+		if v.Cursor.Y+offy < h {
 			v.Cursor.Y += offy
 		} else {
-			v.Cursor.Y = h
+			v.Cursor.Y = h - 1
 		}
 	}
-	log.Printf("Moved cursor to (%d,%d)", v.Cursor.X, v.Cursor.Y)
 	if err := v.Render(); err != nil {
 		log.Printf("Error during post-cursor move render: %v", err)
 	}
@@ -341,7 +342,7 @@ func (v *HistoryView) MoveCursor(offx, offy int) {
 // HistoryWidget is the controller for the chat history TUI
 type HistoryWidget struct {
 	*HistoryView
-	*views.CellView
+	*CellView
 	*views.Application
 	*forest.Builder
 	*Config
@@ -647,7 +648,7 @@ func main() {
 	if err := historyView.Render(); err != nil {
 		log.Fatal(err)
 	}
-	cv := views.NewCellView()
+	cv := NewCellView()
 	cv.SetModel(historyView)
 	cv.MakeCursorVisible()
 	app := new(views.Application)
