@@ -1,10 +1,8 @@
 package main
 
 import (
-	"encoding"
 	"flag"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"log"
 	"os"
@@ -21,54 +19,6 @@ import (
 	forest "git.sr.ht/~whereswaldon/forest-go"
 	"git.sr.ht/~whereswaldon/forest-go/fields"
 )
-
-// save encodes the binary form of the given BinaryMarshaler into `w`
-func save(w io.Writer, node encoding.BinaryMarshaler) error {
-	b, err := node.MarshalBinary()
-	if err != nil {
-		return err
-	}
-	_, err = w.Write(b)
-	return err
-}
-
-// saveAs stores the binary form of the given BinaryMarshaler into a new file called `name`
-func saveAs(name string, node encoding.BinaryMarshaler) error {
-	outfile, err := os.Create(name)
-	if err != nil {
-		return err
-	}
-	log.Printf("saving to %s", outfile.Name())
-	defer outfile.Close()
-
-	return save(outfile, node)
-}
-
-// index returns the index of `element` within `group`, or -1 if it is not present
-func index(element *fields.QualifiedHash, group []*fields.QualifiedHash) int {
-	for i, current := range group {
-		if element.Equals(current) {
-			return i
-		}
-	}
-	return -1
-}
-
-// in returns whether `element` is in `group`
-func in(element *fields.QualifiedHash, group []*fields.QualifiedHash) bool {
-	return index(element, group) >= 0
-}
-
-// nth returns the `n`th rune in the input string. Note that this is not the same as the
-// Nth byte of data, as unicode runes can take multiple bytes.
-func nth(input string, n int) rune {
-	for i, r := range input {
-		if i == n {
-			return r
-		}
-	}
-	return '?'
-}
 
 // ReplyList holds a sortable list of replies
 type ReplyList []*forest.Reply
@@ -637,16 +587,4 @@ func renderNode(node forest.Node, store forest.Store, config renderConfig) ([]Re
 		}
 	}
 	return out, nil
-}
-
-// stripCommentLines removes all lines in `input` that begin with "#"
-func stripCommentLines(input string) string {
-	lines := strings.Split(input, "\n")
-	out := make([]string, 0, len(lines))
-	for _, line := range lines {
-		if !strings.HasPrefix(line, "#") {
-			out = append(out, line)
-		}
-	}
-	return strings.Join(out, "\n")
 }
