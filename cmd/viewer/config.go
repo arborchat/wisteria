@@ -105,57 +105,105 @@ func (c *Config) Builder() (*forest.Builder, error) {
 	return forest.As(identity, signer), nil
 }
 
+// StdoutPrompter asks the user to make choices in an interactive text prompt
+type StdoutPrompter struct {
+	Out io.Writer
+	In  io.Reader
+}
+
+// Choose asks the user to choose from among a list of options. The formatter
+// function is used to display each option to the user
+func (s *StdoutPrompter) Choose(prompt string, slice []interface{}, formatter func(element interface{}) string) (choice interface{}, err error) {
+	in := bufio.NewReader(s.In)
+	success := false
+	attempts := 0
+	index := 0
+	const maxAttempts = 5
+	for !success && attempts < maxAttempts {
+		fmt.Fprintln(s.Out)
+		attempts++
+		fmt.Fprintln(s.Out, prompt)
+		for i, v := range slice {
+			fmt.Fprintf(s.Out, "\t%d) %s\n", i, formatter(v))
+		}
+		fmt.Print("Your choice: ")
+		str, err := in.ReadString("\n"[0])
+		if err != nil {
+			fmt.Fprintf(s.Out, "Error reading input: %v", err)
+			continue
+		}
+		index, err = strconv.Atoi(strings.TrimSuffix(str, "\n"))
+		if err != nil {
+			fmt.Fprintf(s.Out, "Input must be a number: %v", err)
+			continue
+		}
+		if index >= len(slice) || index < 0 {
+			fmt.Fprintf(s.Out, "Index %d is out of range", index)
+			continue
+		}
+		success = true
+	}
+	if !success {
+		return nil, fmt.Errorf("max input attempts exceeded")
+	}
+	return slice[index], nil
+}
+
+func KeyFrom(id *forest.Identity) (*openpgp.Entity, error) {
+	buf := bytes.NewBuffer(id.PublicKey.Blob)
+	entity, err := openpgp.ReadEntity(packet.NewReader(buf))
+	if err != nil {
+		return nil, fmt.Errorf("Error reading public key from %v: %v", id.ID(), err)
+	}
+	return entity, nil
+}
+
 // RunWizard populates the config by asking the user for information and
 // inferring from the runtime environment
 func RunWizard(cwd string, config *Config) error {
-	in := bufio.NewReader(os.Stdin)
-	prompt := func(out string) (int, error) {
-		fmt.Print(out)
-		s, err := in.ReadString("\n"[0])
-		if err != nil {
-			return 0, err
-		}
-		index, err := strconv.Atoi(strings.TrimSuffix(s, "\n"))
-		if err != nil {
-			return 0, fmt.Errorf("Error decoding user response to integer: %v", err)
-		}
-		return index, nil
-	}
-	identities := []*forest.Identity{}
+	identities := []interface{}{}
 	for _, node := range NodesFromDir(cwd) {
 		if id, ok := node.(*forest.Identity); ok {
 			identities = append(identities, id)
 		}
 	}
-	keys := make([]*openpgp.Entity, len(identities))
-	for i, id := range identities {
-		buf := bytes.NewBuffer(id.PublicKey.Blob)
-		entity, err := openpgp.ReadEntity(packet.NewReader(buf))
-		if err != nil {
-			return fmt.Errorf("Error reading public key from %v: %v", id.ID(), err)
+	// ensure that we have a typed nil to represent a the choice to create a new
+	// identity
+	var makeNew *forest.Identity = nil
+	identities = append(identities, makeNew)
+	prompter := &StdoutPrompter{In: os.Stdin, Out: os.Stdout}
+	choiceInterface, err := prompter.Choose("Please choose an identity:", identities, func(i interface{}) string {
+		id := i.(*forest.Identity)
+		if id == nil {
+			return "create a new identity (unimplemented)"
 		}
-		keys[i] = entity
-	}
-	fmt.Println("Please choose an identity:")
-	for i, id := range identities {
 		idString, err := id.ID().MarshalString()
 		if err != nil {
-			return fmt.Errorf("Error formatting ID() into string: %v", err)
+			return fmt.Sprintf("Error formatting ID() into string: %v", err)
 		}
-		fmt.Printf("%4d) %16s %60s\n", i, string(id.Name.Blob), idString)
-	}
-	index, err := prompt("Your choice: ")
+		return fmt.Sprintf("%-16s %60s", string(id.Name.Blob), idString)
+	})
 	if err != nil {
 		return fmt.Errorf("Error reading user response: %v", err)
 	}
-	name, err := identities[index].ID().MarshalString()
+	choice := choiceInterface.(*forest.Identity)
+	if choice == nil {
+		fmt.Println("Creating a new identity is not yet supported")
+		return fmt.Errorf("Creating a new identity is not yet supported")
+	}
+
+	name, err := choice.ID().MarshalString()
 	if err != nil {
 		return fmt.Errorf("Error marshalling identity string: %v", err)
 	}
 	config.IdentityName = name
+	key, err := KeyFrom(choice)
+	if err != nil {
+		return fmt.Errorf("Error extracting key: %v", err)
+	}
 	pgpIds := []string{}
-	for key := range keys[index].Identities {
-		pgpIds = append(pgpIds, key)
+	for keyID := range key.Identities {
+		pgpIds = append(pgpIds, keyID)
 	}
 	config.PGPUser = pgpIds[0]
 	return nil
