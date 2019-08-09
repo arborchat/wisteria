@@ -114,6 +114,9 @@ type StdoutPrompter struct {
 // Choose asks the user to choose from among a list of options. The formatter
 // function is used to display each option to the user
 func (s *StdoutPrompter) Choose(prompt string, slice []interface{}, formatter func(element interface{}) string) (choice interface{}, err error) {
+	if len(slice) < 1 {
+		return nil, fmt.Errorf("Cannot choose from empty option list")
+	}
 	in := bufio.NewReader(s.In)
 	success := false
 	attempts := 0
@@ -149,6 +152,32 @@ func (s *StdoutPrompter) Choose(prompt string, slice []interface{}, formatter fu
 	return slice[index], nil
 }
 
+func (s *StdoutPrompter) PromptLine(prompt string) (input string, err error) {
+	in := bufio.NewReader(s.In)
+	success := false
+	attempts := 0
+	const maxAttempts = 5
+	for !success && attempts < maxAttempts {
+		fmt.Fprintln(s.Out)
+		attempts++
+		fmt.Fprintln(s.Out, prompt)
+		input, err = in.ReadString("\n"[0])
+		if err != nil {
+			fmt.Fprintf(s.Out, "Error reading input: %v", err)
+			continue
+		}
+		if len(strings.TrimSpace(input)) < 1 {
+			fmt.Fprintf(s.Out, "Cannot use only whitespace")
+			continue
+		}
+		success = true
+	}
+	if !success {
+		return "", fmt.Errorf("max input attempts exceeded")
+	}
+	return input, nil
+}
+
 func KeyFrom(id *forest.Identity) (*openpgp.Entity, error) {
 	buf := bytes.NewBuffer(id.PublicKey.Blob)
 	entity, err := openpgp.ReadEntity(packet.NewReader(buf))
@@ -158,24 +187,89 @@ func KeyFrom(id *forest.Identity) (*openpgp.Entity, error) {
 	return entity, nil
 }
 
-// RunWizard populates the config by asking the user for information and
-// inferring from the runtime environment
-func RunWizard(cwd string, config *Config) error {
+func GetSecretKeys() ([]string, error) {
+	cmd := exec.Command("gpg2", "--list-secret-keys", "--with-colons")
+	out, err := cmd.StdoutPipe()
+	if err != nil {
+		return nil, fmt.Errorf("Failed to create gpg2 stdout pipe: %v", err)
+	}
+	if err := cmd.Start(); err != nil {
+		return nil, fmt.Errorf("Failed starting to list gpg2 secret keys: %v", err)
+	}
+	b, err := ioutil.ReadAll(out)
+	if err != nil {
+		return nil, fmt.Errorf("Failed reading gpg2 stdout: %v", err)
+	}
+	if err := cmd.Wait(); err != nil {
+		return nil, fmt.Errorf("Failed listing gpg2 secret keys: %v", err)
+	}
+	lines := strings.Split(string(b), "\n")
+	ids := []string{}
+	const commentPosition = 9 // the field number of the user info comment
+	for _, line := range lines {
+		if strings.HasPrefix(line, "uid") {
+			ids = append(ids, strings.Split(line, ":")[commentPosition])
+		}
+	}
+	return ids, nil
+}
+
+func ConfigureNewIdentity(config *Config) (chosen *forest.Identity, err error) {
+	prompter := &StdoutPrompter{In: os.Stdin, Out: os.Stdout}
+	secKeys, err := GetSecretKeys()
+	if err != nil {
+		return nil, fmt.Errorf("Failed to list available secret keys: %v", err)
+	}
+	asInterface := make([]interface{}, len(secKeys))
+	for i := range secKeys {
+		asInterface[i] = secKeys[i]
+	}
+	const createNewOption = "Create a new key"
+	asInterface = append(asInterface, createNewOption)
+	secKey, err := prompter.Choose("Choose a gpg private key for this identity:", asInterface, func(i interface{}) string {
+		return i.(string)
+	})
+	if secKey.(string) == createNewOption {
+		fmt.Printf("\nTo create a new key, run:\n\ngpg2 --generate-key\n\nRe-run %v when you've done that.\n", os.Args[0])
+		return nil, fmt.Errorf("Closing so that you can generate a key")
+	}
+	signer, err := forest.NewGPGSigner(secKey.(string))
+	if err != nil {
+		return nil, fmt.Errorf("Unable to construct a signer from gpg key for %s: %v", secKey, err)
+	}
+	username, err := prompter.PromptLine("Enter a username:")
+	if err != nil {
+		return nil, fmt.Errorf("Failed to get username: %v", err)
+	}
+	identity, err := forest.NewIdentity(signer, username, "")
+	if err != nil {
+		return nil, fmt.Errorf("Failed to create identity: %v", err)
+	}
+	name, err := identity.ID().MarshalString()
+	if err != nil {
+		return nil, fmt.Errorf("Error marshalling identity string: %v", err)
+	}
+	if err := saveAs(name, identity); err != nil {
+		return nil, fmt.Errorf("Error saving new identity %s: %v", name, err)
+	}
+	return identity, nil
+}
+
+func ConfigureIdentity(config *Config, cwd string) (chosen *forest.Identity, err error) {
 	identities := []interface{}{}
 	for _, node := range NodesFromDir(cwd) {
 		if id, ok := node.(*forest.Identity); ok {
 			identities = append(identities, id)
 		}
 	}
-	// ensure that we have a typed nil to represent a the choice to create a new
-	// identity
+	// ensure that we have a typed nil to represent a the choice to create a new identity
 	var makeNew *forest.Identity = nil
 	identities = append(identities, makeNew)
 	prompter := &StdoutPrompter{In: os.Stdin, Out: os.Stdout}
 	choiceInterface, err := prompter.Choose("Please choose an identity:", identities, func(i interface{}) string {
 		id := i.(*forest.Identity)
 		if id == nil {
-			return "create a new identity (unimplemented)"
+			return "create a new identity"
 		}
 		idString, err := id.ID().MarshalString()
 		if err != nil {
@@ -184,20 +278,29 @@ func RunWizard(cwd string, config *Config) error {
 		return fmt.Sprintf("%-16s %60s", string(id.Name.Blob), idString)
 	})
 	if err != nil {
-		return fmt.Errorf("Error reading user response: %v", err)
+		return nil, fmt.Errorf("Error reading user response: %v", err)
 	}
 	choice := choiceInterface.(*forest.Identity)
 	if choice == nil {
-		fmt.Println("Creating a new identity is not yet supported")
-		return fmt.Errorf("Creating a new identity is not yet supported")
+		return ConfigureNewIdentity(config)
 	}
 
 	name, err := choice.ID().MarshalString()
 	if err != nil {
-		return fmt.Errorf("Error marshalling identity string: %v", err)
+		return nil, fmt.Errorf("Error marshalling identity string: %v", err)
 	}
 	config.IdentityName = name
-	key, err := KeyFrom(choice)
+	return choice, nil
+}
+
+// RunWizard populates the config by asking the user for information and
+// inferring from the runtime environment
+func RunWizard(cwd string, config *Config) error {
+	identity, err := ConfigureIdentity(config, cwd)
+	if err != nil {
+		return fmt.Errorf("Error configuring user identity: %v", err)
+	}
+	key, err := KeyFrom(identity)
 	if err != nil {
 		return fmt.Errorf("Error extracting key: %v", err)
 	}
