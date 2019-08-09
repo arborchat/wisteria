@@ -10,6 +10,7 @@ import (
 	"path"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/fsnotify/fsnotify"
 	"github.com/gdamore/tcell"
@@ -577,7 +578,8 @@ func renderNode(node forest.Node, store forest.Store, config renderConfig) ([]Re
 		default:
 			style = tcell.StyleDefault
 		}
-		rendered := fmt.Sprintf("%s: %s", string(asIdent.Name.Blob), string(n.Content.Blob))
+		timestamp := n.Created.Time().UTC()
+		rendered := fmt.Sprintf("%s - %s:\n%s", timestamp.Format(time.Stamp), string(asIdent.Name.Blob), string(n.Content.Blob))
 		// drop all trailing newline characters
 		for rendered[len(rendered)-1] == "\n"[0] {
 			rendered = rendered[:len(rendered)-1]
@@ -589,6 +591,7 @@ func renderNode(node forest.Node, store forest.Store, config renderConfig) ([]Re
 				Text:  line,
 			})
 		}
+		out[0].Style = tcell.StyleDefault
 	}
 	return out, nil
 }
