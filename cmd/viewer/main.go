@@ -507,8 +507,12 @@ func Watch(dir string, handler func(filename string)) (*fsnotify.Watcher, error)
 				if !ok {
 					return
 				}
-				if event.Op&fsnotify.Create != 0 {
+				switch {
+				case event.Op&fsnotify.Create != 0:
 					log.Println("Got create event for", event.Name)
+					handler(event.Name)
+				case event.Op&fsnotify.Write != 0:
+					log.Println("Got write event for", event.Name)
 					handler(event.Name)
 				}
 			case err, ok := <-watcher.Errors:
