@@ -285,6 +285,12 @@ func (v *HistoryView) MoveCursor(offx, offy int) {
 	}
 }
 
+// SelectLastLine warps the cursor to the final line of rendered text
+func (v *HistoryView) SelectLastLine() {
+	_, h := v.GetBounds()
+	v.SetCursor(0, h-1-MaxEmtpyVisibleLines)
+}
+
 // HistoryWidget is the controller for the chat history TUI
 type HistoryWidget struct {
 	*HistoryView
@@ -405,6 +411,14 @@ func (v *HistoryWidget) HandleEvent(event tcell.Event) bool {
 			return false
 		}
 		switch keyEvent.Rune() {
+		case 'g':
+			v.HistoryView.SetCursor(0, 0)
+			v.MakeCursorVisible()
+			return true
+		case 'G':
+			v.SelectLastLine()
+			v.MakeCursorVisible()
+			return true
 		case 'h':
 			v.MoveCursor(-1, 0)
 			v.MakeCursorVisible()
@@ -473,6 +487,7 @@ func main() {
 	cv := NewCellView()
 	cv.SetModel(historyView)
 	cv.MakeCursorVisible()
+	historyView.SelectLastLine() // start at bottom of history
 	app := new(views.Application)
 	hw := &HistoryWidget{
 		historyView,
