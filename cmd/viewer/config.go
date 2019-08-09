@@ -166,7 +166,8 @@ func (s *StdoutPrompter) PromptLine(prompt string) (input string, err error) {
 			fmt.Fprintf(s.Out, "Error reading input: %v", err)
 			continue
 		}
-		if len(strings.TrimSpace(input)) < 1 {
+		input = strings.TrimSpace(input)
+		if len(input) < 1 {
 			fmt.Fprintf(s.Out, "Cannot use only whitespace")
 			continue
 		}
@@ -214,7 +215,7 @@ func GetSecretKeys() ([]string, error) {
 	return ids, nil
 }
 
-func ConfigureNewIdentity(config *Config) (chosen *forest.Identity, err error) {
+func MakeNewIdentity() (chosen *forest.Identity, err error) {
 	prompter := &StdoutPrompter{In: os.Stdin, Out: os.Stdout}
 	secKeys, err := GetSecretKeys()
 	if err != nil {
@@ -282,7 +283,7 @@ func ConfigureIdentity(config *Config, cwd string) (chosen *forest.Identity, err
 	}
 	choice := choiceInterface.(*forest.Identity)
 	if choice == nil {
-		return ConfigureNewIdentity(config)
+		choice, err = MakeNewIdentity()
 	}
 
 	name, err := choice.ID().MarshalString()
