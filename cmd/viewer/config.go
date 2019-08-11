@@ -26,7 +26,7 @@ type Config struct {
 	// and mutually exclusive with PGPUser
 	PGPKey string
 	// the file name of the user's arbor identity node
-	IdentityName string
+	Identity *forest.Identity
 	// where to store log and profile data
 	RuntimeDirectory string
 	// The command to launch an editor for composing new messages
@@ -54,8 +54,8 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("PGPUser and PGPKey cannot both be set")
 	case c.PGPUser == "" && c.PGPKey == "":
 		return fmt.Errorf("One of PGPUser and PGPKey must be set")
-	case c.IdentityName == "":
-		return fmt.Errorf("IdentityName must be set")
+	case c.Identity == nil:
+		return fmt.Errorf("Identity must be set")
 	case len(c.EditorCmd) < 2:
 		return fmt.Errorf("Editor Command %v is impossibly short", c.EditorCmd)
 	}
@@ -94,15 +94,7 @@ func (c *Config) Builder() (*forest.Builder, error) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	idBytes, err := ioutil.ReadFile(c.IdentityName)
-	if err != nil {
-		log.Fatal(err)
-	}
-	identity, err := forest.UnmarshalIdentity(idBytes)
-	if err != nil && err != io.EOF {
-		log.Fatal(err)
-	}
-	return forest.As(identity, signer), nil
+	return forest.As(c.Identity, signer), nil
 }
 
 // StdoutPrompter asks the user to make choices in an interactive text prompt
@@ -286,11 +278,7 @@ func ConfigureIdentity(config *Config, cwd string) (chosen *forest.Identity, err
 		choice, err = MakeNewIdentity()
 	}
 
-	name, err := choice.ID().MarshalString()
-	if err != nil {
-		return nil, fmt.Errorf("Error marshalling identity string: %v", err)
-	}
-	config.IdentityName = name
+	config.Identity = choice
 	return choice, nil
 }
 

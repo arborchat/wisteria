@@ -8,10 +8,12 @@ import (
 	"os"
 	"os/exec"
 	"path"
+	"runtime"
 	"sort"
 	"strings"
 	"time"
 
+	"github.com/0xAX/notificator"
 	"github.com/fsnotify/fsnotify"
 	"github.com/gdamore/tcell"
 	"github.com/gdamore/tcell/views"
@@ -95,7 +97,7 @@ func NewArchiveFromDir(dirname string, store forest.Store) (*Archive, error) {
 // a Reply node, it will be added to the ReplyList
 func (a *Archive) Add(node forest.Node) error {
 	if _, has, _ := a.Store.Get(node.ID()); has {
-		return nil
+		return fmt.Errorf("Archive already contains %v", node)
 	}
 	if err := a.Store.Add(node); err != nil {
 		return err
@@ -301,6 +303,7 @@ type HistoryWidget struct {
 	*views.Application
 	*forest.Builder
 	*Config
+	*notificator.Notificator
 }
 
 var _ views.Widget = &HistoryWidget{}
@@ -329,7 +332,29 @@ func (v *HistoryWidget) ReadMessageFile(filename string) {
 			return
 		}
 		v.Application.Update()
+		if reply, ok := node.(*forest.Reply); ok {
+			v.TryNotify(reply)
+		}
 	})
+}
+
+// TryNotify checks whether a desktop notification should be sent
+// and attempts to send it
+func (v *HistoryWidget) TryNotify(reply *forest.Reply) {
+	username := strings.ToLower(string(v.Config.Identity.Name.Blob))
+	messageText := strings.ToLower(string(reply.Content.Blob))
+	if !strings.Contains(messageText, username) {
+		return
+	}
+	author, has, err := v.Get(&reply.Author)
+	if err != nil {
+		log.Printf("Couldn't render desktop notification: %v", err)
+		return
+	} else if !has {
+		log.Println("Couldn't render desktop notification: author information missing")
+		return
+	}
+	log.Printf("Pushing notification: %v", v.Push("Arbor Mention from "+string(author.(*forest.Identity).Name.Blob), string(reply.Content.Blob), "", notificator.UR_NORMAL))
 }
 
 func (v *HistoryWidget) StartReply() error {
@@ -443,7 +468,17 @@ func (v *HistoryWidget) HandleEvent(event tcell.Event) bool {
 	return false
 }
 
+func CheckNotify() {
+	if runtime.GOOS == "linux" {
+		if _, err := exec.LookPath("notify-send"); err != nil {
+			log.Println("WARNING: desktop notifications require `notify-send` to be installed")
+		}
+	}
+}
+
 func main() {
+	CheckNotify()
+	var identityFile string
 	config := NewConfig()
 	defer profile.Start(profile.ProfilePath(config.RuntimeDirectory)).Stop()
 	logPath := path.Join(config.RuntimeDirectory, "viewer.log")
@@ -456,8 +491,14 @@ func main() {
 	log.SetFlags(log.Lshortfile | log.LstdFlags)
 	flag.StringVar(&config.PGPUser, "gpguser", "", "gpg user to sign new messages with")
 	flag.StringVar(&config.PGPKey, "key", "", "PGP key to sign messages with")
-	flag.StringVar(&config.IdentityName, "identity", "", "arbor identity node to sign with")
+	flag.StringVar(&identityFile, "identity", "", "arbor identity node to sign with")
 	flag.Parse()
+	b, err := ioutil.ReadFile(identityFile)
+	if err != nil {
+	}
+	config.Identity, err = forest.UnmarshalIdentity(b)
+	if err != nil {
+	}
 	if flag.NArg() > 0 {
 		config.EditorCmd = flag.Args()
 	}
@@ -465,11 +506,13 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	if err := RunWizard(cwd, config); err != nil {
-		log.Fatal("Error running configuration wizard", err)
-	}
-	if err := config.Validate(); err != nil {
-		log.Fatal("Error validating configuration:", err)
+	if config.Validate() != nil {
+		if err := RunWizard(cwd, config); err != nil {
+			log.Fatal("Error running configuration wizard", err)
+		}
+		if err := config.Validate(); err != nil {
+			log.Fatal("Error validating configuration:", err)
+		}
 	}
 	builder, err := config.Builder()
 	if err != nil {
@@ -491,6 +534,12 @@ func main() {
 	cv.SetModel(historyView)
 	cv.MakeCursorVisible()
 	historyView.SelectLastLine() // start at bottom of history
+
+	// set up desktop notifications
+	notify := notificator.New(notificator.Options{
+		AppName: "Arbor",
+	})
+
 	app := new(views.Application)
 	hw := &HistoryWidget{
 		historyView,
@@ -498,6 +547,7 @@ func main() {
 		app,
 		builder,
 		config,
+		notify,
 	}
 	app.SetRootWidget(hw)
 
