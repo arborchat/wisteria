@@ -282,6 +282,23 @@ func ConfigureIdentity(config *Config, cwd string) (chosen *forest.Identity, err
 	return choice, nil
 }
 
+func ConfigureEditor(config *Config) error {
+	editors := []interface{}{}
+	for _, ed := range FindEditors() {
+		editors = append(editors, ed)
+	}
+	prompter := &StdoutPrompter{In: os.Stdin, Out: os.Stdout}
+	choiceInterface, err := prompter.Choose("Please choose a command to edit messages with:", editors, func(i interface{}) string {
+		return strings.Join(KnownEditorCommands[i.(string)], " ")
+	})
+	if err != nil {
+		return fmt.Errorf("Error reading user response: %v", err)
+	}
+
+	config.EditorCmd = KnownEditorCommands[choiceInterface.(string)]
+	return nil
+}
+
 // RunWizard populates the config by asking the user for information and
 // inferring from the runtime environment
 func RunWizard(cwd string, config *Config) error {
@@ -298,5 +315,37 @@ func RunWizard(cwd string, config *Config) error {
 		pgpIds = append(pgpIds, keyID)
 	}
 	config.PGPUser = pgpIds[0]
+	if err := ConfigureEditor(config); err != nil {
+		return fmt.Errorf("Error configuring editor command: %v", err)
+	}
 	return nil
+}
+
+func FindEditors() []string {
+	out := []string{}
+	for term := range KnownEditorCommands {
+		if _, err := exec.LookPath(term); err == nil {
+			out = append(out, term)
+		}
+	}
+	return out
+}
+
+func ExpandAll(in []string) []string {
+	for i, s := range in {
+		in[i] = os.Expand(s, func(in string) string {
+			if val, ok := os.LookupEnv(in); !ok {
+				return fmt.Sprintf("[set $%s to use]", in)
+			} else {
+				return val
+			}
+		})
+	}
+	return in
+}
+
+var KnownEditorCommands = map[string][]string{
+	"xterm":          ExpandAll([]string{"xterm", "-e", "$EDITOR", "{}"}),
+	"gnome-terminal": ExpandAll([]string{"gnome-terminal", "--wait", "--", "$EDITOR", "{}"}),
+	"gedit":          {"gedit", "{}"},
 }
