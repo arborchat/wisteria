@@ -94,6 +94,9 @@ func NewArchiveFromDir(dirname string, store forest.Store) (*Archive, error) {
 // Add accepts an arbor node and stores it in the Archive. If it is
 // a Reply node, it will be added to the ReplyList
 func (a *Archive) Add(node forest.Node) error {
+	if _, has, _ := a.Store.Get(node.ID()); has {
+		return nil
+	}
 	if err := a.Store.Add(node); err != nil {
 		return err
 	}
