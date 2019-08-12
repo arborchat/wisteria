@@ -276,6 +276,9 @@ func ConfigureIdentity(config *Config, cwd string) (chosen *forest.Identity, err
 	choice := choiceInterface.(*forest.Identity)
 	if choice == nil {
 		choice, err = MakeNewIdentity()
+		if err != nil {
+			return nil, fmt.Errorf("Failed to create new identity: %v", err)
+		}
 	}
 
 	config.Identity = choice
