@@ -127,7 +127,7 @@ func (s *StdoutPrompter) Choose(prompt string, slice []interface{}, formatter fu
 			fmt.Fprintf(s.Out, "Error reading input: %v", err)
 			continue
 		}
-		index, err = strconv.Atoi(strings.TrimSuffix(str, "\n"))
+		index, err = strconv.Atoi(strings.ReplaceAll(strings.ReplaceAll(str, "\r", ""), "\n", ""))
 		if err != nil {
 			fmt.Fprintf(s.Out, "Input must be a number: %v", err)
 			continue
