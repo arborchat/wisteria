@@ -49,11 +49,24 @@ func (s NativeSigner) PublicKey() ([]byte, error) {
 	return keybuf.Bytes(), nil
 }
 
+// FindGPG returns the path to the local gpg executable if one can be found. Otherwise it
+// returns an error.
+func FindGPG() (path string, err error) {
+	candidates := []string{"gpg2", "gpg1", "gpg"}
+	for _, executable := range candidates {
+		if path, err := exec.LookPath(executable); err == nil {
+			return path, nil
+		}
+	}
+	return "", fmt.Errorf("None of %v are installed", candidates)
+}
+
 // GPGSigner uses a local gpg2 installation for key management. It will invoke gpg2 as a subprocess
 // to sign data and to acquire the public key for its signing key. The public fields can be used
 // to modify its behavior in order to change how it prompts for passphrases and other details.
 type GPGSigner struct {
-	GPGUserName string
+	gpgExecutable string
+	GPGUserName   string
 	// Rewriter is invoked on each invocation of exec.Command that spawns GPG. You can use it to modify
 	// flags or any other property of the subcommand (environment variables). This is especially useful
 	// to control how GPG prompts for key passphrases.
@@ -62,13 +75,20 @@ type GPGSigner struct {
 
 // NewGPGSigner wraps the private key so that it can sign using the local system's implementation of GPG.
 func NewGPGSigner(gpgUserName string) (*GPGSigner, error) {
-	return &GPGSigner{GPGUserName: gpgUserName, Rewriter: func(_ *exec.Cmd) error { return nil }}, nil
+	var err error
+	g := &GPGSigner{GPGUserName: gpgUserName, Rewriter: func(_ *exec.Cmd) error { return nil }}
+	g.gpgExecutable, err = FindGPG()
+	if err != nil {
+		return nil, fmt.Errorf("missing both gpg and gpg2, unable to create gpg signer")
+	}
+
+	return g, nil
 }
 
 // Sign invokes gpg2 to sign the data as this Signer's configured PGP user. It returns the signature or
 // an error (if any).
 func (s *GPGSigner) Sign(data []byte) ([]byte, error) {
-	gpg2 := exec.Command("gpg2", "--local-user", s.GPGUserName, "--detach-sign")
+	gpg2 := exec.Command(s.gpgExecutable, "--local-user", s.GPGUserName, "--detach-sign")
 	if err := s.Rewriter(gpg2); err != nil {
 		return nil, fmt.Errorf("Error invoking Rewrite: %v", err)
 	}

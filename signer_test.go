@@ -11,13 +11,15 @@ import (
 )
 
 // ensureGPGInstalled will cause the calling test to be skipped if GPG
-// isn't available on the system.
-func ensureGPGInstalled(t *testing.T) {
-	gpg2 := exec.Command("gpg2", "--version")
-	if err := gpg2.Run(); err != nil {
-		t.Skip("GPG2 not available", err)
+// isn't available on the system. It returns the path to the gpg executable
+// if it is available
+func ensureGPGInstalled(t *testing.T) string {
+	gpg, err := forest.FindGPG()
+	if err != nil {
+		t.Skip("GPG not available", err)
 		t.SkipNow()
 	}
+	return gpg
 }
 
 const testPassphrase = testKeyPassphrase
@@ -40,7 +42,7 @@ func TestGPGSigner(t *testing.T) {
 }
 
 func getGPGSignerOrFail(t *testing.T) (forest.Signer, func()) {
-	ensureGPGInstalled(t)
+	gpgExec := ensureGPGInstalled(t)
 
 	// generate PGP key to use
 	tempdir, err := ioutil.TempDir("", "arborchat-test")
@@ -54,7 +56,7 @@ func getGPGSignerOrFail(t *testing.T) (forest.Signer, func()) {
 	}
 
 	cleanup := func() { os.RemoveAll(tempdir) }
-	gpg2 := exec.Command("gpg2", "--yes", "--batch", "--pinentry-mode", "loopback", "--import", tempkey.Name())
+	gpg2 := exec.Command(gpgExec, "--yes", "--batch", "--pinentry-mode", "loopback", "--import", tempkey.Name())
 	gpg2.Env = []string{"GNUPGHOME=" + tempdir}
 	stderr, _ := gpg2.StderrPipe()
 	if err := gpg2.Run(); err != nil {
@@ -66,7 +68,7 @@ func getGPGSignerOrFail(t *testing.T) (forest.Signer, func()) {
 	// build signer
 	signer, err := forest.NewGPGSigner(testUsername)
 	if err != nil {
-		t.Errorf("Failed to construct signer with valid username: %v", err)
+		t.Fatalf("Failed to construct signer with valid username: %v", err)
 		cleanup()
 	}
 	signer.Rewriter = func(gpg2 *exec.Cmd) error {

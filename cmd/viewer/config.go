@@ -181,20 +181,24 @@ func KeyFrom(id *forest.Identity) (*openpgp.Entity, error) {
 }
 
 func GetSecretKeys() ([]string, error) {
-	cmd := exec.Command("gpg2", "--list-secret-keys", "--with-colons")
+	gpgCommand, err := forest.FindGPG()
+	if err != nil {
+		return nil, fmt.Errorf("Failed to find gpg installation: %v", err)
+	}
+	cmd := exec.Command(gpgCommand, "--list-secret-keys", "--with-colons")
 	out, err := cmd.StdoutPipe()
 	if err != nil {
-		return nil, fmt.Errorf("Failed to create gpg2 stdout pipe: %v", err)
+		return nil, fmt.Errorf("Failed to create gpg stdout pipe: %v", err)
 	}
 	if err := cmd.Start(); err != nil {
-		return nil, fmt.Errorf("Failed starting to list gpg2 secret keys: %v", err)
+		return nil, fmt.Errorf("Failed starting to list gpg secret keys: %v", err)
 	}
 	b, err := ioutil.ReadAll(out)
 	if err != nil {
-		return nil, fmt.Errorf("Failed reading gpg2 stdout: %v", err)
+		return nil, fmt.Errorf("Failed reading gpg stdout: %v", err)
 	}
 	if err := cmd.Wait(); err != nil {
-		return nil, fmt.Errorf("Failed listing gpg2 secret keys: %v", err)
+		return nil, fmt.Errorf("Failed listing gpg secret keys: %v", err)
 	}
 	lines := strings.Split(string(b), "\n")
 	ids := []string{}
