@@ -103,6 +103,13 @@ func Unixify(in string) string {
 	return strings.ReplaceAll(in, "\r\n", "\n")
 }
 
+// Prompter can display text to the user and can ask them to make simple choices.
+type Prompter interface {
+	Choose(prompt string, slice []interface{}, formatter func(element interface{}) string) (choice interface{}, err error)
+	PromptLine(prompt string) (input string, err error)
+	Display(message string) error
+}
+
 // StdoutPrompter asks the user to make choices in an interactive text prompt
 type StdoutPrompter struct {
 	Out io.Writer
@@ -150,6 +157,7 @@ func (s *StdoutPrompter) Choose(prompt string, slice []interface{}, formatter fu
 	return slice[index], nil
 }
 
+// PromptLine asks the user for a single line of free-form input text
 func (s *StdoutPrompter) PromptLine(prompt string) (input string, err error) {
 	in := bufio.NewReader(s.In)
 	success := false
@@ -175,6 +183,12 @@ func (s *StdoutPrompter) PromptLine(prompt string) (input string, err error) {
 		return "", fmt.Errorf("max input attempts exceeded")
 	}
 	return input, nil
+}
+
+// Display shows a message to the user
+func (s *StdoutPrompter) Display(message string) error {
+	_, err := fmt.Fprintln(s.Out, message)
+	return err
 }
 
 func KeyFrom(id *forest.Identity) (*openpgp.Entity, error) {
@@ -217,11 +231,16 @@ func GetSecretKeys() ([]string, error) {
 	return ids, nil
 }
 
-func MakeNewIdentity() (chosen *forest.Identity, err error) {
-	prompter := &StdoutPrompter{In: os.Stdin, Out: os.Stdout}
+type Wizard struct {
+	Prompter
+	*Config
+}
+
+// ConfigureNewIdentity creates a completely new identity using an existing GPG key
+func (w *Wizard) ConfigureNewIdentity() error {
 	secKeys, err := GetSecretKeys()
 	if err != nil {
-		return nil, fmt.Errorf("Failed to list available secret keys: %v", err)
+		return fmt.Errorf("Failed to list available secret keys: %v", err)
 	}
 	asInterface := make([]interface{}, len(secKeys))
 	for i := range secKeys {
@@ -229,36 +248,39 @@ func MakeNewIdentity() (chosen *forest.Identity, err error) {
 	}
 	const createNewOption = "Create a new key"
 	asInterface = append(asInterface, createNewOption)
-	secKey, err := prompter.Choose("Choose a gpg private key for this identity:", asInterface, func(i interface{}) string {
+	secKey, err := w.Choose("Choose a gpg private key for this identity:", asInterface, func(i interface{}) string {
 		return i.(string)
 	})
 	if secKey.(string) == createNewOption {
 		fmt.Printf("\nTo create a new key, run:\n\ngpg2 --generate-key\n\nRe-run %v when you've done that.\n", os.Args[0])
-		return nil, fmt.Errorf("Closing so that you can generate a key")
+		return fmt.Errorf("Closing so that you can generate a key")
 	}
 	signer, err := forest.NewGPGSigner(secKey.(string))
 	if err != nil {
-		return nil, fmt.Errorf("Unable to construct a signer from gpg key for %s: %v", secKey, err)
+		return fmt.Errorf("Unable to construct a signer from gpg key for %s: %v", secKey, err)
 	}
-	username, err := prompter.PromptLine("Enter a username:")
+	username, err := w.PromptLine("Enter a username:")
 	if err != nil {
-		return nil, fmt.Errorf("Failed to get username: %v", err)
+		return fmt.Errorf("Failed to get username: %v", err)
 	}
 	identity, err := forest.NewIdentity(signer, username, "")
 	if err != nil {
-		return nil, fmt.Errorf("Failed to create identity: %v", err)
+		return fmt.Errorf("Failed to create identity: %v", err)
 	}
 	name, err := identity.ID().MarshalString()
 	if err != nil {
-		return nil, fmt.Errorf("Error marshalling identity string: %v", err)
+		return fmt.Errorf("Error marshalling identity string: %v", err)
 	}
 	if err := saveAs(name, identity); err != nil {
-		return nil, fmt.Errorf("Error saving new identity %s: %v", name, err)
+		return fmt.Errorf("Error saving new identity %s: %v", name, err)
 	}
-	return identity, nil
+	w.Identity = identity
+	return nil
 }
 
-func ConfigureIdentity(config *Config, cwd string) (chosen *forest.Identity, err error) {
+// ConfigureIdentity sets up an identity in the Wizard's config. It creates a new one
+// if the user requests it.
+func (w *Wizard) ConfigureIdentity(cwd string) error {
 	identities := []interface{}{}
 	for _, node := range NodesFromDir(cwd) {
 		if id, ok := node.(*forest.Identity); ok {
@@ -268,8 +290,7 @@ func ConfigureIdentity(config *Config, cwd string) (chosen *forest.Identity, err
 	// ensure that we have a typed nil to represent a the choice to create a new identity
 	var makeNew *forest.Identity = nil
 	identities = append(identities, makeNew)
-	prompter := &StdoutPrompter{In: os.Stdin, Out: os.Stdout}
-	choiceInterface, err := prompter.Choose("Please choose an identity:", identities, func(i interface{}) string {
+	choiceInterface, err := w.Choose("Please choose an identity:", identities, func(i interface{}) string {
 		id := i.(*forest.Identity)
 		if id == nil {
 			return "create a new identity"
@@ -281,45 +302,43 @@ func ConfigureIdentity(config *Config, cwd string) (chosen *forest.Identity, err
 		return fmt.Sprintf("%-16s %60s", string(id.Name.Blob), idString)
 	})
 	if err != nil {
-		return nil, fmt.Errorf("Error reading user response: %v", err)
-	}
-	choice := choiceInterface.(*forest.Identity)
-	if choice == nil {
-		choice, err = MakeNewIdentity()
-		if err != nil {
-			return nil, fmt.Errorf("Failed to create new identity: %v", err)
-		}
+		return fmt.Errorf("Error reading user response: %v", err)
 	}
 
-	config.Identity = choice
-	return choice, nil
+	choice := choiceInterface.(*forest.Identity)
+	if choice != nil {
+		w.Identity = choice
+		return nil
+	}
+
+	return w.ConfigureNewIdentity()
 }
 
-func ConfigureEditor(config *Config) error {
+// ConfigureEditor walks the user through choosing an editor command for their client.
+func (w *Wizard) ConfigureEditor() error {
 	editors := []interface{}{}
 	for _, ed := range FindEditors() {
 		editors = append(editors, ed)
 	}
-	prompter := &StdoutPrompter{In: os.Stdin, Out: os.Stdout}
-	choiceInterface, err := prompter.Choose("Please choose a command to edit messages with:", editors, func(i interface{}) string {
+	choiceInterface, err := w.Choose("Please choose a command to edit messages with:", editors, func(i interface{}) string {
 		return strings.Join(KnownEditorCommands[i.(string)], " ")
 	})
 	if err != nil {
 		return fmt.Errorf("Error reading user response: %v", err)
 	}
 
-	config.EditorCmd = KnownEditorCommands[choiceInterface.(string)]
+	w.EditorCmd = KnownEditorCommands[choiceInterface.(string)]
 	return nil
 }
 
-// RunWizard populates the config by asking the user for information and
+// Run populates the config by asking the user for information and
 // inferring from the runtime environment
-func RunWizard(cwd string, config *Config) error {
-	identity, err := ConfigureIdentity(config, cwd)
+func (w *Wizard) Run(cwd string) error {
+	err := w.ConfigureIdentity(cwd)
 	if err != nil {
 		return fmt.Errorf("Error configuring user identity: %v", err)
 	}
-	key, err := KeyFrom(identity)
+	key, err := KeyFrom(w.Identity)
 	if err != nil {
 		return fmt.Errorf("Error extracting key: %v", err)
 	}
@@ -327,8 +346,8 @@ func RunWizard(cwd string, config *Config) error {
 	for keyID := range key.Identities {
 		pgpIds = append(pgpIds, keyID)
 	}
-	config.PGPUser = pgpIds[0]
-	if err := ConfigureEditor(config); err != nil {
+	w.PGPUser = pgpIds[0]
+	if err := w.ConfigureEditor(); err != nil {
 		return fmt.Errorf("Error configuring editor command: %v", err)
 	}
 	return nil

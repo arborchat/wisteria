@@ -507,7 +507,11 @@ func main() {
 		log.Fatal(err)
 	}
 	if config.Validate() != nil {
-		if err := RunWizard(cwd, config); err != nil {
+		wizard := &Wizard{
+			Config:   config,
+			Prompter: &StdoutPrompter{In: os.Stdin, Out: os.Stdout},
+		}
+		if err := wizard.Run(cwd); err != nil {
 			log.Fatal("Error running configuration wizard", err)
 		}
 		if err := config.Validate(); err != nil {
