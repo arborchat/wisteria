@@ -97,6 +97,12 @@ func (c *Config) Builder() (*forest.Builder, error) {
 	return forest.As(c.Identity, signer), nil
 }
 
+// Unixify ensures that a string contains only unix-style newlines, converting
+// windows-style ones as necessary
+func Unixify(in string) string {
+	return strings.ReplaceAll(in, "\r\n", "\n")
+}
+
 // StdoutPrompter asks the user to make choices in an interactive text prompt
 type StdoutPrompter struct {
 	Out io.Writer
@@ -127,7 +133,7 @@ func (s *StdoutPrompter) Choose(prompt string, slice []interface{}, formatter fu
 			fmt.Fprintf(s.Out, "Error reading input: %v", err)
 			continue
 		}
-		index, err = strconv.Atoi(strings.ReplaceAll(strings.ReplaceAll(str, "\r", ""), "\n", ""))
+		index, err = strconv.Atoi(strings.ReplaceAll(Unixify(str), "\n", ""))
 		if err != nil {
 			fmt.Fprintf(s.Out, "Input must be a number: %v", err)
 			continue
