@@ -251,8 +251,13 @@ func (w *Wizard) ConfigureNewIdentity() error {
 	secKey, err := w.Choose("Choose a gpg private key for this identity:", asInterface, func(i interface{}) string {
 		return i.(string)
 	})
+	gpgPath, err := forest.FindGPG()
+	if err != nil {
+		w.Display(installGPGMessage)
+		return fmt.Errorf("Failed finding gpg installation: %v", err)
+	}
 	if secKey.(string) == createNewOption {
-		fmt.Printf("\nTo create a new key, run:\n\ngpg2 --generate-key\n\nRe-run %v when you've done that.\n", os.Args[0])
+		w.Display(fmt.Sprintf("\nTo create a new key, run:\n\n%s --generate-key\n\nRe-run %v when you've done that.\n", gpgPath, os.Args[0]))
 		return fmt.Errorf("Closing so that you can generate a key")
 	}
 	signer, err := forest.NewGPGSigner(secKey.(string))
@@ -331,12 +336,14 @@ func (w *Wizard) ConfigureEditor() error {
 	return nil
 }
 
+const installGPGMessage = "This program requires GPG to run. Please install GPG and restart. https://gnupg.org/"
+
 // Run populates the config by asking the user for information and
 // inferring from the runtime environment
 func (w *Wizard) Run(cwd string) error {
 	_, err := forest.FindGPG()
 	if err != nil {
-		w.Display("This program requires GPG to run. Please install GPG and restart. https://gnupg.org/")
+		w.Display(installGPGMessage)
 		return fmt.Errorf("Cannot configure without GPG: %v", err)
 	}
 	err = w.ConfigureIdentity(cwd)
