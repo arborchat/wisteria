@@ -380,4 +380,5 @@ var KnownEditorCommands = map[string][]string{
 	"xterm":          ExpandAll([]string{"xterm", "-e", "$EDITOR", "{}"}),
 	"gnome-terminal": ExpandAll([]string{"gnome-terminal", "--wait", "--", "$EDITOR", "{}"}),
 	"gedit":          {"gedit", "{}"},
+	"notepad":        {"notepad", "{}"},
 }
