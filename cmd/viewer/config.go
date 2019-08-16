@@ -2,7 +2,6 @@ package main
 
 import (
 	"bufio"
-	"bytes"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -191,15 +190,6 @@ func (s *StdoutPrompter) Display(message string) error {
 	return err
 }
 
-func KeyFrom(id *forest.Identity) (*openpgp.Entity, error) {
-	buf := bytes.NewBuffer(id.PublicKey.Blob)
-	entity, err := openpgp.ReadEntity(packet.NewReader(buf))
-	if err != nil {
-		return nil, fmt.Errorf("Error reading public key from %v: %v", id.ID(), err)
-	}
-	return entity, nil
-}
-
 func GetSecretKeys() ([]string, error) {
 	gpgCommand, err := forest.FindGPG()
 	if err != nil {
@@ -350,7 +340,7 @@ func (w *Wizard) Run(cwd string) error {
 	if err != nil {
 		return fmt.Errorf("Error configuring user identity: %v", err)
 	}
-	key, err := KeyFrom(w.Identity)
+	key, err := w.Identity.PublicKey.AsEntity()
 	if err != nil {
 		return fmt.Errorf("Error extracting key: %v", err)
 	}

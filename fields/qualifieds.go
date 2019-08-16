@@ -7,6 +7,8 @@ import (
 	"reflect"
 
 	"git.sr.ht/~whereswaldon/forest-go/serialize"
+	"golang.org/x/crypto/openpgp"
+	"golang.org/x/crypto/openpgp/packet"
 )
 
 const minSizeofQualified = sizeofDescriptor
@@ -195,6 +197,15 @@ func (q *QualifiedKey) Validate() error {
 		return fmt.Errorf("Descriptor length %d does not match value length %d", q.Descriptor.Length, len(q.Blob))
 	}
 	return nil
+}
+
+func (q *QualifiedKey) AsEntity() (*openpgp.Entity, error) {
+	buf := bytes.NewBuffer(q.Blob)
+	entity, err := openpgp.ReadEntity(packet.NewReader(buf))
+	if err != nil {
+		return nil, fmt.Errorf("Error reading public key: %v", err)
+	}
+	return entity, nil
 }
 
 type QualifiedSignature struct {
