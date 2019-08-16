@@ -334,7 +334,12 @@ func (w *Wizard) ConfigureEditor() error {
 // Run populates the config by asking the user for information and
 // inferring from the runtime environment
 func (w *Wizard) Run(cwd string) error {
-	err := w.ConfigureIdentity(cwd)
+	_, err := forest.FindGPG()
+	if err != nil {
+		w.Display("This program requires GPG to run. Please install GPG and restart. https://gnupg.org/")
+		return fmt.Errorf("Cannot configure without GPG: %v", err)
+	}
+	err = w.ConfigureIdentity(cwd)
 	if err != nil {
 		return fmt.Errorf("Error configuring user identity: %v", err)
 	}
