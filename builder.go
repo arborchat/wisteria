@@ -121,7 +121,7 @@ func (s *GPGSigner) Sign(data []byte) ([]byte, error) {
 
 // PublicKey returns the bytes of the OpenPGP public key used by this signer.
 func (s GPGSigner) PublicKey() ([]byte, error) {
-	gpg2 := exec.Command("gpg2", "--export", s.GPGUserName)
+	gpg2 := exec.Command(s.gpgExecutable, "--export", s.GPGUserName)
 	if err := s.Rewriter(gpg2); err != nil {
 		return nil, fmt.Errorf("Error invoking Rewrite: %v", err)
 	}
