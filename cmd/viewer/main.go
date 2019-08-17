@@ -623,9 +623,10 @@ type renderConfig struct {
 // by `node` and `config` to make style choices.
 func renderNode(node forest.Node, store forest.Store, config renderConfig) ([]RenderedLine, error) {
 	var (
-		ancestorColor   = tcell.StyleDefault.Foreground(tcell.ColorYellow)
-		descendantColor = tcell.StyleDefault.Foreground(tcell.ColorGreen)
-		currentColor    = tcell.StyleDefault.Foreground(tcell.ColorRed)
+		ancestorColor         = tcell.StyleDefault.Foreground(tcell.ColorYellow)
+		descendantColor       = tcell.StyleDefault.Foreground(tcell.ColorGreen)
+		currentColor          = tcell.StyleDefault.Foreground(tcell.ColorRed)
+		conversationRootColor = tcell.StyleDefault.Foreground(tcell.ColorTeal)
 	)
 	idstring, _ := node.ID().MarshalString()
 	log.Printf("%s => %d", idstring, config.state)
@@ -663,7 +664,11 @@ func renderNode(node forest.Node, store forest.Store, config renderConfig) ([]Re
 				Text:  line,
 			})
 		}
-		out[0].Style = tcell.StyleDefault
+		if n.Depth == 1 {
+			out[0].Style = conversationRootColor
+		} else {
+			out[0].Style = tcell.StyleDefault
+		}
 	}
 	return out, nil
 }
