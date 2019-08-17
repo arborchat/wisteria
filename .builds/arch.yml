@@ -4,7 +4,7 @@ packages:
 sources:
   - https://git.sr.ht/~whereswaldon/forest-go
 environment:
-  oses: '"linux darwin openbsd freebsd netbsd windows"'
+  oses: 'linux darwin openbsd freebsd netbsd windows'
   github_mirror_url: "git@github.com:arborchat/forest-go.git"
 secrets:
   - 08901094-23ba-4278-8b09-a02b7df36f52
