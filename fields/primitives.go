@@ -71,8 +71,18 @@ func (c ContentLength) MarshalBinary() ([]byte, error) {
 	return b.Bytes(), err
 }
 
+const contentLengthTextFormat = "B%d"
+
 func (c ContentLength) MarshalText() ([]byte, error) {
-	return []byte(fmt.Sprintf("B%d", c)), nil
+	return []byte(fmt.Sprintf(contentLengthTextFormat, c)), nil
+}
+
+func (c ContentLength) UnmarshalText(b []byte) error {
+	_, err := fmt.Sscanf(string(b), contentLengthTextFormat, &c)
+	if err != nil {
+		return fmt.Errorf("failed unmarshalling content length: %v", err)
+	}
+	return nil
 }
 
 // UnmarshalBinary converts from the binary representation of a ContentLength
@@ -132,6 +142,17 @@ func (v Blob) MarshalBinary() ([]byte, error) {
 func (v Blob) MarshalText() ([]byte, error) {
 	based := base64.RawURLEncoding.EncodeToString([]byte(v))
 	return []byte(based), nil
+}
+
+func (v Blob) UnmarshalText(b []byte) error {
+	if []byte(v) == nil {
+		v = make([]byte, base64.RawURLEncoding.DecodedLen(len(b)))
+	}
+	_, err := base64.RawURLEncoding.Decode(v, b)
+	if err != nil {
+		return fmt.Errorf("failed decoding blob: %v", err)
+	}
+	return nil
 }
 
 // UnmarshalBinary converts from the binary representation of a Blob
@@ -300,6 +321,16 @@ func (t HashType) MarshalBinary() ([]byte, error) {
 
 func (t HashType) MarshalText() ([]byte, error) {
 	return []byte(hashNames[t]), nil
+}
+
+func (t *HashType) UnmarshalText(b []byte) error {
+	for hashType, hashName := range hashNames {
+		if hashName == string(b) {
+			*t = hashType
+			return nil
+		}
+	}
+	return fmt.Errorf("no such hash type %s", string(b))
 }
 
 func (t *HashType) UnmarshalBinary(b []byte) error {

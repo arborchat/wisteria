@@ -21,6 +21,8 @@ type QualifiedHash struct {
 
 const minSizeofQualifiedHash = sizeofHashDescriptor
 
+const qualifiedTextSeparator = "__"
+
 func marshalTextQualified(first, second encoding.TextMarshaler) ([]byte, error) {
 	buf := new(bytes.Buffer)
 	b, err := first.MarshalText()
@@ -28,7 +30,7 @@ func marshalTextQualified(first, second encoding.TextMarshaler) ([]byte, error) 
 		return nil, err
 	}
 	_, _ = buf.Write(b)
-	_, _ = buf.Write([]byte("__"))
+	_, _ = buf.Write([]byte(qualifiedTextSeparator))
 	b, err = second.MarshalText()
 	if err != nil {
 		return nil, err
@@ -74,6 +76,10 @@ func (q *QualifiedHash) Equals(other *QualifiedHash) bool {
 
 func (q *QualifiedHash) MarshalText() ([]byte, error) {
 	return marshalTextQualified(&q.Descriptor, q.Blob)
+}
+
+func (q *QualifiedHash) UnmarshalText(b []byte) error {
+	return unmarshalTextDelimited(b, qualifiedTextSeparator, &q.Descriptor, &q.Blob)
 }
 
 func (q *QualifiedHash) MarshalString() (string, error) {

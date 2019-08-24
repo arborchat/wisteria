@@ -4,9 +4,12 @@ import (
 	"bytes"
 	"encoding"
 	"fmt"
+	"strings"
 )
 
 const sizeofDescriptor = sizeofgenericType + sizeofContentLength
+
+const descriptorTextSeparator = "_"
 
 func marshalTextDescriptor(descriptorType encoding.TextMarshaler, length encoding.TextMarshaler) ([]byte, error) {
 	buf := new(bytes.Buffer)
@@ -15,13 +18,27 @@ func marshalTextDescriptor(descriptorType encoding.TextMarshaler, length encodin
 		return nil, err
 	}
 	_, _ = buf.Write(b)
-	_, _ = buf.Write([]byte("_"))
+	_, _ = buf.Write([]byte(descriptorTextSeparator))
 	b, err = length.MarshalText()
 	if err != nil {
 		return nil, err
 	}
 	_, _ = buf.Write(b)
 	return buf.Bytes(), nil
+}
+
+func unmarshalTextDelimited(b []byte, delimiter string, descriptorType, length encoding.TextUnmarshaler) error {
+	parts := strings.Split(string(b), delimiter)
+	if len(parts) < 2 {
+		return fmt.Errorf("too few \"%s\"-delimited parts (expected %d, got %d)", descriptorTextSeparator, 2, len(parts))
+	}
+	if err := descriptorType.UnmarshalText([]byte(parts[0])); err != nil {
+		return fmt.Errorf("failed unmarshaling descriptor type: %v", err)
+	}
+	if err := length.UnmarshalText([]byte(parts[1])); err != nil {
+		return fmt.Errorf("failed unmarshaling descriptor length: %v", err)
+	}
+	return nil
 }
 
 // concrete descriptors
@@ -48,6 +65,9 @@ func (d *HashDescriptor) MarshalText() ([]byte, error) {
 	return marshalTextDescriptor(d.Type, d.Length)
 }
 
+func (d *HashDescriptor) UnmarshalText(b []byte) error {
+	return unmarshalTextDelimited(b, descriptorTextSeparator, &d.Type, &d.Length)
+}
 func (d *HashDescriptor) Validate() error {
 	validLengths, validType := ValidHashTypes[d.Type]
 	if !validType {
