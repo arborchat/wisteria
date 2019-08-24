@@ -77,8 +77,8 @@ func (c ContentLength) MarshalText() ([]byte, error) {
 	return []byte(fmt.Sprintf(contentLengthTextFormat, c)), nil
 }
 
-func (c ContentLength) UnmarshalText(b []byte) error {
-	_, err := fmt.Sscanf(string(b), contentLengthTextFormat, &c)
+func (c *ContentLength) UnmarshalText(b []byte) error {
+	_, err := fmt.Sscanf(string(b), contentLengthTextFormat, c)
 	if err != nil {
 		return fmt.Errorf("failed unmarshalling content length: %v", err)
 	}
@@ -144,11 +144,11 @@ func (v Blob) MarshalText() ([]byte, error) {
 	return []byte(based), nil
 }
 
-func (v Blob) UnmarshalText(b []byte) error {
-	if []byte(v) == nil {
-		v = make([]byte, base64.RawURLEncoding.DecodedLen(len(b)))
+func (v *Blob) UnmarshalText(b []byte) error {
+	if []byte(*v) == nil {
+		*v = make([]byte, base64.RawURLEncoding.DecodedLen(len(b)))
 	}
-	_, err := base64.RawURLEncoding.Decode(v, b)
+	_, err := base64.RawURLEncoding.Decode(*v, b)
 	if err != nil {
 		return fmt.Errorf("failed decoding blob: %v", err)
 	}
