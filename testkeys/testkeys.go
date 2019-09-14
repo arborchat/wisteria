@@ -1,64 +1,50 @@
-package forest_test
+/*
+Package testkeys provides PGP private keys SUITABLE ONLY FOR WRITING TEST CASES.
+DO NOT IMPORT THESE KEYS FOR ANY OTHER PURPOSE. THEY ARE UTTERLY INSECURE.
+*/
+package testkeys
 
 import (
+	"bytes"
 	"testing"
 
-	forest "git.sr.ht/~whereswaldon/forest-go"
-	"git.sr.ht/~whereswaldon/forest-go/fields"
-	"git.sr.ht/~whereswaldon/forest-go/testkeys"
+	"git.sr.ht/~whereswaldon/forest-go"
+	"golang.org/x/crypto/openpgp"
 )
 
-func MakeIdentityFromKeyOrSkip(t *testing.T, privKey, passphrase string) (*forest.Identity, forest.Signer) {
-	signer := testkeys.Signer(t, privKey)
-	identity, err := forest.NewIdentity(signer, "test-username", "")
+// getKey can be used to acquire a test PGP private key ONLY FOR USE IN TEST CASES.
+// Pass in the constants defined in this package to get a key.
+func getKey(privKey, passphrase string) (*openpgp.Entity, error) {
+	privKeyBuf := bytes.NewBuffer([]byte(privKey))
+	keyEntities, err := openpgp.ReadArmoredKeyRing(privKeyBuf)
 	if err != nil {
-		t.Error("Failed to create Identity with valid parameters", err)
+		return nil, err
 	}
-	return identity, signer
+
+	keyEntity := keyEntities[0]
+
+	if keyEntity.PrivateKey.Encrypted {
+		_ = keyEntity.PrivateKey.Decrypt([]byte(passphrase))
+	}
+
+	return keyEntity, nil
 }
 
-func MakeIdentityOrSkip(t *testing.T) (*forest.Identity, forest.Signer) {
-	return MakeIdentityFromKeyOrSkip(t, privKey1, testKeyPassphrase)
-}
-
-func TestIdentityValidatesSelf(t *testing.T) {
-	identity, _ := MakeIdentityOrSkip(t)
-	if correct, err := forest.ValidateID(identity, *identity.ID()); err != nil || !correct {
-		t.Error("ID validation failed on unmodified node", err)
-	}
-	if correct, err := forest.ValidateSignature(identity, identity); err != nil || !correct {
-		t.Error("Signature validation failed on unmodified node", err)
-	}
-}
-
-func TestIdentityValidationFailsWhenTampered(t *testing.T) {
-	identity, _ := MakeIdentityOrSkip(t)
-	identity.Name.Blob = fields.Blob([]byte("whatever"))
-	if correct, err := forest.ValidateID(identity, *identity.ID()); err == nil && correct {
-		t.Error("ID validation succeeded on modified node", err)
-	}
-	if correct, err := forest.ValidateSignature(identity, identity); err == nil && correct {
-		t.Error("Signature validation succeeded on modified node", err)
-	}
-}
-
-func TestIdentitySerialize(t *testing.T) {
-	identity, _ := MakeIdentityOrSkip(t)
-	buf, err := identity.MarshalBinary()
+// Signer creates a signer suitable ONLY FOR USE IN TEST CASES.
+func Signer(t *testing.T, privKey string) forest.Signer {
+	privkey, err := getKey(privKey, testKeyPassphrase)
 	if err != nil {
-		t.Error("Failed to serialize identity", err)
+		t.Skip("Failed to create private key", err)
 	}
-	id2, err := forest.UnmarshalIdentity(buf)
+	signer, err := forest.NewNativeSigner(privkey)
 	if err != nil {
-		t.Error("Failed to deserialize identity", err)
+		t.Error("Failed to create signer with valid parameters", err)
 	}
-	if !identity.Equals(id2) {
-		t.Errorf("Deserialized identity should be the same as what went in, expected %v, got %v", identity, id2)
-	}
+	return signer
 }
 
 const testKeyPassphrase = "pleasedonotusethisasapassword"
-const privKey1 = `-----BEGIN PGP PRIVATE KEY BLOCK-----
+const PrivKey1 = `-----BEGIN PGP PRIVATE KEY BLOCK-----
 
 lQPGBF0VVHoBCAC0cCCvM0O2IwlNBMIqA53h9t3YU9BcbDYCTGx0tmkNmBW6hoQ9
 MXHTly+5rkyDKUptEg9s46rLZlQ7esLbSMni+7dMM9pVFyPNWIjbO8U2FoGuKpUh
@@ -119,7 +105,7 @@ LPMVs+cyXrCxG6HDCOQ=
 =x5Z7
 -----END PGP PRIVATE KEY BLOCK-----`
 
-const privKey2 = `-----BEGIN PGP PRIVATE KEY BLOCK-----
+const PrivKey2 = `-----BEGIN PGP PRIVATE KEY BLOCK-----
 
 lQPGBF0VcH8BCADAfingc7lrKBXEZDWH2e+J93zUbpdxMgET/KDK8XaIRXxZjsVw
 xisvjT1p+UJepQ58AHtb2zEDf6/FWTy89pMEi8dAe5dRtoBY2s3fPKc/oIHHRfbr

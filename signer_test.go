@@ -1,7 +1,6 @@
 package forest_test
 
 import (
-	"encoding/base64"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -37,8 +36,9 @@ func TestGPGSigner(t *testing.T) {
 	signature, err := signer.Sign([]byte(testData))
 	if err != nil {
 		t.Errorf("Failed sign data: %v", err)
+	} else if len(signature) < 1 {
+		t.Errorf("Signing produced empty signature")
 	}
-	t.Logf("data: %s\nsignature %s", testData, base64.StdEncoding.EncodeToString(signature))
 }
 
 func getGPGSignerOrFail(t *testing.T) (forest.Signer, func()) {
