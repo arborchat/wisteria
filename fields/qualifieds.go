@@ -106,11 +106,11 @@ const minSizeofQualifiedContent = sizeofContentDescriptor
 
 // NewQualifiedContent returns a valid QualifiedContent from the given data
 func NewQualifiedContent(t ContentType, content []byte) (*QualifiedContent, error) {
-	hd, err := NewContentDescriptor(t, len(content))
+	cd, err := NewContentDescriptor(t, len(content))
 	if err != nil {
 		return nil, err
 	}
-	return &QualifiedContent{*hd, Blob(content)}, nil
+	return &QualifiedContent{*cd, Blob(content)}, nil
 }
 
 func (q *QualifiedContent) Equals(other *QualifiedContent) bool {
@@ -168,11 +168,11 @@ const minSizeofQualifiedKey = sizeofKeyDescriptor
 
 // NewQualifiedKey returns a valid QualifiedKey from the given data
 func NewQualifiedKey(t KeyType, content []byte) (*QualifiedKey, error) {
-	hd, err := NewKeyDescriptor(t, len(content))
+	kd, err := NewKeyDescriptor(t, len(content))
 	if err != nil {
 		return nil, err
 	}
-	return &QualifiedKey{*hd, Blob(content)}, nil
+	return &QualifiedKey{*kd, Blob(content)}, nil
 }
 
 func (q *QualifiedKey) Equals(other *QualifiedKey) bool {
@@ -223,11 +223,11 @@ const minSizeofQualifiedSignature = sizeofSignatureDescriptor
 
 // NewQualifiedSignature returns a valid QualifiedSignature from the given data
 func NewQualifiedSignature(t SignatureType, content []byte) (*QualifiedSignature, error) {
-	hd, err := NewSignatureDescriptor(t, len(content))
+	sd, err := NewSignatureDescriptor(t, len(content))
 	if err != nil {
 		return nil, err
 	}
-	return &QualifiedSignature{*hd, Blob(content)}, nil
+	return &QualifiedSignature{*sd, Blob(content)}, nil
 }
 
 func (q *QualifiedSignature) Equals(other *QualifiedSignature) bool {
