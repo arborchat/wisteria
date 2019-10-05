@@ -150,20 +150,7 @@ func (m *CacheStore) Size() (int, error) {
 // If the cache is missed by the backing store is hit, the node will automatically be
 // added to the cache.
 func (m *CacheStore) Get(id *fields.QualifiedHash) (Node, bool, error) {
-	if node, has, err := m.Cache.Get(id); err != nil {
-		return nil, false, err
-	} else if has {
-		return node, has, nil
-	}
-	if node, has, err := m.Back.Get(id); err != nil {
-		return nil, false, err
-	} else if has {
-		if err := m.Cache.Add(node); err != nil {
-			return nil, false, err
-		}
-		return node, has, nil
-	}
-	return nil, false, nil
+	return m.getUsingFuncs(id, m.Cache.Get, m.Back.Get)
 }
 
 func (m *CacheStore) CopyInto(other Store) error {
@@ -179,4 +166,56 @@ func (m *CacheStore) Add(node Node) error {
 		return err
 	}
 	return nil
+}
+
+func (m *CacheStore) getUsingFuncs(id *fields.QualifiedHash, getter1, getter2 func(*fields.QualifiedHash) (Node, bool, error)) (Node, bool, error) {
+	cacheNode, inCache, err := getter1(id)
+	if err != nil {
+		return nil, false, fmt.Errorf("failed fetching id from cache: %w", err)
+	}
+	if inCache {
+		return cacheNode, inCache, err
+	}
+	backNode, inBackingStore, err := getter2(id)
+	if err != nil {
+		return nil, false, fmt.Errorf("failed fetching id from cache: %w", err)
+	}
+	if inBackingStore {
+		if err := m.Cache.Add(backNode); err != nil {
+			return nil, false, fmt.Errorf("failed to up-propagate node into cache: %w", err)
+		}
+	}
+	return backNode, inBackingStore, err
+}
+
+func (m *CacheStore) GetIdentity(id *fields.QualifiedHash) (Node, bool, error) {
+	return m.getUsingFuncs(id, m.Cache.GetIdentity, m.Back.GetIdentity)
+}
+
+func (m *CacheStore) GetCommunity(id *fields.QualifiedHash) (Node, bool, error) {
+	return m.getUsingFuncs(id, m.Cache.GetCommunity, m.Back.GetCommunity)
+}
+
+func (m *CacheStore) GetConversation(communityID, conversationID *fields.QualifiedHash) (Node, bool, error) {
+	return m.getUsingFuncs(communityID, // this id is irrelevant
+		func(*fields.QualifiedHash) (Node, bool, error) {
+			return m.Cache.GetConversation(communityID, conversationID)
+		},
+		func(*fields.QualifiedHash) (Node, bool, error) {
+			return m.Back.GetConversation(communityID, conversationID)
+		})
+}
+
+func (m *CacheStore) GetReply(communityID, conversationID, replyID *fields.QualifiedHash) (Node, bool, error) {
+	return m.getUsingFuncs(communityID, // this id is irrelevant
+		func(*fields.QualifiedHash) (Node, bool, error) {
+			return m.Cache.GetReply(communityID, conversationID, replyID)
+		},
+		func(*fields.QualifiedHash) (Node, bool, error) {
+			return m.Back.GetReply(communityID, conversationID, replyID)
+		})
+}
+
+func (m *CacheStore) Children(id *fields.QualifiedHash) ([]*fields.QualifiedHash, error) {
+	return m.Back.Children(id)
 }
