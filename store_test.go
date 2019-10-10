@@ -84,7 +84,7 @@ func testStandardStoreInterface(t *testing.T, s forest.Store, storeImplName stri
 		}
 	}
 
-    // map nodes to the children that they ought to have within the store
+	// map nodes to the children that they ought to have within the store
 	nodesToChildren := []struct {
 		forest.Node
 		children []*fields.QualifiedHash
@@ -94,7 +94,7 @@ func testStandardStoreInterface(t *testing.T, s forest.Store, storeImplName stri
 		{reply, []*fields.QualifiedHash{}},
 	}
 
-    // check each node has its proper children
+	// check each node has its proper children
 	for _, childConfig := range nodesToChildren {
 		if children, err := s.Children(childConfig.ID()); err != nil {
 			t.Errorf("%s should not error fetching children of %v", storeImplName, childConfig.ID())
@@ -104,6 +104,51 @@ func testStandardStoreInterface(t *testing.T, s forest.Store, storeImplName stri
 					t.Errorf("%s should have %v as a child of %v", storeImplName, child, childConfig.ID())
 				}
 			}
+		}
+	}
+
+	// add some more nodes so that we can test the Recent method
+	identity2, _, community2, reply2 := MakeReplyOrSkip(t)
+	for _, i := range []forest.Node{identity2, community2, reply2} {
+		if err := s.Add(i); err != nil {
+			t.Errorf("%s Add() should not err on Add(): %s", storeImplName, err)
+		}
+	}
+	// try recent on each node type and ensure that it returns the right
+	// number and order of results
+	type recentRun struct {
+		fields.NodeType
+		atZero forest.Node
+		atOne  forest.Node
+	}
+	for _, run := range []recentRun{
+		{fields.NodeTypeIdentity, identity2, identity},
+		{fields.NodeTypeCommunity, community2, community},
+		{fields.NodeTypeReply, reply2, reply},
+	} {
+		recentNodes, err := s.Recent(run.NodeType, 1)
+		if err != nil {
+			t.Errorf("Recent failed on valid input: %v", err)
+		} else if len(recentNodes) < 1 {
+			t.Errorf("Recent on store with data returned too few results")
+		} else if !recentNodes[0].Equals(run.atZero) {
+			t.Errorf("Expected most recent node to be the newly created one")
+		}
+		recentNodes, err = s.Recent(run.NodeType, 2)
+		if err != nil {
+			t.Errorf("Recent failed on valid input: %v", err)
+		} else if len(recentNodes) < 2 {
+			t.Errorf("Recent on store with data returned too few results")
+		} else if !recentNodes[0].Equals(run.atZero) {
+			t.Errorf("Expected most recent node to be the newly created one")
+		} else if !recentNodes[1].Equals(run.atOne) {
+			t.Errorf("Expected first node to be the older one")
+		}
+		recentNodes, err = s.Recent(run.NodeType, 3)
+		if err != nil {
+			t.Errorf("Recent failed on valid input: %v", err)
+		} else if len(recentNodes) > 2 {
+			t.Errorf("Recent on store with only two matching nodes returned more than 2 results")
 		}
 	}
 }

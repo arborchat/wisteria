@@ -2,6 +2,7 @@ package forest
 
 import (
 	"fmt"
+	"sort"
 
 	"git.sr.ht/~whereswaldon/forest-go/fields"
 )
@@ -15,6 +16,7 @@ type Store interface {
 	GetConversation(communityID, conversationID *fields.QualifiedHash) (Node, bool, error)
 	GetReply(communityID, conversationID, replyID *fields.QualifiedHash) (Node, bool, error)
 	Children(*fields.QualifiedHash) ([]*fields.QualifiedHash, error)
+	Recent(nodeType fields.NodeType, quantity int) ([]Node, error)
 	Add(Node) error
 }
 
@@ -113,6 +115,43 @@ func (m *MemoryStore) AddID(id string, node Node) error {
 	}
 	m.ChildMap[parentID] = append(m.ChildMap[parentID], id)
 	return nil
+}
+
+// Recent returns a slice of len `quantity` (or fewer) nodes of the given type.
+// These nodes are the most recent (by creation time) nodes of that type known
+// to the store.
+func (m *MemoryStore) Recent(nodeType fields.NodeType, quantity int) ([]Node, error) {
+	// highly inefficient implementation, but it should work for now
+	candidates := make([]Node, 0, quantity)
+	for _, node := range m.Items {
+		switch n := node.(type) {
+		case *Identity:
+			if nodeType == fields.NodeTypeIdentity {
+				candidates = append(candidates, n)
+				sort.SliceStable(candidates, func(i, j int) bool {
+					return candidates[i].(*Identity).Created > candidates[j].(*Identity).Created
+				})
+			}
+		case *Community:
+			if nodeType == fields.NodeTypeCommunity {
+				candidates = append(candidates, n)
+				sort.SliceStable(candidates, func(i, j int) bool {
+					return candidates[i].(*Community).Created > candidates[j].(*Community).Created
+				})
+			}
+		case *Reply:
+			if nodeType == fields.NodeTypeReply {
+				candidates = append(candidates, n)
+				sort.SliceStable(candidates, func(i, j int) bool {
+					return candidates[i].(*Reply).Created > candidates[j].(*Reply).Created
+				})
+			}
+		}
+	}
+	if len(candidates) > quantity {
+		candidates = candidates[:quantity]
+	}
+	return candidates, nil
 }
 
 // CacheStore combines two other stores into one logical store. It is
@@ -218,4 +257,8 @@ func (m *CacheStore) GetReply(communityID, conversationID, replyID *fields.Quali
 
 func (m *CacheStore) Children(id *fields.QualifiedHash) ([]*fields.QualifiedHash, error) {
 	return m.Back.Children(id)
+}
+
+func (m *CacheStore) Recent(nodeType fields.NodeType, quantity int) ([]Node, error) {
+	return m.Back.Recent(nodeType, quantity)
 }
