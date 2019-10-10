@@ -1,6 +1,8 @@
 package forest
 
 import (
+	"fmt"
+
 	"git.sr.ht/~whereswaldon/forest-go/fields"
 )
 
@@ -8,15 +10,26 @@ type Store interface {
 	Size() (int, error)
 	CopyInto(Store) error
 	Get(*fields.QualifiedHash) (Node, bool, error)
+	GetIdentity(*fields.QualifiedHash) (Node, bool, error)
+	GetCommunity(*fields.QualifiedHash) (Node, bool, error)
+	GetConversation(communityID, conversationID *fields.QualifiedHash) (Node, bool, error)
+	GetReply(communityID, conversationID, replyID *fields.QualifiedHash) (Node, bool, error)
+	Children(*fields.QualifiedHash) ([]*fields.QualifiedHash, error)
 	Add(Node) error
 }
 
 type MemoryStore struct {
-	Items map[string]Node
+	Items    map[string]Node
+	ChildMap map[string][]string
 }
 
+var _ Store = &MemoryStore{}
+
 func NewMemoryStore() *MemoryStore {
-	return &MemoryStore{make(map[string]Node)}
+	return &MemoryStore{
+		Items:    make(map[string]Node),
+		ChildMap: make(map[string][]string),
+	}
 }
 
 func (m *MemoryStore) Size() (int, error) {
@@ -40,9 +53,44 @@ func (m *MemoryStore) Get(id *fields.QualifiedHash) (Node, bool, error) {
 	return m.GetID(idString)
 }
 
+func (m *MemoryStore) GetIdentity(id *fields.QualifiedHash) (Node, bool, error) {
+	return m.Get(id)
+}
+
+func (m *MemoryStore) GetCommunity(id *fields.QualifiedHash) (Node, bool, error) {
+	return m.Get(id)
+}
+
+func (m *MemoryStore) GetConversation(communityID, conversationID *fields.QualifiedHash) (Node, bool, error) {
+	return m.Get(conversationID)
+}
+
+func (m *MemoryStore) GetReply(communityID, conversationID, replyID *fields.QualifiedHash) (Node, bool, error) {
+	return m.Get(replyID)
+}
+
 func (m *MemoryStore) GetID(id string) (Node, bool, error) {
 	item, has := m.Items[id]
 	return item, has, nil
+}
+
+func (m *MemoryStore) Children(id *fields.QualifiedHash) ([]*fields.QualifiedHash, error) {
+	idString, err := id.MarshalString()
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal node id into key: %w", err)
+	}
+	children, any := m.ChildMap[idString]
+	if !any {
+		return []*fields.QualifiedHash{}, nil
+	}
+	childIDs := make([]*fields.QualifiedHash, len(children))
+	for i, childStr := range children {
+		childIDs[i] = &fields.QualifiedHash{}
+		if err := childIDs[i].UnmarshalText([]byte(childStr)); err != nil {
+			return nil, fmt.Errorf("failed to transform key back into node id: %w", err)
+		}
+	}
+	return childIDs, nil
 }
 
 func (m *MemoryStore) Add(node Node) error {
@@ -59,6 +107,11 @@ func (m *MemoryStore) AddID(id string, node Node) error {
 		return nil
 	}
 	m.Items[id] = node
+	parentID, err := node.ParentID().MarshalString()
+	if err != nil {
+		return fmt.Errorf("failed to marshal string of parent node: %w", err)
+	}
+	m.ChildMap[parentID] = append(m.ChildMap[parentID], id)
 	return nil
 }
 
@@ -70,6 +123,8 @@ func (m *MemoryStore) AddID(id string, node Node) error {
 type CacheStore struct {
 	Cache, Back Store
 }
+
+var _ Store = &CacheStore{}
 
 // NewCacheStore creates a single logical store from the given two stores.
 // All items from `cache` are automatically copied into `base` during
@@ -95,20 +150,7 @@ func (m *CacheStore) Size() (int, error) {
 // If the cache is missed by the backing store is hit, the node will automatically be
 // added to the cache.
 func (m *CacheStore) Get(id *fields.QualifiedHash) (Node, bool, error) {
-	if node, has, err := m.Cache.Get(id); err != nil {
-		return nil, false, err
-	} else if has {
-		return node, has, nil
-	}
-	if node, has, err := m.Back.Get(id); err != nil {
-		return nil, false, err
-	} else if has {
-		if err := m.Cache.Add(node); err != nil {
-			return nil, false, err
-		}
-		return node, has, nil
-	}
-	return nil, false, nil
+	return m.getUsingFuncs(id, m.Cache.Get, m.Back.Get)
 }
 
 func (m *CacheStore) CopyInto(other Store) error {
@@ -124,4 +166,56 @@ func (m *CacheStore) Add(node Node) error {
 		return err
 	}
 	return nil
+}
+
+func (m *CacheStore) getUsingFuncs(id *fields.QualifiedHash, getter1, getter2 func(*fields.QualifiedHash) (Node, bool, error)) (Node, bool, error) {
+	cacheNode, inCache, err := getter1(id)
+	if err != nil {
+		return nil, false, fmt.Errorf("failed fetching id from cache: %w", err)
+	}
+	if inCache {
+		return cacheNode, inCache, err
+	}
+	backNode, inBackingStore, err := getter2(id)
+	if err != nil {
+		return nil, false, fmt.Errorf("failed fetching id from cache: %w", err)
+	}
+	if inBackingStore {
+		if err := m.Cache.Add(backNode); err != nil {
+			return nil, false, fmt.Errorf("failed to up-propagate node into cache: %w", err)
+		}
+	}
+	return backNode, inBackingStore, err
+}
+
+func (m *CacheStore) GetIdentity(id *fields.QualifiedHash) (Node, bool, error) {
+	return m.getUsingFuncs(id, m.Cache.GetIdentity, m.Back.GetIdentity)
+}
+
+func (m *CacheStore) GetCommunity(id *fields.QualifiedHash) (Node, bool, error) {
+	return m.getUsingFuncs(id, m.Cache.GetCommunity, m.Back.GetCommunity)
+}
+
+func (m *CacheStore) GetConversation(communityID, conversationID *fields.QualifiedHash) (Node, bool, error) {
+	return m.getUsingFuncs(communityID, // this id is irrelevant
+		func(*fields.QualifiedHash) (Node, bool, error) {
+			return m.Cache.GetConversation(communityID, conversationID)
+		},
+		func(*fields.QualifiedHash) (Node, bool, error) {
+			return m.Back.GetConversation(communityID, conversationID)
+		})
+}
+
+func (m *CacheStore) GetReply(communityID, conversationID, replyID *fields.QualifiedHash) (Node, bool, error) {
+	return m.getUsingFuncs(communityID, // this id is irrelevant
+		func(*fields.QualifiedHash) (Node, bool, error) {
+			return m.Cache.GetReply(communityID, conversationID, replyID)
+		},
+		func(*fields.QualifiedHash) (Node, bool, error) {
+			return m.Back.GetReply(communityID, conversationID, replyID)
+		})
+}
+
+func (m *CacheStore) Children(id *fields.QualifiedHash) ([]*fields.QualifiedHash, error) {
+	return m.Back.Children(id)
 }
