@@ -44,10 +44,11 @@ func TestTextMarshalQualifiedHash(t *testing.T) {
 	if !q.Equals(out) {
 		t.Fatalf("Input and output do not match:\nin: %v\nout: %v", *q, *out)
 	}
+}
 
-	q.Blob = []byte(`this
-                    is a newline test`)
-	if !q.Blob.ContainsString("\n") {
+func TestBlobContains(t *testing.T) {
+     b := fields.Blob([]byte("something here"))
+     if !b.ContainsString("thing") {
         t.Fatal("ContainsString() failed to find newline in Blob.")
-	}
+     }
 }
