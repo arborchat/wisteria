@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/base64"
 	"encoding/binary"
+	"strings"
 	"fmt"
 	"math"
 	"time"
@@ -133,6 +134,11 @@ func (t *TreeDepth) Equals(t2 *TreeDepth) bool {
 
 // Blob represents a quantity of arbitrary binary data in the Forest
 type Blob []byte
+
+// Contains checks if a substing of bytes exists in a Blob
+func (v Blob) Contains(c []byte) bool {
+    return strings.Contains(string(v), string(c))
+}
 
 // MarshalBinary converts the Blob into its binary representation
 func (v Blob) MarshalBinary() ([]byte, error) {
