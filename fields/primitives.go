@@ -140,6 +140,11 @@ func (v Blob) Contains(c []byte) bool {
     return strings.Contains(string(v), string(c))
 }
 
+// ContainsString checks if a substing exists in a Blob
+func (v Blob) ContainsString(s string) bool {
+    return v.Contains([]byte(s))
+}
+
 // MarshalBinary converts the Blob into its binary representation
 func (v Blob) MarshalBinary() ([]byte, error) {
 	return v, nil
