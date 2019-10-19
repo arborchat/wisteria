@@ -169,6 +169,11 @@ func NewIdentityQualified(signer Signer, name *fields.QualifiedContent, metadata
 	identity.Metadata = *metadata
 	identity.Created = fields.TimestampFrom(time.Now())
 
+	// Check no newline in name
+	if name.ContainsString("\n") {
+		return nil, fmt.Errorf("Newline in username is illegal")
+	}
+
 	// get public key
 	pubkey, err := signer.PublicKey()
 	if err != nil {
@@ -257,6 +262,11 @@ func (n *Builder) NewCommunityQualified(name *fields.QualifiedContent, metadata 
 		return nil, err
 	}
 	c.IDDesc = *idDesc
+
+	// Check no newline in name
+	if name.ContainsString("\n") {
+		return nil, fmt.Errorf("Newline in community name is illegal")
+	}
 
 	// we've defined all pre-signature fields, it's time to sign the data
 	signedDataBytes, err := c.MarshalSignedData()

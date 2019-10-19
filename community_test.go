@@ -16,6 +16,14 @@ func MakeCommunityOrSkip(t *testing.T) (*forest.Identity, forest.Signer, *forest
 	return identity, privkey, community
 }
 
+func TestCommunityNewline(t *testing.T) {
+	identity, privkey := MakeIdentityOrSkip(t)
+	_, err := forest.As(identity, privkey).NewCommunity("string with \n newline", "")
+	if err == nil {
+		t.Error("Failed to raise error in Community with newline in name")
+	}
+}
+
 func TestCommunityValidatesSelf(t *testing.T) {
 	identity, _, community := MakeCommunityOrSkip(t)
 	if correct, err := forest.ValidateID(community, *community.ID()); err != nil || !correct {
