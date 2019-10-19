@@ -49,6 +49,6 @@ func TestTextMarshalQualifiedHash(t *testing.T) {
 func TestBlobContains(t *testing.T) {
      b := fields.Blob([]byte("something here"))
      if !b.ContainsString("thing") {
-        t.Fatal("ContainsString() failed to find newline in Blob.")
+        t.Fatal("ContainsString() found nonexistent string in Blob.")
      }
 }
