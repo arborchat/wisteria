@@ -17,6 +17,14 @@ func MakeIdentityFromKeyOrSkip(t *testing.T, privKey, passphrase string) (*fores
 	return identity, signer
 }
 
+func TestIdentityNewline(t *testing.T) {
+	signer := testkeys.Signer(t, privKey1)
+	_, err := forest.NewIdentity(signer, "newline-in\nusername", "")
+	if err == nil {
+		t.Error("Failed to error with newline in username")
+	}
+}
+
 func MakeIdentityOrSkip(t *testing.T) (*forest.Identity, forest.Signer) {
 	return MakeIdentityFromKeyOrSkip(t, privKey1, testKeyPassphrase)
 }
