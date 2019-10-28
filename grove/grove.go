@@ -9,8 +9,10 @@ Note: this package is not yet complete.
 package grove
 
 import (
+	"errors"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 
@@ -66,6 +68,7 @@ func (r RelativeFS) OpenFile(path string, flag int, perm os.FileMode) (File, err
 
 // Grove is an on-disk store for arbor forest nodes.
 type Grove struct {
+	FS
 }
 
 // New constructs a Grove that stores nodes in a hierarchy rooted at
@@ -80,12 +83,33 @@ func NewWithFS(fs FS) (*Grove, error) {
 	if fs == nil {
 		return nil, fmt.Errorf("fs cannot be nil")
 	}
-	return &Grove{}, nil
+	return &Grove{
+		FS: fs,
+	}, nil
 }
 
 // Get searches the grove for a node with the given id. It returns the node if it was
 // found, a boolean indicating whether it was found, and an error (if there was a
 // problem searching for the node).
 func (g *Grove) Get(nodeID *fields.QualifiedHash) (forest.Node, bool, error) {
-	return nil, false, nil
+	filename, err := nodeID.MarshalString()
+	if err != nil {
+		return nil, false, fmt.Errorf("failed determining file name for node: %w", err)
+	}
+	file, err := g.Open(filename)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return nil, false, nil
+		}
+		return nil, false, fmt.Errorf("failed opening node file \"%s\": %w", filename, err)
+	}
+	b, err := ioutil.ReadAll(file)
+	if err != nil {
+		return nil, false, fmt.Errorf("failed reading bytes from \"%s\": %w", filename, err)
+	}
+	node, err := forest.UnmarshalBinaryNode(b)
+	if err != nil {
+		return nil, false, fmt.Errorf("failed unmarshalling node from \"%s\": %w", filename, err)
+	}
+	return node, true, nil
 }

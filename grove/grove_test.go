@@ -45,19 +45,23 @@ var _ grove.FS = fakeFS{}
 // Open opens the given path as an absolute path relative to the root
 // of the fakeFS
 func (r fakeFS) Open(path string) (grove.File, error) {
-	return r.files[path], nil
+	file, exists := r.files[path]
+	if !exists {
+		return nil, os.ErrNotExist
+	}
+	return file, nil
 }
 
 // Create makes the given path as an absolute path relative to the root
 // of the fakeFS
 func (r fakeFS) Create(path string) (grove.File, error) {
-	return r.files[path], nil
+	return r.Open(path)
 }
 
 // OpenFile opens the given path as an absolute path relative to the root
 // of the fakeFS
 func (r fakeFS) OpenFile(path string, flag int, perm os.FileMode) (grove.File, error) {
-	return r.files[path], nil
+	return r.Open(path)
 }
 
 func newFakeFS() fakeFS {
