@@ -97,10 +97,12 @@ func (g *Grove) Get(nodeID *fields.QualifiedHash) (forest.Node, bool, error) {
 		return nil, false, fmt.Errorf("failed determining file name for node: %w", err)
 	}
 	file, err := g.Open(filename)
+	// if the file doesn't exist, just return false with no error
+	if errors.Is(err, os.ErrNotExist) {
+		return nil, false, nil
+	}
+	// if it's some other error, wrap it and return
 	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return nil, false, nil
-		}
 		return nil, false, fmt.Errorf("failed opening node file \"%s\": %w", filename, err)
 	}
 	b, err := ioutil.ReadAll(file)
