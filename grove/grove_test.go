@@ -35,9 +35,51 @@ func (f *fakeFile) Close() error {
 	return nil
 }
 
+// errFile implements the grove.File interface and wraps another grove.File.
+// If the errFile's error field is set to nil, it is a transparent wrapper
+// for the underlying File. If the field is set to a non-nil error value,
+// this will be returned from all operations that can return an error.
+type errFile struct {
+	error
+	wrappedFile grove.File
+}
+
+var _ grove.File = &errFile{}
+
+func NewErrFile(file grove.File) *errFile {
+	return &errFile{
+		wrappedFile: file,
+	}
+}
+
+func (e *errFile) Name() string {
+	return e.wrappedFile.Name()
+}
+
+func (e *errFile) Read(b []byte) (int, error) {
+	if e.error != nil {
+		return 0, e.error
+	}
+	return e.wrappedFile.Read(b)
+}
+
+func (e *errFile) Write(b []byte) (int, error) {
+	if e.error != nil {
+		return 0, e.error
+	}
+	return e.wrappedFile.Write(b)
+}
+
+func (e *errFile) Close() error {
+	if e.error != nil {
+		return e.error
+	}
+	return e.wrappedFile.Close()
+}
+
 // fakeFS implements grove.FS, but is entirely in-memory.
 type fakeFS struct {
-	files map[string]*fakeFile
+	files map[string]grove.File
 }
 
 var _ grove.FS = fakeFS{}
@@ -76,7 +118,7 @@ func (r fakeFS) OpenFile(path string, flag int, perm os.FileMode) (grove.File, e
 
 func newFakeFS() fakeFS {
 	return fakeFS{
-		make(map[string]*fakeFile),
+		make(map[string]grove.File),
 	}
 }
 
