@@ -92,10 +92,7 @@ func NewWithFS(fs FS) (*Grove, error) {
 // found, a boolean indicating whether it was found, and an error (if there was a
 // problem searching for the node).
 func (g *Grove) Get(nodeID *fields.QualifiedHash) (forest.Node, bool, error) {
-	filename, err := nodeID.MarshalString()
-	if err != nil {
-		return nil, false, fmt.Errorf("failed determining file name for node: %w", err)
-	}
+	filename := nodeID.String()
 	file, err := g.Open(filename)
 	// if the file doesn't exist, just return false with no error
 	if errors.Is(err, os.ErrNotExist) {

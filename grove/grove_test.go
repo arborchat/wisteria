@@ -227,6 +227,33 @@ func TestGroveGetErrorReadingFile(t *testing.T) {
 	} else if present {
 		t.Errorf("Grove indicated that a node was present when it could not be read")
 	} else if node != nil {
-		t.Errorf("Grove did returned a node when the requested node was unreadable")
+		t.Errorf("Grove returned a node when the requested node was unreadable")
+	}
+}
+
+func TestGroveGetErrorUnmarshallingFile(t *testing.T) {
+	fs := newFakeFS()
+	fakeNodeBuilder := NewNodeBuilder(t)
+	reply, replyFile := fakeNodeBuilder.newReplyFile("test content")
+	replyFile.Reset()
+	_, err := replyFile.Write([]byte("this is not an arbor node"))
+	if err != nil {
+		t.Skipf("Unable to write test data into node file: %v", err)
+	}
+	g, err := grove.NewWithFS(fs)
+	if err != nil {
+		t.Errorf("Failed constructing grove: %v", err)
+	}
+
+	// add node to fs, now should be discoverable
+	fs.files[replyFile.Name()] = replyFile
+
+	// no nodes in fs, make sure we get nothing
+	if node, present, err := g.Get(reply.ID()); err == nil {
+		t.Errorf("Expected error unmarshalling file to be propagated upward, got nil")
+	} else if present {
+		t.Errorf("Grove indicated that a node was present when it could not be unmarshalled")
+	} else if node != nil {
+		t.Errorf("Grove returned a node when the requested node was unparsable")
 	}
 }
