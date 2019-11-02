@@ -91,7 +91,10 @@ func NewWithFS(fs FS) (*Grove, error) {
 // Get searches the grove for a node with the given id. It returns the node if it was
 // found, a boolean indicating whether it was found, and an error (if there was a
 // problem searching for the node).
-func (g *Grove) Get(nodeID *fields.QualifiedHash) (forest.Node, bool, error) {
+// The returned `present` will never be true unless the returned `node` holds an
+// actual node struct. If the file holding a node exists on disk but was unable
+// to be opened, read, or parsed, `present` will still be false.
+func (g *Grove) Get(nodeID *fields.QualifiedHash) (node forest.Node, present bool, err error) {
 	filename := nodeID.String()
 	file, err := g.Open(filename)
 	// if the file doesn't exist, just return false with no error
@@ -106,7 +109,7 @@ func (g *Grove) Get(nodeID *fields.QualifiedHash) (forest.Node, bool, error) {
 	if err != nil {
 		return nil, false, fmt.Errorf("failed reading bytes from \"%s\": %w", filename, err)
 	}
-	node, err := forest.UnmarshalBinaryNode(b)
+	node, err = forest.UnmarshalBinaryNode(b)
 	if err != nil {
 		return nil, false, fmt.Errorf("failed unmarshalling node from \"%s\": %w", filename, err)
 	}

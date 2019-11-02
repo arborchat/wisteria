@@ -84,6 +84,12 @@ type fakeFS struct {
 
 var _ grove.FS = fakeFS{}
 
+func newFakeFS() fakeFS {
+	return fakeFS{
+		make(map[string]grove.File),
+	}
+}
+
 // Open opens the given path as an absolute path relative to the root
 // of the fakeFS
 func (r fakeFS) Open(path string) (grove.File, error) {
@@ -106,10 +112,46 @@ func (r fakeFS) OpenFile(path string, flag int, perm os.FileMode) (grove.File, e
 	return r.Open(path)
 }
 
-func newFakeFS() fakeFS {
-	return fakeFS{
-		make(map[string]grove.File),
+// errFS is a testing type that wraps an ordinary FS with the ability to
+// return a specific error on any function call.
+type errFS struct {
+	fs grove.FS
+	error
+}
+
+var _ grove.FS = errFS{}
+
+func newErrFS(fs grove.FS) *errFS {
+	return &errFS{
+		fs: fs,
 	}
+}
+
+// Open opens the given path as an absolute path relative to the root
+// of the errFS
+func (r errFS) Open(path string) (grove.File, error) {
+	if r.error != nil {
+		return nil, r.error
+	}
+	return r.fs.Open(path)
+}
+
+// Create makes the given path as an absolute path relative to the root
+// of the errFS
+func (r errFS) Create(path string) (grove.File, error) {
+	if r.error != nil {
+		return nil, r.error
+	}
+	return r.fs.Create(path)
+}
+
+// OpenFile opens the given path as an absolute path relative to the root
+// of the errFS
+func (r errFS) OpenFile(path string, flag int, perm os.FileMode) (grove.File, error) {
+	if r.error != nil {
+		return nil, r.error
+	}
+	return r.fs.OpenFile(path, flag, perm)
 }
 
 type testNodeBuilder struct {
@@ -255,5 +297,26 @@ func TestGroveGetErrorUnmarshallingFile(t *testing.T) {
 		t.Errorf("Grove indicated that a node was present when it could not be unmarshalled")
 	} else if node != nil {
 		t.Errorf("Grove returned a node when the requested node was unparsable")
+	}
+}
+
+func TestGroveGetErrorOpeningFile(t *testing.T) {
+	fs := newFakeFS()
+	eFS := newErrFS(fs)
+	fakeNodeBuilder := NewNodeBuilder(t)
+	reply, _ := fakeNodeBuilder.newReplyFile("test content")
+	g, err := grove.NewWithFS(eFS)
+	if err != nil {
+		t.Errorf("Failed constructing grove: %v", err)
+	}
+	eFS.error = os.ErrPermission
+
+	// no nodes in fs, make sure we get nothing
+	if node, present, err := g.Get(reply.ID()); err == nil {
+		t.Errorf("Expected error accessing file to be propagated upward, got nil")
+	} else if present {
+		t.Errorf("Grove indicated that a node was present when it could not be opened")
+	} else if node != nil {
+		t.Errorf("Grove returned a node when the requested node was inaccessible")
 	}
 }
