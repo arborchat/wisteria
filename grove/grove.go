@@ -15,6 +15,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"git.sr.ht/~whereswaldon/forest-go"
 	"git.sr.ht/~whereswaldon/forest-go/fields"
@@ -26,6 +27,7 @@ import (
 type File interface {
 	io.ReadWriteCloser
 	Name() string
+	Readdir(n int) ([]os.FileInfo, error)
 }
 
 // FS represents a type that acts as a filesystem. It can create and
@@ -114,4 +116,50 @@ func (g *Grove) Get(nodeID *fields.QualifiedHash) (forest.Node, bool, error) {
 		return nil, false, fmt.Errorf("failed unmarshalling node from \"%s\": %w", filename, err)
 	}
 	return node, true, nil
+}
+
+// Children returns the IDs of all known child nodes of the specified ID.
+// Any error opening, reading, or parsing files in the grove that occurs
+// during the search for child nodes will cause the entire operation to
+// error.
+func (g *Grove) Children(id *fields.QualifiedHash) ([]*fields.QualifiedHash, error) {
+	// open root of grove hierarchy so we can list its nodes
+	rootDir, err := g.Open("")
+	if err != nil {
+		return nil, fmt.Errorf("failed opening grove root dir: %w", err)
+	}
+	info, err := rootDir.Readdir(-1) // read whole directory at once. Inefficient
+	if err != nil {
+		return nil, fmt.Errorf("failed listing files in grove: %w", err)
+	}
+	nodeInfo := make([]os.FileInfo, 0, len(info))
+	// find all files that are plausibly nodes
+	for _, fileInfo := range info {
+		// search for the string form of all supported hash types
+		for _, hashName := range fields.HashNames {
+			if strings.HasPrefix(fileInfo.Name(), hashName) {
+				nodeInfo = append(nodeInfo, fileInfo)
+			}
+		}
+	}
+	children := make([]*fields.QualifiedHash, 0, len(nodeInfo))
+	for _, nodeFileInfo := range nodeInfo {
+		nodeFile, err := g.Open(nodeFileInfo.Name())
+		if err != nil {
+			return nil, fmt.Errorf("failed opening node file %s: %w", nodeFileInfo.Name(), err)
+		}
+		nodeData, err := ioutil.ReadAll(nodeFile)
+		if err != nil {
+			return nil, fmt.Errorf("failed reading node file %s: %w", nodeFileInfo.Name(), err)
+		}
+		node, err := forest.UnmarshalBinaryNode(nodeData)
+		if err != nil {
+			return nil, fmt.Errorf("failed parsing node file %s: %w", nodeFileInfo.Name(), err)
+		}
+		if node.ParentID().Equals(id) {
+			children = append(children, node.ID())
+		}
+	}
+
+	return children, nil
 }
