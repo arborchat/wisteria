@@ -420,3 +420,21 @@ func TestGroveChildren(t *testing.T) {
 		t.Errorf("Expected 3 child nodes for community, found none")
 	}
 }
+
+func TestGroveChildrenOpenRootFails(t *testing.T) {
+	fs := newFakeFS()
+	efs := newErrFS(fs)
+	efs.error = os.ErrPermission
+	fakeNodeBuilder := NewNodeBuilder(t)
+	reply, _ := fakeNodeBuilder.newReplyFile("test content")
+	g, err := grove.NewWithFS(efs)
+	if err != nil {
+		t.Errorf("Failed constructing grove: %v", err)
+	}
+
+	if children, err := g.Children(reply.ID()); err == nil {
+		t.Errorf("Expected error opening root grove dir to cause Children() to fail, but did not error")
+	} else if len(children) > 0 {
+		t.Errorf("Expected no child nodes to be returned when opening root grove dir fails, but found %d", len(children))
+	}
+}
