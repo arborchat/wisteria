@@ -81,6 +81,13 @@ func (e *errFile) Close() error {
 	return e.wrappedFile.Close()
 }
 
+func (e *errFile) Readdir(n int) ([]os.FileInfo, error) {
+	if e.error != nil {
+		return nil, e.error
+	}
+	return e.wrappedFile.Readdir(n)
+}
+
 // fakeFS implements grove.FS, but is entirely in-memory.
 type fakeFS struct {
 	files map[string]grove.File
