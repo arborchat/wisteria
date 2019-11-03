@@ -10,6 +10,11 @@ import (
 	"git.sr.ht/~whereswaldon/forest-go/testkeys"
 )
 
+type truncatableFile interface {
+	grove.File
+	Truncate(size int64) error
+}
+
 // fakeFile implements the grove.File interface, but is entirely in-memory.
 // This helps speed testing.
 type fakeFile struct {
@@ -17,7 +22,7 @@ type fakeFile struct {
 	name string
 }
 
-var _ grove.File = &fakeFile{}
+var _ truncatableFile = &fakeFile{}
 
 func newFakeFile(name string, content []byte) *fakeFile {
 	return &fakeFile{
@@ -35,18 +40,24 @@ func (f *fakeFile) Close() error {
 	return nil
 }
 
+// needed to implement truncatableFile
+func (f *fakeFile) Truncate(size int64) error {
+	f.Buffer.Truncate(int(size))
+	return nil
+}
+
 // errFile implements the grove.File interface and wraps another grove.File.
 // If the errFile's error field is set to nil, it is a transparent wrapper
 // for the underlying File. If the field is set to a non-nil error value,
 // this will be returned from all operations that can return an error.
 type errFile struct {
 	error
-	wrappedFile grove.File
+	wrappedFile truncatableFile
 }
 
 var _ grove.File = &errFile{}
 
-func NewErrFile(file grove.File) *errFile {
+func NewErrFile(file truncatableFile) *errFile {
 	return &errFile{
 		wrappedFile: file,
 	}
@@ -77,16 +88,23 @@ func (e *errFile) Close() error {
 	return e.wrappedFile.Close()
 }
 
+func (e *errFile) Truncate(size int64) error {
+	if e.error != nil {
+		return e.error
+	}
+	return e.wrappedFile.Truncate(size)
+}
+
 // fakeFS implements grove.FS, but is entirely in-memory.
 type fakeFS struct {
-	files map[string]grove.File
+	files map[string]truncatableFile
 }
 
 var _ grove.FS = fakeFS{}
 
 func newFakeFS() fakeFS {
 	return fakeFS{
-		make(map[string]grove.File),
+		files: make(map[string]truncatableFile),
 	}
 }
 
@@ -105,8 +123,13 @@ func (r fakeFS) Open(path string) (grove.File, error) {
 func (r fakeFS) Create(path string) (grove.File, error) {
 	// mimic os.Create(), so creating a file that already exists truncates
 	// the current one
-	file := newFakeFile(path, []byte{})
-	r.files[path] = file
+	file, exists := r.files[path]
+	if exists {
+		file.Truncate(0)
+	} else {
+		file = newFakeFile(path, []byte{})
+		r.files[path] = file
+	}
 
 	return file, nil
 }
