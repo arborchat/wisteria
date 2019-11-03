@@ -459,3 +459,23 @@ func TestGroveChildrenOpenNodeFails(t *testing.T) {
 		t.Errorf("Expected no child nodes for when reading a node failed, found %d", len(children))
 	}
 }
+
+func TestGroveChildrenParseNodeFails(t *testing.T) {
+	fs := newFakeFS()
+	fakeNodeBuilder := NewNodeBuilder(t)
+	reply, replyFile := fakeNodeBuilder.newReplyFile("test content")
+	replyFile.Buffer.Truncate(1)
+	g, err := grove.NewWithFS(fs)
+	if err != nil {
+		t.Errorf("Failed constructing grove: %v", err)
+	}
+
+	// add node to fs, now should be discoverable
+	fs.files[replyFile.Name()] = replyFile
+
+	if children, err := g.Children(reply.ID()); err == nil {
+		t.Errorf("Expected error when parsing node file to be propagated upward, but Children() did not error")
+	} else if len(children) > 0 {
+		t.Errorf("Expected no child nodes for when parsing a node failed, found %d", len(children))
+	}
+}
