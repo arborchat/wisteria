@@ -2,10 +2,12 @@ package grove_test
 
 import (
 	"bytes"
+	"fmt"
 	"os"
 	"testing"
 
 	forest "git.sr.ht/~whereswaldon/forest-go"
+	"git.sr.ht/~whereswaldon/forest-go/fields"
 	"git.sr.ht/~whereswaldon/forest-go/grove"
 	"git.sr.ht/~whereswaldon/forest-go/testkeys"
 )
@@ -321,5 +323,60 @@ func TestGroveAddFailToCreate(t *testing.T) {
 
 	if err := g.Add(reply); err == nil {
 		t.Errorf("Expected Add() to fail when creating file fails")
+	}
+}
+
+type errNode struct {
+	error
+}
+
+var _ forest.Node = errNode{}
+
+func (e errNode) TreeDepth() fields.TreeDepth {
+	return 0
+}
+
+func (e errNode) ID() *fields.QualifiedHash {
+	return &fields.QualifiedHash{}
+}
+
+func (e errNode) ParentID() *fields.QualifiedHash {
+	return &fields.QualifiedHash{}
+}
+
+func (e errNode) Equals(interface{}) bool {
+	return false
+}
+
+func (e errNode) MarshalBinary() ([]byte, error) {
+	return nil, e.error
+}
+
+func (e errNode) UnmarshalBinary([]byte) error {
+	return e.error
+}
+
+func (e errNode) ValidateDeep(forest.Store) error {
+	return e.error
+}
+
+func (e errNode) ValidateShallow() error {
+	return e.error
+}
+
+func TestGroveAddFailToSerialize(t *testing.T) {
+	fs := newFakeFS()
+	efs := newErrFS(fs)
+	efs.error = os.ErrPermission
+	eNode := errNode{
+		fmt.Errorf("I can't be serialized"),
+	}
+	g, err := grove.NewWithFS(efs)
+	if err != nil {
+		t.Errorf("Failed constructing grove: %v", err)
+	}
+
+	if err := g.Add(eNode); err == nil {
+		t.Errorf("Expected Add() to fail when serializing node fails")
 	}
 }
