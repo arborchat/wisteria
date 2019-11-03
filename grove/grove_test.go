@@ -360,3 +360,63 @@ func TestGroveGet(t *testing.T) {
 		t.Errorf("Grove did not return a node when the requested node was present")
 	}
 }
+
+func TestGroveChildren(t *testing.T) {
+	fs := newFakeFS()
+	fakeNodeBuilder := NewNodeBuilder(t)
+	reply, replyFile := fakeNodeBuilder.newReplyFile("test content")
+	_, replyFile1 := fakeNodeBuilder.newReplyFile("test content")
+	_, replyFile2 := fakeNodeBuilder.newReplyFile("test content")
+	g, err := grove.NewWithFS(fs)
+	if err != nil {
+		t.Errorf("Failed constructing grove: %v", err)
+	}
+
+	// add node to fs, now should be discoverable
+	fs.files[replyFile.Name()] = replyFile
+
+	identity := fakeNodeBuilder.Builder.User
+	identityData, err := identity.MarshalBinary()
+	idFileName, _ := identity.ID().MarshalString()
+	idFile := newFakeFile(idFileName, identityData)
+	fs.files[idFile.Name()] = idFile
+
+	community := fakeNodeBuilder.Community
+	communityData, err := community.MarshalBinary()
+	communityFileName, _ := community.ID().MarshalString()
+	communityFile := newFakeFile(communityFileName, communityData)
+	fs.files[communityFile.Name()] = communityFile
+
+	if children, err := g.Children(identity.ID()); err != nil {
+		t.Errorf("Expected looking for identity children to succeed: %v", err)
+	} else if len(children) > 0 {
+		t.Errorf("Expected no child nodes for identity, found %d", len(children))
+	}
+
+	// reset fakeFiles so they can be read again
+	replyFile.ResetBuffer()
+	idFile.ResetBuffer()
+	communityFile.ResetBuffer()
+
+	if children, err := g.Children(community.ID()); err != nil {
+		t.Errorf("Expected looking for community children to succeed: %v", err)
+	} else if len(children) < 1 {
+		t.Errorf("Expected child nodes for community, found none")
+	} else if !children[0].Equals(reply.ID()) {
+		t.Errorf("Expected child of community node to be reply node")
+	}
+
+	// reset fakeFiles so they can be read again
+	replyFile.ResetBuffer()
+	idFile.ResetBuffer()
+	communityFile.ResetBuffer()
+
+	fs.files[replyFile1.Name()] = replyFile1
+	fs.files[replyFile2.Name()] = replyFile2
+
+	if children, err := g.Children(community.ID()); err != nil {
+		t.Errorf("Expected looking for community children to succeed: %v", err)
+	} else if len(children) < 3 {
+		t.Errorf("Expected 3 child nodes for community, found none")
+	}
+}
