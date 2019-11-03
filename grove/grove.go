@@ -115,3 +115,14 @@ func (g *Grove) Get(nodeID *fields.QualifiedHash) (forest.Node, bool, error) {
 	}
 	return node, true, nil
 }
+
+// CopyInto copies all nodes from the store into the provided store.
+//
+// BUG(whereswaldon): this method is not yet implemented. It requires
+// more extensive file manipulation than other Grove methods (listing
+// directory contents) and has therefore been deprioritized in favor
+// of the functionality that can be implemented simply. However, it is
+// implementable, and should be done as soon as is feasible.
+func (g *Grove) CopyInto(other forest.Store) error {
+	return fmt.Errorf("method CopyInto() is not currently implemented on Grove")
+}
