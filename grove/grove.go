@@ -15,6 +15,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"git.sr.ht/~whereswaldon/forest-go"
@@ -118,11 +119,9 @@ func (g *Grove) Get(nodeID *fields.QualifiedHash) (forest.Node, bool, error) {
 	return node, true, nil
 }
 
-// Children returns the IDs of all known child nodes of the specified ID.
-// Any error opening, reading, or parsing files in the grove that occurs
-// during the search for child nodes will cause the entire operation to
-// error.
-func (g *Grove) Children(id *fields.QualifiedHash) ([]*fields.QualifiedHash, error) {
+// getAllNodeFileInfo returns a slice of information about all node files
+// within the grove.
+func (g *Grove) getAllNodeFileInfo() ([]os.FileInfo, error) {
 	// open root of grove hierarchy so we can list its nodes
 	rootDir, err := g.Open("")
 	if err != nil {
@@ -142,24 +141,116 @@ func (g *Grove) Children(id *fields.QualifiedHash) ([]*fields.QualifiedHash, err
 			}
 		}
 	}
-	children := make([]*fields.QualifiedHash, 0, len(nodeInfo))
-	for _, nodeFileInfo := range nodeInfo {
-		nodeFile, err := g.Open(nodeFileInfo.Name())
+	return nodeInfo, nil
+}
+
+// nodeFromInfo converts the info about a file into a node extracted from
+// the contents of that file (it opens, reads, and parses the file).
+func (g *Grove) nodeFromInfo(info os.FileInfo) (forest.Node, error) {
+	nodeFile, err := g.Open(info.Name())
+	if err != nil {
+		return nil, fmt.Errorf("failed opening node file %s: %w", info.Name(), err)
+	}
+	nodeData, err := ioutil.ReadAll(nodeFile)
+	if err != nil {
+		return nil, fmt.Errorf("failed reading node file %s: %w", info.Name(), err)
+	}
+	node, err := forest.UnmarshalBinaryNode(nodeData)
+	if err != nil {
+		return nil, fmt.Errorf("failed parsing node file %s: %w", info.Name(), err)
+	}
+	return node, nil
+}
+
+// nodesFromInfo batch-converts a slice of file info into a slice of
+// forest nodes by calling nodeFromInfo on each.
+func (g *Grove) nodesFromInfo(info []os.FileInfo) ([]forest.Node, error) {
+	nodes := make([]forest.Node, 0, len(info))
+	for _, nodeFileInfo := range info {
+		node, err := g.nodeFromInfo(nodeFileInfo)
 		if err != nil {
-			return nil, fmt.Errorf("failed opening node file %s: %w", nodeFileInfo.Name(), err)
+			return nil, fmt.Errorf("failed transforming fileInfo into Node: %w", err)
 		}
-		nodeData, err := ioutil.ReadAll(nodeFile)
-		if err != nil {
-			return nil, fmt.Errorf("failed reading node file %s: %w", nodeFileInfo.Name(), err)
-		}
-		node, err := forest.UnmarshalBinaryNode(nodeData)
-		if err != nil {
-			return nil, fmt.Errorf("failed parsing node file %s: %w", nodeFileInfo.Name(), err)
-		}
+		nodes = append(nodes, node)
+	}
+	return nodes, nil
+}
+
+// allNodes returns a slice of every node in the grove.
+func (g *Grove) allNodes() ([]forest.Node, error) {
+	nodeInfo, err := g.getAllNodeFileInfo()
+	if err != nil {
+		return nil, fmt.Errorf("failed listing node file candidates: %w", err)
+	}
+	nodes, err := g.nodesFromInfo(nodeInfo)
+	if err != nil {
+		return nil, fmt.Errorf("failed converting node files into nodes: %w", err)
+	}
+	return nodes, nil
+}
+
+// Children returns the IDs of all known child nodes of the specified ID.
+// Any error opening, reading, or parsing files in the grove that occurs
+// during the search for child nodes will cause the entire operation to
+// error.
+func (g *Grove) Children(id *fields.QualifiedHash) ([]*fields.QualifiedHash, error) {
+	nodes, err := g.allNodes()
+	if err != nil {
+		return nil, fmt.Errorf("failed getting all nodes from grove: %w", err)
+	}
+	children := make([]*fields.QualifiedHash, 0, len(nodes))
+	for _, node := range nodes {
 		if node.ParentID().Equals(id) {
 			children = append(children, node.ID())
 		}
 	}
 
 	return children, nil
+}
+
+// Recent returns a slice of the most recently-created nodes of the given type.
+func (g *Grove) Recent(nodeType fields.NodeType, quantity int) ([]forest.Node, error) {
+	nodes, err := g.allNodes()
+	if err != nil {
+		return nil, fmt.Errorf("failed getting all nodes from grove: %w", err)
+	}
+	// TODO: find a cleaner way to sort nodes by time
+	sort.Slice(nodes, func(i, j int) bool {
+		var a, b forest.CommonNode
+		switch n := nodes[i].(type) {
+		case *forest.Identity:
+			a = n.CommonNode
+		case *forest.Community:
+			a = n.CommonNode
+		case *forest.Reply:
+			a = n.CommonNode
+		}
+		switch n := nodes[j].(type) {
+		case *forest.Identity:
+			b = n.CommonNode
+		case *forest.Community:
+			b = n.CommonNode
+		case *forest.Reply:
+			b = n.CommonNode
+		}
+		return a.Created < b.Created
+	})
+	rightType := make([]forest.Node, 0, quantity)
+	for _, node := range nodes {
+		switch node.(type) {
+		case *forest.Identity:
+			if nodeType == fields.NodeTypeIdentity {
+				rightType = append(rightType, node)
+			}
+		case *forest.Community:
+			if nodeType == fields.NodeTypeCommunity {
+				rightType = append(rightType, node)
+			}
+		case *forest.Reply:
+			if nodeType == fields.NodeTypeReply {
+				rightType = append(rightType, node)
+			}
+		}
+	}
+	return rightType[:quantity], nil
 }

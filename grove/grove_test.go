@@ -7,6 +7,7 @@ import (
 	"time"
 
 	forest "git.sr.ht/~whereswaldon/forest-go"
+	"git.sr.ht/~whereswaldon/forest-go/fields"
 	"git.sr.ht/~whereswaldon/forest-go/grove"
 	"git.sr.ht/~whereswaldon/forest-go/testkeys"
 )
@@ -478,4 +479,49 @@ func TestGroveChildrenParseNodeFails(t *testing.T) {
 	} else if len(children) > 0 {
 		t.Errorf("Expected no child nodes for when parsing a node failed, found %d", len(children))
 	}
+}
+
+func TestGroveRecent(t *testing.T) {
+	fs := newFakeFS()
+	fakeNodeBuilder := NewNodeBuilder(t)
+	_, replyFile := fakeNodeBuilder.newReplyFile("test content")
+	_, replyFile1 := fakeNodeBuilder.newReplyFile("test content")
+	_, replyFile2 := fakeNodeBuilder.newReplyFile("test content")
+	g, err := grove.NewWithFS(fs)
+	if err != nil {
+		t.Errorf("Failed constructing grove: %v", err)
+	}
+
+	// add node to fs, now should be discoverable
+	fs.files[replyFile.Name()] = replyFile
+	fs.files[replyFile1.Name()] = replyFile1
+	fs.files[replyFile2.Name()] = replyFile2
+
+	identity := fakeNodeBuilder.Builder.User
+	identityData, err := identity.MarshalBinary()
+	idFileName, _ := identity.ID().MarshalString()
+	idFile := newFakeFile(idFileName, identityData)
+	fs.files[idFile.Name()] = idFile
+
+	community := fakeNodeBuilder.Community
+	communityData, err := community.MarshalBinary()
+	communityFileName, _ := community.ID().MarshalString()
+	communityFile := newFakeFile(communityFileName, communityData)
+	fs.files[communityFile.Name()] = communityFile
+
+	if replies, err := g.Recent(fields.NodeTypeReply, 5); err != nil {
+		t.Errorf("Expected recent replies to succeed: %v", err)
+	} else if len(replies) < 3 {
+		t.Errorf("Expected at least 3 replies, found %d", len(replies))
+	}
+	// TODO: check that they are sorted and are the right three nodes
+
+	// reset fakeFiles so they can be read again
+	replyFile.ResetBuffer()
+	replyFile1.ResetBuffer()
+	replyFile2.ResetBuffer()
+	idFile.ResetBuffer()
+	communityFile.ResetBuffer()
+
+	// TODO: test other quantities and node types
 }
