@@ -117,6 +117,10 @@ func (g *Grove) Get(nodeID *fields.QualifiedHash) (forest.Node, bool, error) {
 }
 
 // Add inserts the node into the grove.
+//
+// BUG(whereswaldon): If the node is already present, this will overwrite it.
+// This is rather wasteful. It would be better to detect the existing file and
+// do nothing instead.
 func (g *Grove) Add(node forest.Node) error {
 	data, err := node.MarshalBinary()
 	if err != nil {
