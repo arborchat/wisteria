@@ -438,3 +438,24 @@ func TestGroveChildrenOpenRootFails(t *testing.T) {
 		t.Errorf("Expected no child nodes to be returned when opening root grove dir fails, but found %d", len(children))
 	}
 }
+
+func TestGroveChildrenOpenNodeFails(t *testing.T) {
+	fs := newFakeFS()
+	fakeNodeBuilder := NewNodeBuilder(t)
+	reply, replyFile := fakeNodeBuilder.newReplyFile("test content")
+	eReplyFile := NewErrFile(replyFile)
+	eReplyFile.error = os.ErrPermission
+	g, err := grove.NewWithFS(fs)
+	if err != nil {
+		t.Errorf("Failed constructing grove: %v", err)
+	}
+
+	// add node to fs, now should be discoverable
+	fs.files[eReplyFile.Name()] = eReplyFile
+
+	if children, err := g.Children(reply.ID()); err == nil {
+		t.Errorf("Expected permission error when reading node file to be propagated upward, but Children() did not error")
+	} else if len(children) > 0 {
+		t.Errorf("Expected no child nodes for when reading a node failed, found %d", len(children))
+	}
+}
