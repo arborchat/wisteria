@@ -4,9 +4,9 @@ import (
 	"bytes"
 	"encoding/base64"
 	"encoding/binary"
-	"strings"
 	"fmt"
 	"math"
+	"strings"
 	"time"
 )
 
@@ -137,12 +137,12 @@ type Blob []byte
 
 // Contains checks if a substing of bytes exists in a Blob
 func (v Blob) Contains(c []byte) bool {
-    return strings.Contains(string(v), string(c))
+	return strings.Contains(string(v), string(c))
 }
 
 // ContainsString checks if a substing exists in a Blob
 func (v Blob) ContainsString(s string) bool {
-    return v.Contains([]byte(s))
+	return v.Contains([]byte(s))
 }
 
 // MarshalBinary converts the Blob into its binary representation
@@ -274,7 +274,7 @@ var ValidNodeTypes = map[NodeType]struct{}{
 	NodeTypeReply:     struct{}{},
 }
 
-var nodeTypeNames = map[NodeType]string{
+var NodeTypeNames = map[NodeType]string{
 	NodeTypeIdentity:  "identity",
 	NodeTypeCommunity: "community",
 	NodeTypeReply:     "reply",
@@ -285,7 +285,7 @@ func (t NodeType) MarshalBinary() ([]byte, error) {
 }
 
 func (t NodeType) MarshalText() ([]byte, error) {
-	return []byte(nodeTypeNames[t]), nil
+	return []byte(NodeTypeNames[t]), nil
 }
 
 func (t *NodeType) UnmarshalBinary(b []byte) error {
@@ -321,7 +321,7 @@ var ValidHashTypes = map[HashType][]ContentLength{
 	HashTypeSHA512:   []ContentLength{HashDigestLengthSHA512_256},
 }
 
-var hashNames = map[HashType]string{
+var HashNames = map[HashType]string{
 	HashTypeNullHash: "NullHash",
 	HashTypeSHA512:   "SHA512",
 }
@@ -331,11 +331,11 @@ func (t HashType) MarshalBinary() ([]byte, error) {
 }
 
 func (t HashType) MarshalText() ([]byte, error) {
-	return []byte(hashNames[t]), nil
+	return []byte(HashNames[t]), nil
 }
 
 func (t *HashType) UnmarshalText(b []byte) error {
-	for hashType, hashName := range hashNames {
+	for hashType, hashName := range HashNames {
 		if hashName == string(b) {
 			*t = hashType
 			return nil
@@ -375,7 +375,7 @@ var ValidContentTypes = map[ContentType]struct{}{
 	ContentTypeJSON:       struct{}{},
 }
 
-var contentNames = map[ContentType]string{
+var ContentNames = map[ContentType]string{
 	ContentTypeUTF8String: "UTF-8",
 	ContentTypeJSON:       "JSON",
 }
@@ -385,7 +385,7 @@ func (t ContentType) MarshalBinary() ([]byte, error) {
 }
 
 func (t ContentType) MarshalText() ([]byte, error) {
-	return []byte(contentNames[t]), nil
+	return []byte(ContentNames[t]), nil
 }
 
 func (t *ContentType) UnmarshalBinary(b []byte) error {
@@ -419,7 +419,7 @@ var ValidKeyTypes = map[KeyType]struct{}{
 	KeyTypeOpenPGP: struct{}{},
 }
 
-var keyNames = map[KeyType]string{
+var KeyNames = map[KeyType]string{
 	KeyTypeNoKey:   "None",
 	KeyTypeOpenPGP: "OpenPGP",
 }
@@ -429,7 +429,7 @@ func (t KeyType) MarshalBinary() ([]byte, error) {
 }
 
 func (t KeyType) MarshalText() ([]byte, error) {
-	return []byte(keyNames[t]), nil
+	return []byte(KeyNames[t]), nil
 }
 
 func (t *KeyType) UnmarshalBinary(b []byte) error {
@@ -461,7 +461,7 @@ var ValidSignatureTypes = map[SignatureType]struct{}{
 	SignatureTypeOpenPGP: struct{}{},
 }
 
-var signatureNames = map[SignatureType]string{
+var SignatureNames = map[SignatureType]string{
 	SignatureTypeOpenPGP: "OpenPGP",
 }
 
@@ -470,7 +470,7 @@ func (t SignatureType) MarshalBinary() ([]byte, error) {
 }
 
 func (t SignatureType) MarshalText() ([]byte, error) {
-	return []byte(signatureNames[t]), nil
+	return []byte(SignatureNames[t]), nil
 }
 
 func (t *SignatureType) UnmarshalBinary(b []byte) error {
