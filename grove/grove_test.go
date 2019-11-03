@@ -290,3 +290,20 @@ func TestGroveAdd(t *testing.T) {
 		t.Errorf("Expected Add() to succeed: %v", err)
 	}
 }
+
+func TestGroveAddFailToWrite(t *testing.T) {
+	fs := newFakeFS()
+	fakeNodeBuilder := NewNodeBuilder(t)
+	reply, replyFile := fakeNodeBuilder.newReplyFile("test content")
+	eFile := NewErrFile(replyFile)
+	g, err := grove.NewWithFS(fs)
+	if err != nil {
+		t.Errorf("Failed constructing grove: %v", err)
+	}
+	fs.files[eFile.Name()] = eFile
+	eFile.error = os.ErrClosed
+
+	if err := g.Add(reply); err == nil {
+		t.Errorf("Expected Add() to fail when writing to file fails")
+	}
+}
