@@ -163,19 +163,43 @@ func (e *errFile) Readdir(n int) ([]os.FileInfo, error) {
 // fakeFS implements grove.FS, but is entirely in-memory.
 type fakeFS struct {
 	files map[string]grove.File
+	*bytes.Buffer
 }
 
 var _ grove.FS = fakeFS{}
 
 func newFakeFS() fakeFS {
 	return fakeFS{
-		make(map[string]grove.File),
+		files: make(map[string]grove.File),
 	}
+}
+
+func (r fakeFS) Name() string {
+	return ""
+}
+
+func (r fakeFS) Close() error {
+	return nil
+}
+
+func (r fakeFS) Readdir(n int) ([]os.FileInfo, error) {
+	count := n
+	if count <= 0 {
+		count = len(r.files)
+	}
+	info := make([]os.FileInfo, 0, count)
+	for _, file := range r.files {
+		info = append(info, file.(os.FileInfo))
+	}
+	return info, nil
 }
 
 // Open opens the given path as an absolute path relative to the root
 // of the fakeFS
 func (r fakeFS) Open(path string) (grove.File, error) {
+	if path == "" {
+		return r, nil
+	}
 	file, exists := r.files[path]
 	if !exists {
 		return nil, os.ErrNotExist
