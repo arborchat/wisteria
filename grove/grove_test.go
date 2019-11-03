@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"os"
 	"testing"
+	"time"
 
 	forest "git.sr.ht/~whereswaldon/forest-go"
 	"git.sr.ht/~whereswaldon/forest-go/grove"
@@ -13,21 +14,48 @@ import (
 // fakeFile implements the grove.File interface, but is entirely in-memory.
 // This helps speed testing.
 type fakeFile struct {
+	data []byte
 	*bytes.Buffer
-	name string
+	name    string
+	mode    os.FileMode
+	modtime time.Time
 }
 
 var _ grove.File = &fakeFile{}
+var _ os.FileInfo = &fakeFile{}
 
 func newFakeFile(name string, content []byte) *fakeFile {
 	return &fakeFile{
-		name:   name,
-		Buffer: bytes.NewBuffer(content),
+		name:    name,
+		mode:    os.FileMode(0660),
+		modtime: time.Now(),
+		data:    content,
+		Buffer:  bytes.NewBuffer(content),
 	}
 }
 
 func (f *fakeFile) Name() string {
 	return f.name
+}
+
+func (f *fakeFile) Size() int64 {
+	return int64(f.Buffer.Len())
+}
+
+func (f *fakeFile) Mode() os.FileMode {
+	return f.mode
+}
+
+func (f *fakeFile) ModTime() time.Time {
+	return f.modtime
+}
+
+func (f *fakeFile) IsDir() bool {
+	return false
+}
+
+func (f *fakeFile) Sys() interface{} {
+	return nil
 }
 
 // needed to implement Close so that fakeFile is a io.ReadWriteCloser
@@ -37,6 +65,14 @@ func (f *fakeFile) Close() error {
 
 func (f *fakeFile) Readdir(n int) ([]os.FileInfo, error) {
 	return []os.FileInfo{}, nil
+}
+
+// ResetBuffer creates a new Buffer with the file's data. This is useful
+// for ensuring that a given fakeFile can be read more than once. Calling
+// this method effectively resets the contents of the file to be correct
+// after the file has been read (reading the file will empty it).
+func (f *fakeFile) ResetBuffer() {
+	f.Buffer = bytes.NewBuffer(f.data)
 }
 
 // errFile implements the grove.File interface and wraps another grove.File.
