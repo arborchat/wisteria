@@ -85,6 +85,7 @@ type errFile struct {
 }
 
 var _ grove.File = &errFile{}
+var _ os.FileInfo = &errFile{}
 
 func NewErrFile(file grove.File) *errFile {
 	return &errFile{
@@ -94,6 +95,41 @@ func NewErrFile(file grove.File) *errFile {
 
 func (e *errFile) Name() string {
 	return e.wrappedFile.Name()
+}
+
+func (e *errFile) Size() int64 {
+	if fake, implements := e.wrappedFile.(os.FileInfo); implements {
+		return fake.Size()
+	}
+	return 0
+}
+
+func (e *errFile) Mode() os.FileMode {
+	if fake, implements := e.wrappedFile.(os.FileInfo); implements {
+		return fake.Mode()
+	}
+	return os.FileMode(0660)
+}
+
+func (e *errFile) ModTime() time.Time {
+	if fake, implements := e.wrappedFile.(os.FileInfo); implements {
+		return fake.ModTime()
+	}
+	return time.Now()
+}
+
+func (e *errFile) IsDir() bool {
+	if fake, implements := e.wrappedFile.(os.FileInfo); implements {
+		return fake.IsDir()
+	}
+	return false
+}
+
+func (e *errFile) Sys() interface{} {
+	if fake, implements := e.wrappedFile.(os.FileInfo); implements {
+		return fake.Sys()
+	}
+	return nil
 }
 
 func (e *errFile) Read(b []byte) (int, error) {
