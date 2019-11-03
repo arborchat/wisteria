@@ -55,7 +55,17 @@ func (r fakeFS) Open(path string) (grove.File, error) {
 // Create makes the given path as an absolute path relative to the root
 // of the fakeFS
 func (r fakeFS) Create(path string) (grove.File, error) {
-	return r.Open(path)
+	file, exists := r.files[path]
+	// mimic os.Create(), so creating a file that already exists truncates
+	// the current one
+	if exists {
+		file.Reset()
+		return file, nil
+	}
+	file = newFakeFile(path, []byte{})
+	r.files[path] = file
+
+	return file, nil
 }
 
 // OpenFile opens the given path as an absolute path relative to the root
@@ -162,5 +172,19 @@ func TestGroveGet(t *testing.T) {
 		t.Errorf("Grove indicated that a node was not present when it should have been")
 	} else if node == nil {
 		t.Errorf("Grove did not return a node when the requested node was present")
+	}
+}
+
+func TestGroveAdd(t *testing.T) {
+	fs := newFakeFS()
+	fakeNodeBuilder := NewNodeBuilder(t)
+	reply, _ := fakeNodeBuilder.newReplyFile("test content")
+	g, err := grove.NewWithFS(fs)
+	if err != nil {
+		t.Errorf("Failed constructing grove: %v", err)
+	}
+
+	if err := g.Add(reply); err != nil {
+		t.Errorf("Expected Add() to succeed: %v", err)
 	}
 }

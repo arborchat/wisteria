@@ -115,3 +115,24 @@ func (g *Grove) Get(nodeID *fields.QualifiedHash) (forest.Node, bool, error) {
 	}
 	return node, true, nil
 }
+
+// Add inserts the node into the grove.
+func (g *Grove) Add(node forest.Node) error {
+	data, err := node.MarshalBinary()
+	if err != nil {
+		return fmt.Errorf("failed to serialize node: %w", err)
+	}
+
+	id, _ := node.ID().MarshalString()
+	nodeFile, err := g.Create(id)
+	if err != nil {
+		return fmt.Errorf("failed to create file for node %s: %w", id, err)
+	}
+	defer nodeFile.Close()
+
+	_, err = nodeFile.Write(data)
+	if err != nil {
+		return fmt.Errorf("failed to write data to file for node %s: %w", id, err)
+	}
+	return nil
+}
