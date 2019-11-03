@@ -13,11 +13,6 @@ func TestMemoryStore(t *testing.T) {
 }
 
 func testStandardStoreInterface(t *testing.T, s forest.Store, storeImplName string) {
-	if size, err := s.Size(); size != 0 {
-		t.Errorf("Expected new %s to have size 0, had %d", storeImplName, size)
-	} else if err != nil {
-		t.Errorf("Expected new %s Size() to succeed, failed with %s", storeImplName, err)
-	}
 	// create three test nodes, one of each type
 	identity, _, community, reply := MakeReplyOrSkip(t)
 	nodes := []forest.Node{identity, community, reply}
@@ -49,14 +44,9 @@ func testStandardStoreInterface(t *testing.T, s forest.Store, storeImplName stri
 	}
 
 	// add each node
-	for count, i := range nodes {
+	for _, i := range nodes {
 		if err := s.Add(i); err != nil {
 			t.Errorf("%s Add() should not err on Add(): %s", storeImplName, err)
-		}
-		if size, err := s.Size(); err != nil {
-			t.Errorf("%s Size() should never error, got %s", storeImplName, err)
-		} else if size != count+1 {
-			t.Errorf("%s Size() should be %d after %d Add()s, got %d", storeImplName, count+1, count+1, size)
 		}
 	}
 
