@@ -233,7 +233,7 @@ func (g *Grove) Recent(nodeType fields.NodeType, quantity int) ([]forest.Node, e
 		case *forest.Reply:
 			b = n.CommonNode
 		}
-		return a.Created < b.Created
+		return a.Created > b.Created
 	})
 	rightType := make([]forest.Node, 0, quantity)
 	for _, node := range nodes {
@@ -252,5 +252,8 @@ func (g *Grove) Recent(nodeType fields.NodeType, quantity int) ([]forest.Node, e
 			}
 		}
 	}
-	return rightType[:quantity], nil
+	if len(rightType) > quantity {
+		rightType = rightType[:quantity]
+	}
+	return rightType, nil
 }

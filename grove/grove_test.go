@@ -484,9 +484,9 @@ func TestGroveChildrenParseNodeFails(t *testing.T) {
 func TestGroveRecent(t *testing.T) {
 	fs := newFakeFS()
 	fakeNodeBuilder := NewNodeBuilder(t)
-	_, replyFile := fakeNodeBuilder.newReplyFile("test content")
-	_, replyFile1 := fakeNodeBuilder.newReplyFile("test content")
-	_, replyFile2 := fakeNodeBuilder.newReplyFile("test content")
+	reply, replyFile := fakeNodeBuilder.newReplyFile("test content")
+	reply1, replyFile1 := fakeNodeBuilder.newReplyFile("test content")
+	reply2, replyFile2 := fakeNodeBuilder.newReplyFile("test content")
 	g, err := grove.NewWithFS(fs)
 	if err != nil {
 		t.Errorf("Failed constructing grove: %v", err)
@@ -511,17 +511,49 @@ func TestGroveRecent(t *testing.T) {
 
 	if replies, err := g.Recent(fields.NodeTypeReply, 5); err != nil {
 		t.Errorf("Expected recent replies to succeed: %v", err)
-	} else if len(replies) < 3 {
-		t.Errorf("Expected at least 3 replies, found %d", len(replies))
+	} else if len(replies) != 3 {
+		t.Errorf("Expected 3 replies, found %d", len(replies))
+	} else {
+		for i, r := range replies {
+			asReply, isReply := r.(*forest.Reply)
+			if !isReply {
+				t.Errorf("Reply node is not actually a reply")
+			}
+			if i > 0 {
+				lastReply := replies[i-1].(*forest.Reply)
+				if lastReply.Created < asReply.Created {
+					t.Errorf("Nodes are not in descending order of Created field")
+				}
+
+			}
+			switch i {
+			case 0:
+				if !reply2.ID().Equals(r.ID()) {
+					t.Errorf("First node returned should have been last one created")
+				}
+			case 1:
+				if !reply1.ID().Equals(r.ID()) {
+					t.Errorf("Second node created should have been second node returned")
+				}
+			case 2:
+				if !reply.ID().Equals(r.ID()) {
+					t.Errorf("Last node returned should have been the first one created")
+				}
+			}
+
+		}
 	}
 	// TODO: check that they are sorted and are the right three nodes
 
 	// reset fakeFiles so they can be read again
-	replyFile.ResetBuffer()
-	replyFile1.ResetBuffer()
-	replyFile2.ResetBuffer()
-	idFile.ResetBuffer()
-	communityFile.ResetBuffer()
+	resetAll := func() {
+		replyFile.ResetBuffer()
+		replyFile1.ResetBuffer()
+		replyFile2.ResetBuffer()
+		idFile.ResetBuffer()
+		communityFile.ResetBuffer()
+	}
+	resetAll()
 
 	// TODO: test other quantities and node types
 }
