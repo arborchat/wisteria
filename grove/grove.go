@@ -209,6 +209,7 @@ func (g *Grove) Children(id *fields.QualifiedHash) ([]*fields.QualifiedHash, err
 }
 
 // Recent returns a slice of the most recently-created nodes of the given type.
+// The slice is sorted so that the most-recently-created nodes are at the beginning.
 func (g *Grove) Recent(nodeType fields.NodeType, quantity int) ([]forest.Node, error) {
 	nodes, err := g.allNodes()
 	if err != nil {

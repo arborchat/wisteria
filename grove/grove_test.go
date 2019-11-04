@@ -543,7 +543,6 @@ func TestGroveRecent(t *testing.T) {
 
 		}
 	}
-	// TODO: check that they are sorted and are the right three nodes
 
 	// reset fakeFiles so they can be read again
 	resetAll := func() {
@@ -555,5 +554,42 @@ func TestGroveRecent(t *testing.T) {
 	}
 	resetAll()
 
-	// TODO: test other quantities and node types
+	if replies, err := g.Recent(fields.NodeTypeReply, 2); err != nil {
+		t.Errorf("Did not expect valid query for recent replies to err: %v", err)
+	} else if len(replies) != 2 {
+		t.Errorf("Expected %d nodes, got %d", 2, len(replies))
+	}
+
+	resetAll()
+
+	if ids, err := g.Recent(fields.NodeTypeIdentity, 2); err != nil {
+		t.Errorf("Did not expect valid query for recent identities to err: %v", err)
+	} else if len(ids) != 1 {
+		t.Errorf("Expected %d nodes, got %d", 1, len(ids))
+	} else {
+		asIdentity, isIdentity := ids[0].(*forest.Identity)
+		if !isIdentity {
+			t.Errorf("Recent() request for identities returned a different node type")
+		}
+		if !asIdentity.ID().Equals(identity.ID()) {
+			t.Errorf("Recent() didn't return the correct identity")
+		}
+	}
+
+	resetAll()
+
+	if communities, err := g.Recent(fields.NodeTypeCommunity, 2); err != nil {
+		t.Errorf("Did not expect valid query for recent identities to err: %v", err)
+	} else if len(communities) != 1 {
+		t.Errorf("Expected %d nodes, got %d", 1, len(communities))
+	} else {
+		asCommunity, isCommunity := communities[0].(*forest.Community)
+		if !isCommunity {
+			t.Errorf("Recent() request for communities returned a different node type")
+		}
+		if !asCommunity.ID().Equals(community.ID()) {
+			t.Errorf("Recent() didn't return the correct community")
+		}
+	}
+
 }
