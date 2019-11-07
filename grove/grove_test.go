@@ -192,12 +192,7 @@ func (tnb *testNodeBuilder) newReplyFile(content string) (*forest.Reply, *fakeFi
 	if err != nil {
 		tnb.T.Errorf("Failed marshalling test reply node: %v", err)
 	}
-	id := reply.ID()
-	nodeID, err := id.MarshalString()
-	if err != nil {
-		tnb.T.Errorf("Failed to marshal node id: %v", err)
-	}
-	return reply, newFakeFile(nodeID, b)
+	return reply, newFakeFile(reply.ID().String(), b)
 }
 
 func TestCreateEmptyGrove(t *testing.T) {
