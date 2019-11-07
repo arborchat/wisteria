@@ -115,3 +115,67 @@ func (g *Grove) Get(nodeID *fields.QualifiedHash) (node forest.Node, present boo
 	}
 	return node, true, nil
 }
+
+// GetIdentity returns an Identity node with the given ID (if it is present
+// in the grove). This operation may be faster than using Get, as the grove
+// may be able to do less search work when it knows the type of node you're
+// looking for in advance.
+//
+// BUG(whereswaldon): The current implementation may return nodes of the
+// wrong NodeType if they match the provided ID
+func (g *Grove) GetIdentity(id *fields.QualifiedHash) (forest.Node, bool, error) {
+	// this naiive implementation is not efficient, but works as a short-term
+	// thing.
+	//
+	// TODO: change the on-disk representation so that operations like this can
+	// be fast (store different node types in different directories, etc...)
+	return g.Get(id)
+}
+
+// GetCommunity returns an Community node with the given ID (if it is present
+// in the grove). This operation may be faster than using Get, as the grove
+// may be able to do less search work when it knows the type of node you're
+// looking for in advance.
+//
+// BUG(whereswaldon): The current implementation may return nodes of the
+// wrong NodeType if they match the provided ID
+func (g *Grove) GetCommunity(id *fields.QualifiedHash) (forest.Node, bool, error) {
+	// this naiive implementation is not efficient, but works as a short-term
+	// thing.
+	//
+	// TODO: change the on-disk representation so that operations like this can
+	// be fast (store different node types in different directories, etc...)
+	return g.Get(id)
+}
+
+// GetConversation returns an Conversation node with the given ID (if it is present
+// in the grove). This operation may be faster than using Get, as the grove
+// may be able to do less search work when it knows the type of node you're
+// looking for and its parent node in advance.
+//
+// BUG(whereswaldon): The current implementation may return nodes of the
+// wrong NodeType if they match the provided ID
+func (g *Grove) GetConversation(communityID, conversationID *fields.QualifiedHash) (forest.Node, bool, error) {
+	// this naiive implementation is not efficient, but works as a short-term
+	// thing.
+	//
+	// TODO: change the on-disk representation so that operations like this can
+	// be fast (store different node types in different directories, etc...)
+	return g.Get(conversationID)
+}
+
+// GetReply returns an Reply node with the given ID (if it is present
+// in the grove). This operation may be faster than using Get, as the grove
+// may be able to do less search work when it knows the type of node you're
+// looking for and its parent community and conversation node in advance.
+//
+// BUG(whereswaldon): The current implementation may return nodes of the
+// wrong NodeType if they match the provided ID
+func (g *Grove) GetReply(communityID, conversationID, replyID *fields.QualifiedHash) (forest.Node, bool, error) {
+	// this naiive implementation is not efficient, but works as a short-term
+	// thing.
+	//
+	// TODO: change the on-disk representation so that operations like this can
+	// be fast (store different node types in different directories, etc...)
+	return g.Get(replyID)
+}
