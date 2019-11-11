@@ -94,11 +94,11 @@ func NewWithFS(fs FS) (*Grove, error) {
 // Get searches the grove for a node with the given id. It returns the node if it was
 // found, a boolean indicating whether it was found, and an error (if there was a
 // problem searching for the node).
-func (g *Grove) Get(nodeID *fields.QualifiedHash) (forest.Node, bool, error) {
-	filename, err := nodeID.MarshalString()
-	if err != nil {
-		return nil, false, fmt.Errorf("failed determining file name for node: %w", err)
-	}
+// The returned `present` will never be true unless the returned `node` holds an
+// actual node struct. If the file holding a node exists on disk but was unable
+// to be opened, read, or parsed, `present` will still be false.
+func (g *Grove) Get(nodeID *fields.QualifiedHash) (node forest.Node, present bool, err error) {
+	filename := nodeID.String()
 	file, err := g.Open(filename)
 	// if the file doesn't exist, just return false with no error
 	if errors.Is(err, os.ErrNotExist) {
@@ -112,7 +112,7 @@ func (g *Grove) Get(nodeID *fields.QualifiedHash) (forest.Node, bool, error) {
 	if err != nil {
 		return nil, false, fmt.Errorf("failed reading bytes from \"%s\": %w", filename, err)
 	}
-	node, err := forest.UnmarshalBinaryNode(b)
+	node, err = forest.UnmarshalBinaryNode(b)
 	if err != nil {
 		return nil, false, fmt.Errorf("failed unmarshalling node from \"%s\": %w", filename, err)
 	}
@@ -257,4 +257,104 @@ func (g *Grove) Recent(nodeType fields.NodeType, quantity int) ([]forest.Node, e
 		rightType = rightType[:quantity]
 	}
 	return rightType, nil
+}
+
+// Add inserts the node into the grove.
+//
+// BUG(whereswaldon): If the node is already present, this will overwrite it.
+// This is rather wasteful. It would be better to detect the existing file and
+// do nothing instead.
+func (g *Grove) Add(node forest.Node) error {
+	data, err := node.MarshalBinary()
+	if err != nil {
+		return fmt.Errorf("failed to serialize node: %w", err)
+	}
+
+	id, _ := node.ID().MarshalString()
+	nodeFile, err := g.Create(id)
+	if err != nil {
+		return fmt.Errorf("failed to create file for node %s: %w", id, err)
+	}
+	defer nodeFile.Close()
+
+	_, err = nodeFile.Write(data)
+	if err != nil {
+		return fmt.Errorf("failed to write data to file for node %s: %w", id, err)
+	}
+	return nil
+}
+
+// GetIdentity returns an Identity node with the given ID (if it is present
+// in the grove). This operation may be faster than using Get, as the grove
+// may be able to do less search work when it knows the type of node you're
+// looking for in advance.
+//
+// BUG(whereswaldon): The current implementation may return nodes of the
+// wrong NodeType if they match the provided ID
+func (g *Grove) GetIdentity(id *fields.QualifiedHash) (forest.Node, bool, error) {
+	// this naiive implementation is not efficient, but works as a short-term
+	// thing.
+	//
+	// TODO: change the on-disk representation so that operations like this can
+	// be fast (store different node types in different directories, etc...)
+	return g.Get(id)
+}
+
+// GetCommunity returns an Community node with the given ID (if it is present
+// in the grove). This operation may be faster than using Get, as the grove
+// may be able to do less search work when it knows the type of node you're
+// looking for in advance.
+//
+// BUG(whereswaldon): The current implementation may return nodes of the
+// wrong NodeType if they match the provided ID
+func (g *Grove) GetCommunity(id *fields.QualifiedHash) (forest.Node, bool, error) {
+	// this naiive implementation is not efficient, but works as a short-term
+	// thing.
+	//
+	// TODO: change the on-disk representation so that operations like this can
+	// be fast (store different node types in different directories, etc...)
+	return g.Get(id)
+}
+
+// GetConversation returns an Conversation node with the given ID (if it is present
+// in the grove). This operation may be faster than using Get, as the grove
+// may be able to do less search work when it knows the type of node you're
+// looking for and its parent node in advance.
+//
+// BUG(whereswaldon): The current implementation may return nodes of the
+// wrong NodeType if they match the provided ID
+func (g *Grove) GetConversation(communityID, conversationID *fields.QualifiedHash) (forest.Node, bool, error) {
+	// this naiive implementation is not efficient, but works as a short-term
+	// thing.
+	//
+	// TODO: change the on-disk representation so that operations like this can
+	// be fast (store different node types in different directories, etc...)
+	return g.Get(conversationID)
+}
+
+// GetReply returns an Reply node with the given ID (if it is present
+// in the grove). This operation may be faster than using Get, as the grove
+// may be able to do less search work when it knows the type of node you're
+// looking for and its parent community and conversation node in advance.
+//
+// BUG(whereswaldon): The current implementation may return nodes of the
+// wrong NodeType if they match the provided ID
+func (g *Grove) GetReply(communityID, conversationID, replyID *fields.QualifiedHash) (forest.Node, bool, error) {
+	// this naiive implementation is not efficient, but works as a short-term
+	// thing.
+	//
+	// TODO: change the on-disk representation so that operations like this can
+	// be fast (store different node types in different directories, etc...)
+	return g.Get(replyID)
+}
+
+// CopyInto copies all nodes from the store into the provided store.
+//
+// BUG(whereswaldon): this method is not yet implemented. It requires
+// more extensive file manipulation than other Grove methods (listing
+// directory contents) and has therefore been deprioritized in favor
+// of the functionality that can be implemented simply. However, it is
+// implementable, and should be done as soon as is feasible.
+func (g *Grove) CopyInto(other forest.Store) error {
+	return fmt.Errorf("method CopyInto() is not currently implemented on Grove")
 }

@@ -2,6 +2,7 @@ package grove_test
 
 import (
 	"bytes"
+	"fmt"
 	"os"
 	"testing"
 	"time"
@@ -11,6 +12,11 @@ import (
 	"git.sr.ht/~whereswaldon/forest-go/grove"
 	"git.sr.ht/~whereswaldon/forest-go/testkeys"
 )
+
+type truncatableFile interface {
+	grove.File
+	Truncate(size int64) error
+}
 
 // fakeFile implements the grove.File interface, but is entirely in-memory.
 // This helps speed testing.
@@ -22,8 +28,8 @@ type fakeFile struct {
 	modtime time.Time
 }
 
-var _ grove.File = &fakeFile{}
 var _ os.FileInfo = &fakeFile{}
+var _ truncatableFile = &fakeFile{}
 
 func newFakeFile(name string, content []byte) *fakeFile {
 	return &fakeFile{
@@ -76,19 +82,25 @@ func (f *fakeFile) ResetBuffer() {
 	f.Buffer = bytes.NewBuffer(f.data)
 }
 
+// needed to implement truncatableFile
+func (f *fakeFile) Truncate(size int64) error {
+	f.Buffer.Truncate(int(size))
+	return nil
+}
+
 // errFile implements the grove.File interface and wraps another grove.File.
 // If the errFile's error field is set to nil, it is a transparent wrapper
 // for the underlying File. If the field is set to a non-nil error value,
 // this will be returned from all operations that can return an error.
 type errFile struct {
 	error
-	wrappedFile grove.File
+	wrappedFile truncatableFile
 }
 
-var _ grove.File = &errFile{}
+var _ truncatableFile = &errFile{}
 var _ os.FileInfo = &errFile{}
 
-func NewErrFile(file grove.File) *errFile {
+func NewErrFile(file truncatableFile) *errFile {
 	return &errFile{
 		wrappedFile: file,
 	}
@@ -161,17 +173,24 @@ func (e *errFile) Readdir(n int) ([]os.FileInfo, error) {
 	return e.wrappedFile.Readdir(n)
 }
 
+func (e *errFile) Truncate(size int64) error {
+	if e.error != nil {
+		return e.error
+	}
+	return e.wrappedFile.Truncate(size)
+}
+
 // fakeFS implements grove.FS, but is entirely in-memory.
 type fakeFS struct {
-	files map[string]grove.File
 	*bytes.Buffer
+	files map[string]truncatableFile
 }
 
 var _ grove.FS = fakeFS{}
 
 func newFakeFS() fakeFS {
 	return fakeFS{
-		files: make(map[string]grove.File),
+		files: make(map[string]truncatableFile),
 	}
 }
 
@@ -213,8 +232,13 @@ func (r fakeFS) Open(path string) (grove.File, error) {
 func (r fakeFS) Create(path string) (grove.File, error) {
 	// mimic os.Create(), so creating a file that already exists truncates
 	// the current one
-	file := newFakeFile(path, []byte{})
-	r.files[path] = file
+	file, exists := r.files[path]
+	if exists {
+		file.Truncate(0)
+	} else {
+		file = newFakeFile(path, []byte{})
+		r.files[path] = file
+	}
 
 	return file, nil
 }
@@ -305,12 +329,7 @@ func (tnb *testNodeBuilder) newReplyFile(content string) (*forest.Reply, *fakeFi
 	if err != nil {
 		tnb.T.Errorf("Failed marshalling test reply node: %v", err)
 	}
-	id := reply.ID()
-	nodeID, err := id.MarshalString()
-	if err != nil {
-		tnb.T.Errorf("Failed to marshal node id: %v", err)
-	}
-	return reply, newFakeFile(nodeID, b)
+	return reply, newFakeFile(reply.ID().String(), b)
 }
 
 func TestCreateEmptyGrove(t *testing.T) {
@@ -359,6 +378,183 @@ func TestGroveGet(t *testing.T) {
 		t.Errorf("Grove indicated that a node was not present when it should have been")
 	} else if node == nil {
 		t.Errorf("Grove did not return a node when the requested node was present")
+	}
+}
+
+func TestGroveGetErrorReadingFile(t *testing.T) {
+	fs := newFakeFS()
+	fakeNodeBuilder := NewNodeBuilder(t)
+	reply, replyFile := fakeNodeBuilder.newReplyFile("test content")
+	errReplyFile := NewErrFile(replyFile)
+	g, err := grove.NewWithFS(fs)
+	if err != nil {
+		t.Errorf("Failed constructing grove: %v", err)
+	}
+
+	// add node to fs, now should be discoverable
+	fs.files[errReplyFile.Name()] = errReplyFile
+	errReplyFile.error = os.ErrClosed
+
+	// no nodes in fs, make sure we get nothing
+	if node, present, err := g.Get(reply.ID()); err == nil {
+		t.Errorf("Expected error reading file to be propagated upward, got nil")
+	} else if present {
+		t.Errorf("Grove indicated that a node was present when it could not be read")
+	} else if node != nil {
+		t.Errorf("Grove returned a node when the requested node was unreadable")
+	}
+}
+
+func TestGroveGetErrorUnmarshallingFile(t *testing.T) {
+	fs := newFakeFS()
+	fakeNodeBuilder := NewNodeBuilder(t)
+	reply, replyFile := fakeNodeBuilder.newReplyFile("test content")
+	replyFile.Reset()
+	_, err := replyFile.Write([]byte("this is not an arbor node"))
+	if err != nil {
+		t.Skipf("Unable to write test data into node file: %v", err)
+	}
+	g, err := grove.NewWithFS(fs)
+	if err != nil {
+		t.Errorf("Failed constructing grove: %v", err)
+	}
+
+	// add node to fs, now should be discoverable
+	fs.files[replyFile.Name()] = replyFile
+
+	// no nodes in fs, make sure we get nothing
+	if node, present, err := g.Get(reply.ID()); err == nil {
+		t.Errorf("Expected error unmarshalling file to be propagated upward, got nil")
+	} else if present {
+		t.Errorf("Grove indicated that a node was present when it could not be unmarshalled")
+	} else if node != nil {
+		t.Errorf("Grove returned a node when the requested node was unparsable")
+	}
+}
+
+func TestGroveGetErrorOpeningFile(t *testing.T) {
+	fs := newFakeFS()
+	eFS := newErrFS(fs)
+	fakeNodeBuilder := NewNodeBuilder(t)
+	reply, _ := fakeNodeBuilder.newReplyFile("test content")
+	g, err := grove.NewWithFS(eFS)
+	if err != nil {
+		t.Errorf("Failed constructing grove: %v", err)
+	}
+	eFS.error = os.ErrPermission
+
+	// no nodes in fs, make sure we get nothing
+	if node, present, err := g.Get(reply.ID()); err == nil {
+		t.Errorf("Expected error accessing file to be propagated upward, got nil")
+	} else if present {
+		t.Errorf("Grove indicated that a node was present when it could not be opened")
+	} else if node != nil {
+		t.Errorf("Grove returned a node when the requested node was inaccessible")
+	}
+}
+
+func TestGroveAdd(t *testing.T) {
+	fs := newFakeFS()
+	fakeNodeBuilder := NewNodeBuilder(t)
+	reply, _ := fakeNodeBuilder.newReplyFile("test content")
+
+	g, err := grove.NewWithFS(fs)
+	if err != nil {
+		t.Errorf("Failed constructing grove: %v", err)
+	}
+
+	if err := g.Add(reply); err != nil {
+		t.Errorf("Expected Add() to succeed: %v", err)
+	}
+}
+
+func TestGroveAddFailToWrite(t *testing.T) {
+	fs := newFakeFS()
+	fakeNodeBuilder := NewNodeBuilder(t)
+	reply, replyFile := fakeNodeBuilder.newReplyFile("test content")
+	eFile := NewErrFile(replyFile)
+
+	g, err := grove.NewWithFS(fs)
+	if err != nil {
+		t.Errorf("Failed constructing grove: %v", err)
+	}
+
+	fs.files[eFile.Name()] = eFile
+	eFile.error = os.ErrClosed
+
+	if err := g.Add(reply); err == nil {
+		t.Errorf("Expected Add() to fail when writing to file fails")
+	}
+}
+
+func TestGroveAddFailToCreate(t *testing.T) {
+	fs := newFakeFS()
+	efs := newErrFS(fs)
+	efs.error = os.ErrPermission
+	fakeNodeBuilder := NewNodeBuilder(t)
+	reply, _ := fakeNodeBuilder.newReplyFile("test content")
+	g, err := grove.NewWithFS(efs)
+	if err != nil {
+		t.Errorf("Failed constructing grove: %v", err)
+	}
+
+	if err := g.Add(reply); err == nil {
+		t.Errorf("Expected Add() to fail when creating file fails")
+	}
+}
+
+type errNode struct {
+	error
+}
+
+var _ forest.Node = errNode{}
+
+func (e errNode) TreeDepth() fields.TreeDepth {
+	return 0
+}
+
+func (e errNode) ID() *fields.QualifiedHash {
+	return &fields.QualifiedHash{}
+}
+
+func (e errNode) ParentID() *fields.QualifiedHash {
+	return &fields.QualifiedHash{}
+}
+
+func (e errNode) Equals(interface{}) bool {
+	return false
+}
+
+func (e errNode) MarshalBinary() ([]byte, error) {
+	return nil, e.error
+}
+
+func (e errNode) UnmarshalBinary([]byte) error {
+	return e.error
+}
+
+func (e errNode) ValidateDeep(forest.Store) error {
+	return e.error
+}
+
+func (e errNode) ValidateShallow() error {
+	return e.error
+}
+
+func TestGroveAddFailToSerialize(t *testing.T) {
+	fs := newFakeFS()
+	efs := newErrFS(fs)
+	efs.error = os.ErrPermission
+	eNode := errNode{
+		fmt.Errorf("I can't be serialized"),
+	}
+	g, err := grove.NewWithFS(efs)
+	if err != nil {
+		t.Errorf("Failed constructing grove: %v", err)
+	}
+
+	if err := g.Add(eNode); err == nil {
+		t.Errorf("Expected Add() to fail when serializing node fails")
 	}
 }
 

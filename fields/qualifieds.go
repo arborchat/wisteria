@@ -15,8 +15,8 @@ const minSizeofQualified = sizeofDescriptor
 
 // concrete qualified data types
 type QualifiedHash struct {
-	Descriptor HashDescriptor      `arbor:"order=0,recurse=serialize"`
-	Blob                           `arbor:"order=1"`
+	Descriptor HashDescriptor `arbor:"order=0,recurse=serialize"`
+	Blob       `arbor:"order=1"`
 }
 
 const minSizeofQualifiedHash = sizeofHashDescriptor
@@ -87,6 +87,12 @@ func (q *QualifiedHash) MarshalString() (string, error) {
 	return string(s), e
 }
 
+// String returns the output of MarshalString, but does not return an error.
+func (q *QualifiedHash) String() string {
+	s, _ := q.MarshalString()
+	return s
+}
+
 func (q *QualifiedHash) Validate() error {
 	if err := q.Descriptor.Validate(); err != nil {
 		return err
@@ -98,8 +104,8 @@ func (q *QualifiedHash) Validate() error {
 }
 
 type QualifiedContent struct {
-	Descriptor ContentDescriptor   `arbor:"order=0,recurse=serialize"`
-	Blob                           `arbor:"order=1"`
+	Descriptor ContentDescriptor `arbor:"order=0,recurse=serialize"`
+	Blob       `arbor:"order=1"`
 }
 
 const minSizeofQualifiedContent = sizeofContentDescriptor
@@ -160,8 +166,8 @@ func (q *QualifiedContent) Validate() error {
 }
 
 type QualifiedKey struct {
-	Descriptor KeyDescriptor       `arbor:"order=0,recurse=serialize"`
-	Blob                           `arbor:"order=1"`
+	Descriptor KeyDescriptor `arbor:"order=0,recurse=serialize"`
+	Blob       `arbor:"order=1"`
 }
 
 const minSizeofQualifiedKey = sizeofKeyDescriptor
@@ -216,7 +222,7 @@ func (q *QualifiedKey) AsEntity() (*openpgp.Entity, error) {
 
 type QualifiedSignature struct {
 	Descriptor SignatureDescriptor `arbor:"order=0,recurse=serialize"`
-	Blob                           `arbor:"order=1"`
+	Blob       `arbor:"order=1"`
 }
 
 const minSizeofQualifiedSignature = sizeofSignatureDescriptor
