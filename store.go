@@ -8,7 +8,6 @@ import (
 )
 
 type Store interface {
-	Size() (int, error)
 	CopyInto(Store) error
 	Get(*fields.QualifiedHash) (Node, bool, error)
 	GetIdentity(*fields.QualifiedHash) (Node, bool, error)
@@ -32,10 +31,6 @@ func NewMemoryStore() *MemoryStore {
 		Items:    make(map[string]Node),
 		ChildMap: make(map[string][]string),
 	}
-}
-
-func (m *MemoryStore) Size() (int, error) {
-	return len(m.Items), nil
 }
 
 func (m *MemoryStore) CopyInto(other Store) error {
@@ -177,12 +172,6 @@ func NewCacheStore(cache, back Store) (*CacheStore, error) {
 		return nil, err
 	}
 	return &CacheStore{cache, back}, nil
-}
-
-// Size returns the effective size of this CacheStore, which is the size of the
-// Back Store.
-func (m *CacheStore) Size() (int, error) {
-	return m.Back.Size()
 }
 
 // Get returns the requested node if it is present in either the Cache or the Back Store.

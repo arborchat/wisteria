@@ -222,12 +222,7 @@ func (tnb *testNodeBuilder) newReplyFile(content string) (*forest.Reply, *fakeFi
 	if err != nil {
 		tnb.T.Errorf("Failed marshalling test reply node: %v", err)
 	}
-	id := reply.ID()
-	nodeID, err := id.MarshalString()
-	if err != nil {
-		tnb.T.Errorf("Failed to marshal node id: %v", err)
-	}
-	return reply, newFakeFile(nodeID, b)
+	return reply, newFakeFile(reply.ID().String(), b)
 }
 
 func TestCreateEmptyGrove(t *testing.T) {
@@ -279,10 +274,83 @@ func TestGroveGet(t *testing.T) {
 	}
 }
 
+func TestGroveGetErrorReadingFile(t *testing.T) {
+	fs := newFakeFS()
+	fakeNodeBuilder := NewNodeBuilder(t)
+	reply, replyFile := fakeNodeBuilder.newReplyFile("test content")
+	errReplyFile := NewErrFile(replyFile)
+	g, err := grove.NewWithFS(fs)
+	if err != nil {
+		t.Errorf("Failed constructing grove: %v", err)
+	}
+
+	// add node to fs, now should be discoverable
+	fs.files[errReplyFile.Name()] = errReplyFile
+	errReplyFile.error = os.ErrClosed
+
+	// no nodes in fs, make sure we get nothing
+	if node, present, err := g.Get(reply.ID()); err == nil {
+		t.Errorf("Expected error reading file to be propagated upward, got nil")
+	} else if present {
+		t.Errorf("Grove indicated that a node was present when it could not be read")
+	} else if node != nil {
+		t.Errorf("Grove returned a node when the requested node was unreadable")
+	}
+}
+
+func TestGroveGetErrorUnmarshallingFile(t *testing.T) {
+	fs := newFakeFS()
+	fakeNodeBuilder := NewNodeBuilder(t)
+	reply, replyFile := fakeNodeBuilder.newReplyFile("test content")
+	replyFile.Reset()
+	_, err := replyFile.Write([]byte("this is not an arbor node"))
+	if err != nil {
+		t.Skipf("Unable to write test data into node file: %v", err)
+	}
+	g, err := grove.NewWithFS(fs)
+	if err != nil {
+		t.Errorf("Failed constructing grove: %v", err)
+	}
+
+	// add node to fs, now should be discoverable
+	fs.files[replyFile.Name()] = replyFile
+
+	// no nodes in fs, make sure we get nothing
+	if node, present, err := g.Get(reply.ID()); err == nil {
+		t.Errorf("Expected error unmarshalling file to be propagated upward, got nil")
+	} else if present {
+		t.Errorf("Grove indicated that a node was present when it could not be unmarshalled")
+	} else if node != nil {
+		t.Errorf("Grove returned a node when the requested node was unparsable")
+	}
+}
+
+func TestGroveGetErrorOpeningFile(t *testing.T) {
+	fs := newFakeFS()
+	eFS := newErrFS(fs)
+	fakeNodeBuilder := NewNodeBuilder(t)
+	reply, _ := fakeNodeBuilder.newReplyFile("test content")
+	g, err := grove.NewWithFS(eFS)
+	if err != nil {
+		t.Errorf("Failed constructing grove: %v", err)
+	}
+	eFS.error = os.ErrPermission
+
+	// no nodes in fs, make sure we get nothing
+	if node, present, err := g.Get(reply.ID()); err == nil {
+		t.Errorf("Expected error accessing file to be propagated upward, got nil")
+	} else if present {
+		t.Errorf("Grove indicated that a node was present when it could not be opened")
+	} else if node != nil {
+		t.Errorf("Grove returned a node when the requested node was inaccessible")
+	}
+}
+
 func TestGroveAdd(t *testing.T) {
 	fs := newFakeFS()
 	fakeNodeBuilder := NewNodeBuilder(t)
 	reply, _ := fakeNodeBuilder.newReplyFile("test content")
+
 	g, err := grove.NewWithFS(fs)
 	if err != nil {
 		t.Errorf("Failed constructing grove: %v", err)
@@ -298,10 +366,12 @@ func TestGroveAddFailToWrite(t *testing.T) {
 	fakeNodeBuilder := NewNodeBuilder(t)
 	reply, replyFile := fakeNodeBuilder.newReplyFile("test content")
 	eFile := NewErrFile(replyFile)
+
 	g, err := grove.NewWithFS(fs)
 	if err != nil {
 		t.Errorf("Failed constructing grove: %v", err)
 	}
+
 	fs.files[eFile.Name()] = eFile
 	eFile.error = os.ErrClosed
 
