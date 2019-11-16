@@ -2,26 +2,26 @@ image: archlinux
 packages:
   - go
 sources:
-  - https://git.sr.ht/~whereswaldon/forest-go
+  - https://git.sr.ht/~whereswaldon/wisteria
 environment:
   oses: 'linux darwin openbsd freebsd netbsd windows'
-  github_mirror_url: "git@github.com:arborchat/forest-go.git"
+  github_mirror_url: "git@github.com:arborchat/wisteria.git"
 secrets:
   - 08901094-23ba-4278-8b09-a02b7df36f52
   - 3f11ff14-dff1-45ca-990c-c69873656f63
 tasks:
   - test: |
-      cd forest-go
+      cd wisteria
       go test -cover
       ./cmd/forest/sanity-check.sh
   - cross_compile: |
-      cd forest-go
+      cd wisteria
       for os in $oses ; do env GOOS="$os" go build ; done
   - annotate: |
       go get git.sr.ht/~sircmpwn/annotatego
-      cd forest-go
-      ~/go/bin/annotatego -v -T git.sr.ht/~whereswaldon/forest-go... > annotations.json
-      ../upload-annotations annotations.json whereswaldon forest-go
+      cd wisteria
+      ~/go/bin/annotatego -v -T git.sr.ht/~whereswaldon/wisteria... > annotations.json
+      ../upload-annotations annotations.json whereswaldon wisteria
   - mirror_to_github: |
-      cd forest-go
+      cd wisteria
       ./.builds/mirror.sh "$github_mirror_url"
