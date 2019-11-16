@@ -7,13 +7,12 @@ environment:
   oses: 'linux darwin openbsd freebsd netbsd windows'
   github_mirror_url: "git@github.com:arborchat/wisteria.git"
 secrets:
-  - 08901094-23ba-4278-8b09-a02b7df36f52
+  - c18470ea-9f49-4fcf-8814-2223cfa175f1
   - 3f11ff14-dff1-45ca-990c-c69873656f63
 tasks:
   - test: |
       cd wisteria
       go test -cover
-      ./cmd/forest/sanity-check.sh
   - cross_compile: |
       cd wisteria
       for os in $oses ; do env GOOS="$os" go build ; done
