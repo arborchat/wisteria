@@ -21,6 +21,7 @@ import (
 
 	forest "git.sr.ht/~whereswaldon/forest-go"
 	"git.sr.ht/~whereswaldon/forest-go/fields"
+	"git.sr.ht/~whereswaldon/forest-go/grove"
 )
 
 // ReplyList holds a sortable list of replies
@@ -88,6 +89,25 @@ func NewArchiveFromDir(dirname string, store forest.Store) (*Archive, error) {
 		err := archive.Add(n)
 		if err != nil {
 			return nil, err
+		}
+	}
+	return archive, nil
+}
+
+const defaultArchiveReplyListLen = 1024
+
+func NewArchive(store forest.Store) (*Archive, error) {
+	archive := &Archive{
+		ReplyList: []*forest.Reply{},
+		Store:     store,
+	}
+	nodes, err := store.Recent(fields.NodeTypeReply, defaultArchiveReplyListLen)
+	if err != nil {
+		return nil, fmt.Errorf("Failed loading most recent messages: %w", err)
+	}
+	for _, n := range nodes {
+		if r, ok := n.(*forest.Reply); ok {
+			archive.ReplyList = append(archive.ReplyList, r)
 		}
 	}
 	return archive, nil
@@ -170,7 +190,7 @@ var _ views.CellModel = &HistoryView{}
 
 // CurrentID returns the ID of the currently-selected node
 func (v *HistoryView) CurrentID() *fields.QualifiedHash {
-	if len(v.rendered) > v.Cursor.Y {
+	if len(v.rendered) > v.Cursor.Y && v.Cursor.Y > -1 {
 		return v.rendered[v.Cursor.Y].ID
 	} else if len(v.Archive.ReplyList) > 0 {
 		return v.Archive.ReplyList[0].ID()
@@ -522,10 +542,13 @@ func main() {
 	if err != nil {
 		log.Fatal("Unable to construct builder using configuration:", err)
 	}
-	store := forest.NewMemoryStore()
-	history, err := NewArchiveFromDir(cwd, store)
+	store, err := grove.New(cwd)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("Failed to create grove at %s: %v", cwd, err)
+	}
+	history, err := NewArchive(store)
+	if err != nil {
+		log.Fatalf("Failed to create archive: %v", err)
 	}
 	history.Sort()
 	historyView := &HistoryView{
