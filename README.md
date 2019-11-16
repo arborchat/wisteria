@@ -1,15 +1,8 @@
-# forest-go
+# Wisteria
 
-[![builds.sr.ht status](https://builds.sr.ht/~whereswaldon/forest-go.svg)](https://builds.sr.ht/~whereswaldon/forest-go?)
-[![GoDoc](https://godoc.org/git.sr.ht/~whereswaldon/forest-go?status.svg)](https://godoc.org/git.sr.ht/~whereswaldon/forest-go)
+[![builds.sr.ht status](https://builds.sr.ht/~whereswaldon/wisteria.svg)](https://builds.sr.ht/~whereswaldon/wisteria?)
 
-This repo contains:
-
-- A golang library for working with nodes in the Arbor Forest. This repo is based on the work-in-progress specification [available here](https://github.com/arborchat/protocol/blob/forest/spec/Forest.md).
-- An interactive Arbor client capable of rendering a directory of nodes and creating new ones in `cmd/viewer`. Combined with a file synchronization tool like [`syncthing`](https://syncthing.net/), this client can be used as a standalone chat system.
-- A CLI for creating, manipulating, and viewing nodes in the Arbor Forest in `cmd/forest`
-
-For information about each component of this repo, see later in this file.
+Wisteria is a terminal chat client for the Arbor Chat Project.
 
 ## About Arbor
 
@@ -21,134 +14,98 @@ You can get information about the Arbor project [here](https://man.sr.ht/~wheres
 
 For news about the project, join our [mailing list](https://lists.sr.ht/~whereswaldon/arbor-dev)!
 
-## Interactive Arbor Client
+# What is this?
 
-The `viewer` client displays any valid Arbor nodes within its history as an interactive conversation. It is
-capable of creating new nodes within the conversation using information provided by the user at startup.
+`wisteria` is a minimal terminal arbor client. It is capable of interactively rendering messages stored on disk into a scrollable tree and creating new reply nodes. It also detects new files on disk and loads their contents automatically (if they are arbor nodes).
 
-### Installing the viewer
+> So if it only renders what's on disk, how can I talk to someone?
 
-The CLI is in `./cmd/viewer/`, and you can install it with:
+Well, the key is that it live-loads any new arbor nodes that appear in its current working directory. This means that you can establish a shared folder using any number of file synchronization tools and that folder will replicate its contents between you and whatever peers you share it with. When you write a new node into that folder, it will replicate across the network to your peer, and their client will discover it and load it into their instance of `wisteria`. Depending on the replication, there may be some lag.
 
-```sh
-go get -u git.sr.ht/~whereswaldon/forest-go/cmd/viewer
+## Installing wisteria
+
+You need Go 1.12+ to install this. You may be able to get this with your package manager, but you can always download it from [here](https://golang.org/dl/).
+
+Clone this repo, check out this branch (currently `wisteria`), and run `go install ./...`. Make sure `~/go/bin` (or `$GOPATH/bin` if you have a custom `$GOPATH`) is in your path.
+
+## Running wisteria
+
+Running `wisteria` currently requires some prep work (we'll eliminate most of these steps soon).
+
+### Install the forest CLI
+
+If you have a recent version of Go, you can get this with:
+
+```
+go get git.sr.ht/~whereswaldon/forest-go/cmd/forest@latest
 ```
 
-### Using the viewer
+Otherwise clone that repo, `cd cmd/forest` and `go install`.
 
-Navigate to a directory containing (at minimum) an existing Arbor Identity, Community, and Reply. (You can create these with the `forest` CLI described below)
+### Make a GPG Key
 
-Then run `viewer`. Answer the interactive prompts to configure `viewer` with the ability to create new
-messages.
+First, you need a real GPG key. If you already have one, great! Note the email address that you associated with it (`gpg -k` will help you find that). If you don't have one, you can generate one by following the directions [here](https://wiki.archlinux.org/index.php/GnuPG#Create_a_key_pair).
 
-Once the full-screen terminal client starts up properly, you can use the following keybindings:
+Once you've got a key, try using it:
 
-- `Control+c`: quit
-- `j`: move cursor down
-- `k`: move cursor up
-- `h`: move cursor left
-- `l`: move cursor right
-- `g`: jump to top
-- `G`: jump to bottom
-- `Enter`: reply to message under cursor
-
-When you're composing a new message, `viewer` will launch an editor of your choice. Save and quit that
-editor to send your message. Any lines starting with `#` will be removed from the message text before
-it is sent. If your message is empty, no message will be sent.
-
-## Command Line Interface
-
-The `forest` CLI can create and display nodes in the Arbor Forest.
-
-### Installing the CLI
-
-The CLI is in `./cmd/forest/`, and you can install it with:
-
-```sh
-go get -u git.sr.ht/~whereswaldon/forest-go/cmd/forest
+```bash
+echo test | gpg2 --sign
 ```
 
-### Using the CLI
+If this creates a desktop popup asking for your private key passphrase, proceed. If this creates an in-terminal dialogue asking for your passphrase, you'll need to [adjust your GPG pinentry settings](https://wiki.archlinux.org/index.php/GnuPG#pinentry) so that it uses a popup window instead. This limitation will be removed in the future.
 
-Right now, the CLI works with files in its current working directory, though this will change in the future.
-For the meantime, create a directory to play around in:
+### Choose a storage location
 
-```sh
-mkdir arbor-forest
-cd arbor-forest
+Now you need a folder to store your Arbor history inside of. Perhaps `~/Documents/ArborHistory/`? Or the windows equivalent? Whatever you choose, get a shell with your current working directory there.
+
+### Create an Arbor Identity
+
+Now we need to set up your identity:
+
+```bash
+forest create identity --gpguser <email> --name <username>
 ```
 
-> **Important: About OpenPGP Keys**
-> 
-> Arbor Forest nodes are signed by OpenPGP private keys. This gives Arbor strong guarantees about the authenticity of messages. The below procedures assume that you have `gpg2` installed and have already [generated a private key](https://fedoraproject.org/wiki/Creating_GPG_Keys#Creating_GPG_Keys_Using_the_Command_Line). Wherever you see `--gpguser <email>` below, substitute the email address associated with your GPG private key for `<email>`.
-> 
-> If you do not have `gpg2` or a key and you do not want to install them, you can omit the `--gpguser <email>` flag in the commands below. If you do this, the CLI will create a new one for you and store it
-> in `./arbor.privkey`. This private key is not encrypted (has no passphrase), and should not be used for anything of importance.
+- Replace `<email>` with the email that you associated with your GPG key.
+- Replace `<username>` with the username that you want to use within Arbor.
+ 
+Note the output of this command, as it's the name of your identity on disk. You'll need it soon.
 
-#### Identities
+### Create a community [skip if joining existing community]
 
-Since all nodes must be signed by an Identity node, you must create one of those before you can create any others.
+If you are setting up in a completely empty directory, you'll need to start a community as well. If you're joining some friends who are already talking in arbor, you can probably skip this step.
 
-```sh
-forest create identity --name <your-name> --gpguser <email>
+```bash
+forest create community --gpguser <email> --as <identity_file_name> --name <community_name>
 ```
 
-This will print the base64url-encoded ID of your identity node, which will be stored in a file by that name in your
-current working directory.
+- Replace `<email>` with the email that you associated with your GPG key.
+- Replace `<identity_file_name>` with the output of the `forest create identity ...` command.
+- Replace `<community_name>` with the name that you'd like to give to your community.
+ 
+Note the output of this command, as it is the name of your community on disk. You'll need it later.
 
+### Start a conversation [skip if joining existing community]
 
-To view your identity in a human-readable format, try the following (install `jq` if you don't have it, it's really handy):
+`wisteria` currently can't begin new conversations (though it's coming soon). In order to have a conversation to talk in, we can just make one from our shell. If you're joining people who are already talking, this is likely unnecessary.
 
-```sh
-forest show <id> | jq .
+```bash
+forest create reply --gpguser <email> --to <community_file_name> --as <identity_file_name> --content "<your message>"
 ```
 
-Substitute the base64url-encoded ID of your identity node for `<id>`. `jq` will pretty-print the JSON to make it easier to read.
+- Replace `<email>` with the email that you associated with your GPG key.
+- Replace `<identity_file_name>` with the output of the `forest create identity ...` command.
+- Replace `<community_file_name>` output of the `forest create community ...` command.
+- Replace `<your message` with the message that you want to start out the conversation. Make sure to quote it!
 
-#### Communities
+You won't need the output of this command later.
 
-To create a community, use:
+### Start `wisteria`
 
-```sh
-forest create community --as <id> --name <community-name> --gpguser <email>
+Okay, so now we run `wisteria` itself in the directory where you'd like to store your history. This directory should already contain your arbor identity and at least one community and reply (either ones you created or pre-existing ones).
+
+```bash
+wisteria
 ```
 
-Substitute the base64url-encoded ID of your identity node for `<id>` and provide appropriate values for name and metadata.
-
-To view your community in a human-readable format, try the following:
-
-```sh
-forest show <id> | jq .
-```
-
-Substitute the base64url-encoded ID of your community node for `<id>`. `jq` will pretty-print the JSON to make it easier to read.
-
-#### Replies
-
-To create a reply, use:
-
-```sh
-forest create reply --as <id> --to <parent-id> --content <your message> --gpguser <email>
-```
-
-Substitute the base64url-encoded ID of your identity node for `<id>` and the base64url-encoded ID of another reply or conversation node for `<parent-id>`. Substitute `<your message>`
-for the content of your reply. Usually this will be a response to the content of the node referenced by `<parent-id>`.
-
-To view your reply in a human-readable format, try the following:
-
-```sh
-forest show <id> | jq .
-```
-
-Substitute the base64url-encoded ID of your reply node for `<id>`. `jq` will pretty-print the JSON to make it easier to read.
-
-
-## Build
-
-Must use Go 1.11+
-
-`go build`
-
-## Test
-
-`go test -v -cover`
+You should be asked to select a user account (use one that is you, you won't be able to send messages otherwise). You'll also be asked to select and editor. Choose your favorite option of the list. This program will be launched to compose new replies. When you're done writing a reply, save the file and quit the editor to send the message.

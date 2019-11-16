@@ -1,3 +1,5 @@
+git.sr.ht/~whereswaldon/forest-go v0.0.0-20191111223003-d7e000e471fc h1:0zI9vJ+LtjDgLM45BhbdwLeeEXvKUiEFgAvElKhI2xA=
+git.sr.ht/~whereswaldon/forest-go v0.0.0-20191111223003-d7e000e471fc/go.mod h1:7cXupoNBCJSMi+x/cFvyxDfpAE9p0Zy0/s2/zsboB8o=
 github.com/0xAX/notificator v0.0.0-20181105090803-d81462e38c21 h1:moSC7ACaTejHmVRRwfDTMgByRSwjg2vZooncdWLj7o8=
 github.com/0xAX/notificator v0.0.0-20181105090803-d81462e38c21/go.mod h1:NtXa9WwQsukMHZpjNakTTz0LArxvGYdPA9CjIcUSZ6s=
 github.com/DATA-DOG/go-sqlmock v1.3.3 h1:CWUqKXe0s8A2z6qCgkP4Kru7wC11YoAnoupUKFDnH08=
