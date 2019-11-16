@@ -50,50 +50,6 @@ type Archive struct {
 	forest.Store
 }
 
-// NodesFromDir reads all files in the directory and returns all of them that contained
-// arbor nodes in a slice
-func NodesFromDir(dirname string) []forest.Node {
-	dir, err := os.Open(dirname)
-	if err != nil {
-		return nil
-	}
-	defer dir.Close()
-	names, err := dir.Readdirnames(0)
-	if err != nil {
-		return nil
-	}
-	var nodes []forest.Node
-	for _, name := range names {
-		b, err := ioutil.ReadFile(name)
-		if err != nil {
-			log.Println(err)
-			continue
-		}
-		node, err := forest.UnmarshalBinaryNode(b)
-		if err != nil {
-			log.Printf("Failed parsing %s: %v", name, err)
-			continue
-		}
-		nodes = append(nodes, node)
-	}
-	return nodes
-}
-
-// NewArchiveFromDir creates an archive populated with the contents of `dirname` and
-// using `store` as the storage back-end.
-func NewArchiveFromDir(dirname string, store forest.Store) (*Archive, error) {
-	nodes := NodesFromDir(dirname)
-	var replies []*forest.Reply
-	archive := &Archive{ReplyList: replies, Store: store}
-	for _, n := range nodes {
-		err := archive.Add(n)
-		if err != nil {
-			return nil, err
-		}
-	}
-	return archive, nil
-}
-
 const defaultArchiveReplyListLen = 1024
 
 func NewArchive(store forest.Store) (*Archive, error) {
