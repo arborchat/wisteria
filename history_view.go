@@ -64,12 +64,10 @@ func (v *HistoryView) Render() error {
 	if err != nil {
 		return err
 	}
-	log.Printf("len(ancestry) = %d", len(ancestry))
 	descendants, err := v.DescendantsOf(currentID)
 	if err != nil {
 		return err
 	}
-	log.Printf("len(descendants) = %d", len(descendants))
 	for _, n := range v.ReplyList {
 		config := renderConfig{}
 		if n.ID().Equals(currentID) {

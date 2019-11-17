@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"strings"
 	"time"
 
@@ -34,8 +33,6 @@ func renderNode(node forest.Node, store forest.Store, config renderConfig) ([]Re
 		currentColor          = tcell.StyleDefault.Foreground(tcell.ColorRed)
 		conversationRootColor = tcell.StyleDefault.Foreground(tcell.ColorTeal)
 	)
-	idstring, _ := node.ID().MarshalString()
-	log.Printf("%s => %d", idstring, config.state)
 	var out []RenderedLine
 	var style tcell.Style
 	switch n := node.(type) {
