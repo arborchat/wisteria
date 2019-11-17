@@ -109,9 +109,12 @@ and [flags] are among those listed below:
 
 	// dial relay address (if provided)
 	if flag.NArg() > 0 {
-		_, err := LaunchWorker(flag.Arg(0), store)
+		address := flag.Arg(0)
+		_, err := LaunchWorker(address, store)
 		if err != nil {
 			log.Printf("Failed to launch worker: %v", err)
+		} else {
+			log.Printf("Launched sprout worker connected to %s", address)
 		}
 	}
 
