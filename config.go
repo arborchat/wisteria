@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	forest "git.sr.ht/~whereswaldon/forest-go"
+	"git.sr.ht/~whereswaldon/forest-go/fields"
 	"golang.org/x/crypto/openpgp"
 	"golang.org/x/crypto/openpgp/packet"
 )
@@ -275,17 +276,23 @@ func (w *Wizard) ConfigureNewIdentity() error {
 
 // ConfigureIdentity sets up an identity in the Wizard's config. It creates a new one
 // if the user requests it.
-func (w *Wizard) ConfigureIdentity(cwd string) error {
-	identities := []interface{}{}
-	for _, node := range NodesFromDir(cwd) {
-		if id, ok := node.(*forest.Identity); ok {
-			identities = append(identities, id)
-		}
+func (w *Wizard) ConfigureIdentity(store forest.Store) error {
+	count := 1024
+	identities, err := store.Recent(fields.NodeTypeIdentity, count)
+	// make sure we get *all* identities
+	for len(identities) == count {
+		count *= 2
+		identities, err = store.Recent(fields.NodeTypeIdentity, count)
+	}
+
+	asGeneric := make([]interface{}, len(identities))
+	for i := range identities {
+		asGeneric[i] = identities[i]
 	}
 	// ensure that we have a typed nil to represent a the choice to create a new identity
 	var makeNew *forest.Identity = nil
 	identities = append(identities, makeNew)
-	choiceInterface, err := w.Choose("Please choose an identity:", identities, func(i interface{}) string {
+	choiceInterface, err := w.Choose("Please choose an identity:", asGeneric, func(i interface{}) string {
 		id := i.(*forest.Identity)
 		if id == nil {
 			return "create a new identity"
@@ -330,13 +337,13 @@ const installGPGMessage = "This program requires GPG to run. Please install GPG 
 
 // Run populates the config by asking the user for information and
 // inferring from the runtime environment
-func (w *Wizard) Run(cwd string) error {
+func (w *Wizard) Run(store forest.Store) error {
 	_, err := forest.FindGPG()
 	if err != nil {
 		w.Display(installGPGMessage)
 		return fmt.Errorf("Cannot configure without GPG: %v", err)
 	}
-	err = w.ConfigureIdentity(cwd)
+	err = w.ConfigureIdentity(store)
 	if err != nil {
 		return fmt.Errorf("Error configuring user identity: %v", err)
 	}

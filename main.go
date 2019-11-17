@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"os"
@@ -27,9 +28,9 @@ func CheckNotify() {
 
 func main() {
 	CheckNotify()
-	var identityFile string
 	config := NewConfig()
 	defer profile.Start(profile.ProfilePath(config.RuntimeDirectory)).Stop()
+
 	logPath := path.Join(config.RuntimeDirectory, "viewer.log")
 	log.Println("Logging to", logPath)
 	logFile, err := os.OpenFile(logPath, os.O_APPEND|os.O_RDWR|os.O_CREATE, 0660)
@@ -38,10 +39,13 @@ func main() {
 	}
 	log.SetOutput(logFile)
 	log.SetFlags(log.Lshortfile | log.LstdFlags)
+
 	flag.StringVar(&config.PGPUser, "gpguser", "", "gpg user to sign new messages with")
 	flag.StringVar(&config.PGPKey, "key", "", "PGP key to sign messages with")
+	var identityFile string
 	flag.StringVar(&identityFile, "identity", "", "arbor identity node to sign with")
 	flag.Parse()
+
 	b, err := ioutil.ReadFile(identityFile)
 	if err != nil {
 	}
@@ -55,12 +59,16 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	store, err := grove.New(cwd)
+	if err != nil {
+		log.Fatalf("Failed to create grove at %s: %v", cwd, err)
+	}
 	if config.Validate() != nil {
 		wizard := &Wizard{
 			Config:   config,
 			Prompter: &StdoutPrompter{In: os.Stdin, Out: os.Stdout},
 		}
-		if err := wizard.Run(cwd); err != nil {
+		if err := wizard.Run(store); err != nil {
 			log.Fatal("Error running configuration wizard:", err)
 		}
 		if err := config.Validate(); err != nil {
@@ -70,10 +78,6 @@ func main() {
 	builder, err := config.Builder()
 	if err != nil {
 		log.Fatal("Unable to construct builder using configuration:", err)
-	}
-	store, err := grove.New(cwd)
-	if err != nil {
-		log.Fatalf("Failed to create grove at %s: %v", cwd, err)
 	}
 	history, err := NewArchive(store)
 	if err != nil {
