@@ -8,6 +8,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -45,6 +46,19 @@ func NewConfig() *Config {
 		RuntimeDirectory: dir,
 		EditorCmd:        []string{"xterm", "-e", os.ExpandEnv("$EDITOR"), "{}"},
 	}
+}
+
+// Start logging to configured log file, log location on stderr
+func (c *Config) StartLogging() error {
+	logPath := filepath.Join(c.RuntimeDirectory, "viewer.log")
+	log.Println("Logging to", logPath)
+	logFile, err := os.OpenFile(logPath, os.O_APPEND|os.O_RDWR|os.O_CREATE, 0660)
+	if err != nil {
+		return fmt.Errorf("Failed to open log file %s: %w", logPath, err)
+	}
+	log.SetOutput(logFile)
+	log.SetFlags(log.Lshortfile | log.LstdFlags)
+	return nil
 }
 
 // Validate errors if the configuration is invalid

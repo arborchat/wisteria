@@ -7,7 +7,6 @@ import (
 	"log"
 	"os"
 	"os/exec"
-	"path"
 	"runtime"
 
 	"github.com/0xAX/notificator"
@@ -31,14 +30,9 @@ func main() {
 	config := NewConfig()
 	defer profile.Start(profile.ProfilePath(config.RuntimeDirectory)).Stop()
 
-	logPath := path.Join(config.RuntimeDirectory, "viewer.log")
-	log.Println("Logging to", logPath)
-	logFile, err := os.OpenFile(logPath, os.O_APPEND|os.O_RDWR|os.O_CREATE, 0660)
-	if err != nil {
-		log.Fatal(err)
+	if err := config.StartLogging(); err != nil {
+		log.Fatalf("Failed to configure logging: %v", err)
 	}
-	log.SetOutput(logFile)
-	log.SetFlags(log.Lshortfile | log.LstdFlags)
 
 	flag.StringVar(&config.PGPUser, "gpguser", "", "gpg user to sign new messages with")
 	flag.StringVar(&config.PGPKey, "key", "", "PGP key to sign messages with")
