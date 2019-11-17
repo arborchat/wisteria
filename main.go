@@ -44,6 +44,18 @@ func main() {
 	flag.StringVar(&config.PGPKey, "key", "", "PGP key to sign messages with")
 	var identityFile string
 	flag.StringVar(&identityFile, "identity", "", "arbor identity node to sign with")
+	flag.Usage = func() {
+		executable := os.Args[0]
+		fmt.Fprintf(flag.CommandLine.Output(), `Usage of %s:
+
+%s [flags] [relay-address]
+
+Where [relay-address] is the IP:PORT or FQDN:PORT of a sprout relay
+and [flags] are among those listed below:
+
+`, executable, executable)
+		flag.PrintDefaults()
+	}
 	flag.Parse()
 
 	b, err := ioutil.ReadFile(identityFile)
@@ -51,9 +63,6 @@ func main() {
 	}
 	config.Identity, err = forest.UnmarshalIdentity(b)
 	if err != nil {
-	}
-	if flag.NArg() > 0 {
-		config.EditorCmd = flag.Args()
 	}
 	cwd, err := os.Getwd()
 	if err != nil {
