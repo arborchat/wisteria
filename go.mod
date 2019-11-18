@@ -2,7 +2,7 @@ module git.sr.ht/~whereswaldon/wisteria
 
 require (
 	git.sr.ht/~whereswaldon/forest-go v0.0.0-20191116003248-868ed7d54ed5
-	git.sr.ht/~whereswaldon/sprout-go v0.0.0-20191117025422-cc950b8dab79
+	git.sr.ht/~whereswaldon/sprout-go v0.0.0-20191118024841-b3383ea6fe21
 	github.com/0xAX/notificator v0.0.0-20181105090803-d81462e38c21
 	github.com/fsnotify/fsnotify v1.4.7
 	github.com/gdamore/tcell v1.1.2

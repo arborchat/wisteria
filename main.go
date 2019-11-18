@@ -1,19 +1,21 @@
 package main
 
 import (
+	"crypto/tls"
 	"flag"
 	"fmt"
 	"log"
-	"net"
 	"os"
 	"os/exec"
 	"runtime"
+	"time"
 
 	"github.com/0xAX/notificator"
 	"github.com/gdamore/tcell/views"
 	"github.com/pkg/profile"
 
 	forest "git.sr.ht/~whereswaldon/forest-go"
+	"git.sr.ht/~whereswaldon/forest-go/fields"
 	"git.sr.ht/~whereswaldon/forest-go/grove"
 	"git.sr.ht/~whereswaldon/sprout-go"
 )
@@ -28,7 +30,10 @@ func CheckNotify() {
 
 func LaunchWorker(address string, store forest.Store) (*sprout.Worker, error) {
 	doneChan := make(chan struct{})
-	tcpConn, err := net.Dial("tcp", address)
+	tcpConn, err := tls.Dial("tcp", address, &tls.Config{
+		MinVersion:         tls.VersionTLS12,
+		InsecureSkipVerify: true,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("failed dialing %s: %w", address, err)
 	}
@@ -38,6 +43,7 @@ func LaunchWorker(address string, store forest.Store) (*sprout.Worker, error) {
 		tcpConn.Close()
 		return nil, fmt.Errorf("failed starting sprout worker: %v", err)
 	}
+	go worker.Run()
 	return worker, nil
 }
 
@@ -110,11 +116,27 @@ and [flags] are among those listed below:
 	// dial relay address (if provided)
 	if flag.NArg() > 0 {
 		address := flag.Arg(0)
-		_, err := LaunchWorker(address, store)
+		worker, err := LaunchWorker(address, store)
 		if err != nil {
 			log.Printf("Failed to launch worker: %v", err)
 		} else {
 			log.Printf("Launched sprout worker connected to %s", address)
+		}
+		_, err = worker.SendList(fields.NodeTypeCommunity, 1024)
+		if err != nil {
+			log.Printf("Failed sending list verb to fetch communities: %v", err)
+		}
+		time.Sleep(time.Second)
+		communities, err := store.Recent(fields.NodeTypeCommunity, 1024)
+		if err != nil {
+			log.Printf("Failed loading known recent communities: %v", err)
+		}
+		for _, community := range communities {
+			if _, err := worker.SendSubscribe(community.(*forest.Community)); err != nil {
+				log.Printf("Failed subscribing to community %s: %v", community.ID().String(), err)
+			} else {
+				log.Printf("Subscribed to %s", community.ID().String())
+			}
 		}
 	}
 
