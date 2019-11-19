@@ -1,4 +1,4 @@
-package main
+package watch
 
 import (
 	"log"
@@ -6,8 +6,9 @@ import (
 	"github.com/fsnotify/fsnotify"
 )
 
-// Watch watches for file creation events in `dir`. It executes `handler` on each event.
-func Watch(dir string, handler func(filename string)) (*fsnotify.Watcher, error) {
+// Watch watches for file creation and write events in `dir`. It executes `handler` on each event,
+// and also logs events and errors into the specified logger.
+func Watch(dir string, logger *log.Logger, handler func(filename string)) (*fsnotify.Watcher, error) {
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
 		return nil, err
@@ -21,15 +22,15 @@ func Watch(dir string, handler func(filename string)) (*fsnotify.Watcher, error)
 				}
 				switch {
 				case event.Op&fsnotify.Create != 0:
-					log.Println("Got create event for", event.Name)
+					logger.Println("Got create event for", event.Name)
 					handler(event.Name)
 				case event.Op&fsnotify.Write != 0:
-					log.Println("Got write event for", event.Name)
+					logger.Println("Got write event for", event.Name)
 					handler(event.Name)
 				}
 			case err, ok := <-watcher.Errors:
 				if !ok {
-					log.Println("Got watch error", err)
+					logger.Println("Got watch error", err)
 					return
 				}
 			}
@@ -39,6 +40,6 @@ func Watch(dir string, handler func(filename string)) (*fsnotify.Watcher, error)
 	if err != nil {
 		return nil, err
 	}
-	log.Println("Watching", dir)
+	logger.Println("Watching", dir)
 	return watcher, nil
 }

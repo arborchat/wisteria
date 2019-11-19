@@ -18,6 +18,7 @@ import (
 	"git.sr.ht/~whereswaldon/forest-go/fields"
 	"git.sr.ht/~whereswaldon/forest-go/grove"
 	"git.sr.ht/~whereswaldon/sprout-go"
+	"git.sr.ht/~whereswaldon/wisteria/watch"
 )
 
 func CheckNotify() {
@@ -175,7 +176,8 @@ and [flags] are among those listed below:
 	app.SetRootWidget(hw)
 
 	// watch the cwd for new nodes from other sources
-	if _, err := Watch(cwd, hw.ReadMessageFile); err != nil {
+	logger := log.New(log.Writer(), "", log.LstdFlags|log.Lshortfile)
+	if _, err := watch.Watch(cwd, logger, hw.ReadMessageFile); err != nil {
 		log.Fatal(err)
 	}
 
