@@ -18,7 +18,7 @@ import (
 	"git.sr.ht/~whereswaldon/forest-go/fields"
 	"git.sr.ht/~whereswaldon/forest-go/grove"
 	"git.sr.ht/~whereswaldon/sprout-go"
-	"git.sr.ht/~whereswaldon/wisteria/watch"
+	"git.sr.ht/~whereswaldon/sprout-go/watch"
 )
 
 func CheckNotify() {
