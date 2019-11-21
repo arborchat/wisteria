@@ -28,25 +28,26 @@ var _ views.Widget = &HistoryWidget{}
 
 func (v *HistoryWidget) ReadMessageFile(filename string) {
 	v.Application.PostFunc(func() {
+		log.Printf("Reading message from %s", filename)
 		b, err := ioutil.ReadFile(filename)
 		if err != nil {
-			log.Println(err)
+			log.Printf("Failed reading %s: %v", filename, err)
 			return
 		}
 		node, err := forest.UnmarshalBinaryNode(b)
 		if err != nil {
-			log.Println(err)
+			log.Printf("Failed parsing %s: %v", filename, err)
 			return
 		}
 		err = v.Add(node)
 		if err != nil {
-			log.Println(err)
+			log.Printf("Failed adding %s: %v", filename, err)
 			return
 		}
 		v.Sort()
 		err = v.Render()
 		if err != nil {
-			log.Println(err)
+			log.Printf("Failed rendering %s: %v", filename, err)
 			return
 		}
 		v.Application.Update()
