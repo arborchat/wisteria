@@ -293,10 +293,16 @@ func (w *Wizard) ConfigureNewIdentity() error {
 func (w *Wizard) ConfigureIdentity(store forest.Store) error {
 	count := 1024
 	identities, err := store.Recent(fields.NodeTypeIdentity, count)
+	if err != nil {
+		return fmt.Errorf("failed looking up recent identities: %w", err)
+	}
 	// make sure we get *all* identities
 	for len(identities) == count {
 		count *= 2
 		identities, err = store.Recent(fields.NodeTypeIdentity, count)
+		if err != nil {
+			return fmt.Errorf("failed looking up recent identities: %w", err)
+		}
 	}
 
 	asGeneric := make([]interface{}, len(identities))
