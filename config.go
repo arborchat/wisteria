@@ -311,7 +311,7 @@ func (w *Wizard) ConfigureIdentity(store forest.Store) error {
 	}
 	// ensure that we have a typed nil to represent a the choice to create a new identity
 	var makeNew *forest.Identity = nil
-	identities = append(identities, makeNew)
+	asGeneric = append(asGeneric, makeNew)
 	choiceInterface, err := w.Choose("Please choose an identity:", asGeneric, func(i interface{}) string {
 		id := i.(*forest.Identity)
 		if id == nil {
