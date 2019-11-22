@@ -41,7 +41,7 @@ func renderNode(node forest.Node, store forest.Store, config renderConfig) ([]Re
 		if err != nil {
 			return nil, err
 		} else if !present {
-			return nil, fmt.Errorf("Node %v is not in the store", n.Author)
+			return nil, fmt.Errorf("Node %s is not in the store", n.Author.String())
 		}
 		asIdent := author.(*forest.Identity)
 		switch config.state {

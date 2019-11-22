@@ -62,11 +62,11 @@ func (v *HistoryView) Render() error {
 	v.rendered = []RenderedLine{}
 	ancestry, err := v.AncestryOf(currentID)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed looking up ancestry of %s: %w", currentID.String(), err)
 	}
 	descendants, err := v.DescendantsOf(currentID)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed looking up descendants of %s: %w", currentID.String(), err)
 	}
 	for _, n := range v.ReplyList {
 		config := renderConfig{}
@@ -79,7 +79,8 @@ func (v *HistoryView) Render() error {
 		}
 		lines, err := renderNode(n, v.Store, config)
 		if err != nil {
-			return err
+			log.Printf("failed rendering %s: %v", n.ID().String(), err)
+			continue
 		}
 		v.rendered = append(v.rendered, lines...)
 	}
