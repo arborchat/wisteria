@@ -76,6 +76,8 @@ func (v *HistoryWidget) TryNotify(reply *forest.Reply) {
 	log.Printf("Pushing notification: %v", v.Push("Arbor Mention from "+string(author.(*forest.Identity).Name.Blob), string(reply.Content.Blob), "", notificator.UR_NORMAL))
 }
 
+// StartReply begins a new reply with the currently-selected message as its
+// parent.
 func (v *HistoryWidget) StartReply() error {
 	reply, err := v.CurrentReply()
 	if err != nil {
@@ -101,7 +103,37 @@ func (v *HistoryWidget) StartReply() error {
 	return nil
 }
 
-func (v *HistoryWidget) FinishReply(parent *forest.Reply, replyFileName string, editor *exec.Cmd) {
+// StartConversation begins a new conversation in the same community as the
+// currently-selected message.
+func (v *HistoryWidget) StartConversation() error {
+	reply, err := v.CurrentReply()
+	if err != nil {
+		return fmt.Errorf("couldn't determine current reply: %w", err)
+	}
+	community, _, err := v.GetCommunity(&reply.CommunityID)
+	if err != nil {
+		return fmt.Errorf("couldn't locate current community: %w", err)
+	}
+	file, err := ioutil.TempFile("", "arbor-msg")
+	if err != nil {
+		return fmt.Errorf("couldn't create temporary file for reply: %v", err)
+	}
+	// ensure this file descriptor is closed
+	file.Close()
+	// populate the file, but keep it closed
+	err = ioutil.WriteFile(file.Name(), []byte(fmt.Sprintf("# starting new conversation in %s\n", string(community.(*forest.Community).Name.Blob))), 0660)
+	if err != nil {
+		return fmt.Errorf("couldn't write template into temporary file: %v", err)
+	}
+	editor := v.Config.EditFile(file.Name())
+	if err := editor.Start(); err != nil {
+		return fmt.Errorf("failed to start editor command: %v", err)
+	}
+	go v.FinishReply(community, file.Name(), editor)
+	return nil
+}
+
+func (v *HistoryWidget) FinishReply(parent forest.Node, replyFileName string, editor *exec.Cmd) {
 	if err := editor.Wait(); err != nil {
 		log.Printf("Error waiting on editor command to finish: %v", err)
 		log.Printf("There may be a partial message in %s", replyFileName)
@@ -182,6 +214,11 @@ func (v *HistoryWidget) HandleEvent(event tcell.Event) bool {
 			v.MoveCursor(1, 0)
 			v.MakeCursorVisible()
 			return true
+		case 'c':
+			if err := v.StartConversation(); err != nil {
+				log.Printf("Error starting conversation: %v", err)
+				return true
+			}
 		}
 	}
 	return false

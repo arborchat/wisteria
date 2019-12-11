@@ -177,7 +177,7 @@ and [flags] are among those listed below:
 
 	titlebar := views.NewSimpleStyledTextBar()
 	titlebar.SetLeft("%Swisteria")
-	titlebar.SetRight("%Sarrows or vi to move; enter to reply")
+	titlebar.SetRight("%Sarrows or vi to move; enter to reply; c for new convo")
 	titlebar.SetStyle(tcell.StyleDefault.Reverse(true))
 
 	layout := views.NewBoxLayout(views.Vertical)
