@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/0xAX/notificator"
+	"github.com/gdamore/tcell"
 	"github.com/gdamore/tcell/views"
 	"github.com/pkg/profile"
 
@@ -173,7 +174,16 @@ and [flags] are among those listed below:
 		config,
 		notify,
 	}
-	app.SetRootWidget(hw)
+
+	titlebar := views.NewSimpleStyledTextBar()
+	titlebar.SetLeft("%Swisteria")
+	titlebar.SetRight("%Sarrows or vi to move; enter to reply")
+	titlebar.SetStyle(tcell.StyleDefault.Reverse(true))
+
+	layout := views.NewBoxLayout(views.Vertical)
+	layout.AddWidget(titlebar, 0)
+	layout.AddWidget(hw, 1)
+	app.SetRootWidget(layout)
 
 	// watch the cwd for new nodes from other sources
 	logger := log.New(log.Writer(), "", log.LstdFlags|log.Lshortfile)
