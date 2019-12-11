@@ -10,6 +10,7 @@ import (
 
 	forest "git.sr.ht/~whereswaldon/forest-go"
 	"github.com/0xAX/notificator"
+	"github.com/bbrks/wrap"
 	"github.com/gdamore/tcell"
 	"github.com/gdamore/tcell/views"
 )
@@ -144,7 +145,7 @@ func (v *HistoryWidget) FinishReply(parent forest.Node, replyFileName string, ed
 		log.Printf("Error reading reply from %s: %v", replyFileName, err)
 		return
 	}
-	replyContentString := strings.Trim(stripCommentLines(string(replyContent)), "\n")
+	replyContentString := strings.Trim(wrap.Wrap(stripCommentLines(string(replyContent)), 80), "\n")
 	if len(replyContentString) == 0 {
 		log.Println("Message is empty, not sending")
 		return
