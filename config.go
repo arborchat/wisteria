@@ -99,6 +99,11 @@ func (c *Config) Builder() (*forest.Builder, error) {
 	)
 	if c.PGPUser != "" {
 		signer, err = forest.NewGPGSigner(c.PGPUser)
+		asGPG := signer.(*forest.GPGSigner)
+		asGPG.Rewriter = func(cmd *exec.Cmd) error {
+			cmd.Stderr = log.Writer()
+			return nil
+		}
 	} else if c.PGPKey != "" {
 		keyfile, _ := os.Open(c.PGPKey)
 		defer keyfile.Close()
