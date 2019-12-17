@@ -10,7 +10,7 @@ import (
 
 	forest "git.sr.ht/~whereswaldon/forest-go"
 	"github.com/0xAX/notificator"
-	"github.com/bbrks/wrap"
+	wrap "github.com/bbrks/wrap/v2"
 	"github.com/gdamore/tcell"
 	"github.com/gdamore/tcell/views"
 )
