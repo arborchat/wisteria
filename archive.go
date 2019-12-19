@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"sort"
 
 	forest "git.sr.ht/~whereswaldon/forest-go"
@@ -37,6 +38,16 @@ type Archive struct {
 const defaultArchiveReplyListLen = 1024
 
 func NewArchive(store forest.Store) (*Archive, error) {
+	// Assert archive store is a caching store
+	if _, isCache := store.(*forest.CacheStore); !isCache {
+		log.Printf("Wrapping store in CacheStore")
+		cache := forest.NewMemoryStore()
+		cacheStore, err := forest.NewCacheStore(cache, store)
+		store = cacheStore
+		if err != nil {
+			return nil, fmt.Errorf("Failed to wrap Store in CacheStore: %w", err)
+		}
+	}
 	archive := &Archive{
 		ReplyList: []*forest.Reply{},
 		Store:     store,
