@@ -86,9 +86,16 @@ and [flags] are among those listed below:
 	}
 
 	// use a grove rooted in our current working directory as our node storage
-	store, err := grove.New(cwd)
+	groveStore, err := grove.New(cwd)
 	if err != nil {
 		log.Fatalf("Failed to create grove at %s: %v", cwd, err)
+	}
+
+	// Wrap store in CacheStore
+	cache := forest.NewMemoryStore()
+	store, err := forest.NewCacheStore(cache, groveStore)
+	if err != nil {
+		log.Fatal("Failed to wrap Store in CacheStore:", err)
 	}
 
 	// ask user for interactive configuration
