@@ -54,7 +54,7 @@ func renderNode(node forest.Node, store forest.Store, config renderConfig) ([]Re
 		default:
 			style = tcell.StyleDefault
 		}
-		timestamp := n.Created.Time().UTC()
+		timestamp := n.Created.Time().Local()
 		rendered := fmt.Sprintf("%s - %s:\n%s", timestamp.Format(time.Stamp), string(asIdent.Name.Blob), string(n.Content.Blob))
 		// drop all trailing newline characters
 		for rendered[len(rendered)-1] == "\n"[0] {
