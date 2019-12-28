@@ -20,6 +20,7 @@ type RenderedLine struct {
 // HistoryView models the visible contents of the chat history. It implements tcell.CellModel
 type HistoryView struct {
 	*Archive
+	FilterID *fields.QualifiedHash
 	rendered []RenderedLine
 	Cursor   struct {
 		X, Y int
@@ -68,7 +69,28 @@ func (v *HistoryView) Render() error {
 	if err != nil {
 		return fmt.Errorf("failed looking up descendants of %s: %w", currentID.String(), err)
 	}
+	excludeMap := make(map[string]struct{})
+	if v.FilterID != nil {
+		filterAncestry, err := v.AncestryOf(v.FilterID)
+		if err != nil {
+			return fmt.Errorf("failed lookup up ancestry of filter node %s: %w", v.FilterID, err)
+		}
+		filterDescendants, err := v.DescendantsOf(v.FilterID)
+		if err != nil {
+			return fmt.Errorf("failed lookup up descendants of filter node %s: %w", v.FilterID, err)
+		}
+		excludeMap[v.FilterID.String()] = struct{}{}
+		for _, id := range append(filterAncestry, filterDescendants...) {
+			excludeMap[id.String()] = struct{}{}
+		}
+	}
 	for _, n := range v.ReplyList {
+		if v.FilterID != nil {
+			if _, matchesFilter := excludeMap[n.ID().String()]; !matchesFilter {
+				// skip nodes that don't match current filter
+				continue
+			}
+		}
 		config := renderConfig{}
 		if n.ID().Equals(currentID) {
 			config.state = current
@@ -153,4 +175,25 @@ func (v *HistoryView) MoveCursor(offx, offy int) {
 func (v *HistoryView) SelectLastLine() {
 	_, h := v.GetBounds()
 	v.SetCursor(0, h-1-MaxEmtpyVisibleLines)
+}
+
+// FilterOnCurrent sets the ID of the node to filter on to be the ID of the
+// currently-selected node.
+func (v *HistoryView) FilterOnCurrent() {
+	v.FilterID = v.CurrentID()
+}
+
+// ClearFilter erases the filter on the view to show all nodes again.
+func (v *HistoryView) ClearFilter() {
+	v.FilterID = nil
+}
+
+// ToggleFilter clears any filter that is set, but sets the current message
+// to be the filter if there is no current filter set.
+func (v *HistoryView) ToggleFilter() {
+	if v.FilterID != nil {
+		v.ClearFilter()
+		return
+	}
+	v.FilterOnCurrent()
 }

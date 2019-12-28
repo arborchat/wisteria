@@ -220,6 +220,13 @@ func (v *HistoryWidget) HandleEvent(event tcell.Event) bool {
 				log.Printf("Error starting conversation: %v", err)
 				return true
 			}
+		case ' ':
+			v.ToggleFilter()
+			if err := v.Render(); err != nil {
+				log.Printf("Error re-rendering after filter: %v", err)
+			}
+			v.Application.Update()
+			return true
 		}
 	}
 	return false
