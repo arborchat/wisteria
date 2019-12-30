@@ -225,7 +225,14 @@ func (v *HistoryWidget) HandleEvent(event tcell.Event) bool {
 			if err := v.Render(); err != nil {
 				log.Printf("Error re-rendering after filter: %v", err)
 			}
-			v.Application.Update()
+			v.Application.PostFunc(func() {
+				// make the cursor visible *after* the next redraw cycle
+				// in the core event loop. Trying to do so before then
+				// fails because the views don't realize they've been
+				// resized until Draw()
+				x, y, _, _ := v.GetCursor()
+				v.port.Center(x, y)
+			})
 			return true
 		}
 	}
