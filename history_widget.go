@@ -61,7 +61,12 @@ func (v *HistoryWidget) ReadMessageFile(filename string) {
 // TryNotify checks whether a desktop notification should be sent
 // and attempts to send it
 func (v *HistoryWidget) TryNotify(reply *forest.Reply) {
-	username := strings.ToLower(string(v.Config.Identity.Name.Blob))
+	identity, err := v.Config.IdentityNode(v.Store)
+	if err != nil {
+		log.Printf("couldn't look up local identity: %v", err)
+		return
+	}
+	username := strings.ToLower(string(identity.Name.Blob))
 	messageText := strings.ToLower(string(reply.Content.Blob))
 	if !strings.Contains(messageText, username) {
 		return

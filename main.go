@@ -98,20 +98,26 @@ and [flags] are among those listed below:
 		log.Fatal("Failed to wrap Store in CacheStore:", err)
 	}
 
-	// ask user for interactive configuration
-	wizard := &Wizard{
-		Config:   config,
-		Prompter: &StdoutPrompter{In: os.Stdin, Out: os.Stdout},
-	}
-	if err := wizard.Run(store); err != nil {
-		log.Fatal("Error running configuration wizard:", err)
-	}
-	if err := config.Validate(); err != nil {
-		log.Fatal("Error validating configuration:", err)
+	if err := config.LoadFromDefault(); err != nil {
+		log.Printf("Failed loading configuration file: %v", err)
+		// ask user for interactive configuration
+		wizard := &Wizard{
+			Config:   config,
+			Prompter: &StdoutPrompter{In: os.Stdin, Out: os.Stdout},
+		}
+		if err := wizard.Run(store); err != nil {
+			log.Fatal("Error running configuration wizard:", err)
+		}
+		if err := config.Validate(); err != nil {
+			log.Fatal("Error validating configuration:", err)
+		}
+		if err := config.SaveToDefault(); err != nil {
+			log.Fatal("Error saving configuration:", err)
+		}
 	}
 
 	// get a node builder from config so we can sign nodes
-	builder, err := config.Builder()
+	builder, err := config.Builder(store)
 	if err != nil {
 		log.Fatal("Unable to construct builder using configuration:", err)
 	}

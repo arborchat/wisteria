@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -27,7 +28,7 @@ type Config struct {
 	// and mutually exclusive with PGPUser
 	PGPKey string
 	// the file name of the user's arbor identity node
-	Identity *forest.Identity
+	IdentityID string
 	// where to store log and profile data
 	RuntimeDirectory string
 	// The command to launch an editor for composing new messages
@@ -61,6 +62,94 @@ func (c *Config) StartLogging() error {
 	return nil
 }
 
+// DefaultConfigFilePath returns the path at which configuration should be stored
+// by default on the current OS and for the current user.
+func DefaultConfigFilePath() (string, error) {
+	configDir, err := os.UserConfigDir()
+	if err != nil {
+		return "", fmt.Errorf("failed looking up configuration dir: %w", err)
+	}
+	const wisteriaConfigDirName = "wisteria"
+	const wisteriaConfigFileNameJSON = "wisteria.json"
+	configFile := filepath.Join(configDir, wisteriaConfigDirName, wisteriaConfigFileNameJSON)
+	return configFile, nil
+}
+
+// LoadFrom loads the configuration from the given ReadCloser and closes it. It will error if
+// it fails to read, parse, or validate the configuration that it reads.
+func (c *Config) LoadFrom(configFile io.ReadCloser) error {
+	defer configFile.Close()
+	decoder := json.NewDecoder(configFile)
+	if err := decoder.Decode(c); err != nil {
+		return fmt.Errorf("failed decoding config file: %w", err)
+	}
+	if err := c.Validate(); err != nil {
+		return fmt.Errorf("failed validating configuration from file: %w", err)
+	}
+	return nil
+}
+
+// LoadFromDefault populates the config from the default configuration file.
+func (c *Config) LoadFromDefault() error {
+	defaultPath, err := DefaultConfigFilePath()
+	if err != nil {
+		return fmt.Errorf("unable to get default config path: %w", err)
+	}
+	configFile, err := os.Open(defaultPath)
+	if err != nil {
+		return fmt.Errorf("unable to open default config file: %w", err)
+	}
+	if err := c.LoadFrom(configFile); err != nil {
+		return fmt.Errorf("unable to load default config file: %w", err)
+	}
+	return nil
+}
+
+// FileExists returns whether a wisteria configuration file exists at the default path.
+func (c *Config) FileExists() (bool, error) {
+	defaultPath, err := DefaultConfigFilePath()
+	if err != nil {
+		return false, fmt.Errorf("unable to get default path: %w", err)
+	}
+	if _, err := os.Stat(defaultPath); err != nil {
+		return false, fmt.Errorf("unable to confirm existence of config file: %w", err)
+	}
+	return true, nil
+}
+
+// SaveTo persists this configuration within the given WriteCloser and then closes it.
+func (c *Config) SaveTo(configFile io.WriteCloser) (err error) {
+	defer func() {
+		if closeErr := configFile.Close(); closeErr != nil {
+			err = fmt.Errorf("failed closing config file: %w", err)
+		}
+	}()
+	encoder := json.NewEncoder(configFile)
+	if err := encoder.Encode(c); err != nil {
+		return fmt.Errorf("failed writing config file: %w", err)
+	}
+	return nil
+}
+
+// SaveToDefault saves this configuration to the default configuration file path.
+func (c *Config) SaveToDefault() error {
+	defaultPath, err := DefaultConfigFilePath()
+	if err != nil {
+		return fmt.Errorf("failed determining config file path: %w", err)
+	}
+	if err := os.MkdirAll(filepath.Dir(defaultPath), 0755); err != nil {
+		return fmt.Errorf("failed ensuring config directory exists: %w", err)
+	}
+	configFile, err := os.OpenFile(defaultPath, os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		return fmt.Errorf("failed opening configuration: %w", err)
+	}
+	if err := c.SaveTo(configFile); err != nil {
+		return fmt.Errorf("failed saving configuration: %w", err)
+	}
+	return nil
+}
+
 // Validate errors if the configuration is invalid
 func (c *Config) Validate() error {
 	switch {
@@ -68,7 +157,7 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("PGPUser and PGPKey cannot both be set")
 	case c.PGPUser == "" && c.PGPKey == "":
 		return fmt.Errorf("One of PGPUser and PGPKey must be set")
-	case c.Identity == nil:
+	case c.IdentityID == "":
 		return fmt.Errorf("Identity must be set")
 	case len(c.EditorCmd) < 2:
 		return fmt.Errorf("Editor Command %v is impossibly short", c.EditorCmd)
@@ -92,7 +181,7 @@ func (c *Config) EditFile(filename string) *exec.Cmd {
 
 // Builder creates a forest.Builder based on the configuration. This allows the client
 // to create nodes on this user's behalf.
-func (c *Config) Builder() (*forest.Builder, error) {
+func (c *Config) Builder(store forest.Store) (*forest.Builder, error) {
 	var (
 		signer forest.Signer
 		err    error
@@ -113,7 +202,25 @@ func (c *Config) Builder() (*forest.Builder, error) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	return forest.As(c.Identity, signer), nil
+	identity, err := c.IdentityNode(store)
+	if err != nil {
+		return nil, fmt.Errorf("failed getting identity node: %w", err)
+	}
+	return forest.As(identity, signer), nil
+}
+
+func (c *Config) IdentityNode(store forest.Store) (*forest.Identity, error) {
+	identityID := &fields.QualifiedHash{}
+	if err := identityID.UnmarshalText([]byte(c.IdentityID)); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal IdentityID %s into QualifiedHash: %w", c.IdentityID, err)
+	}
+	identity, has, err := store.GetIdentity(identityID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get identity %s: %w", c.IdentityID, err)
+	} else if !has {
+		return nil, fmt.Errorf("store does not contain identity %s", c.IdentityID)
+	}
+	return identity.(*forest.Identity), nil
 }
 
 // Unixify ensures that a string contains only unix-style newlines, converting
@@ -282,14 +389,11 @@ func (w *Wizard) ConfigureNewIdentity() error {
 	if err != nil {
 		return fmt.Errorf("Failed to create identity: %v", err)
 	}
-	name, err := identity.ID().MarshalString()
-	if err != nil {
-		return fmt.Errorf("Error marshalling identity string: %v", err)
-	}
+	name := identity.ID().String()
 	if err := saveAs(name, identity); err != nil {
 		return fmt.Errorf("Error saving new identity %s: %v", name, err)
 	}
-	w.Identity = identity
+	w.IdentityID = name
 	return nil
 }
 
@@ -322,10 +426,7 @@ func (w *Wizard) ConfigureIdentity(store forest.Store) error {
 		if id == nil {
 			return "create a new identity"
 		}
-		idString, err := id.ID().MarshalString()
-		if err != nil {
-			return fmt.Sprintf("Error formatting ID() into string: %v", err)
-		}
+		idString := id.ID().String()
 		return fmt.Sprintf("%-16s %60s", string(id.Name.Blob), idString)
 	})
 	if err != nil {
@@ -334,7 +435,7 @@ func (w *Wizard) ConfigureIdentity(store forest.Store) error {
 
 	choice := choiceInterface.(*forest.Identity)
 	if choice != nil {
-		w.Identity = choice
+		w.IdentityID = choice.ID().String()
 		return nil
 	}
 
@@ -372,7 +473,11 @@ func (w *Wizard) Run(store forest.Store) error {
 	if err != nil {
 		return fmt.Errorf("Error configuring user identity: %v", err)
 	}
-	key, err := w.Identity.PublicKey.AsEntity()
+	identity, err := w.IdentityNode(store)
+	if err != nil {
+		return fmt.Errorf("Error getting identity node: %w", err)
+	}
+	key, err := identity.PublicKey.AsEntity()
 	if err != nil {
 		return fmt.Errorf("Error extracting key: %v", err)
 	}
