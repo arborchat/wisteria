@@ -6,6 +6,7 @@ import (
 
 	forest "git.sr.ht/~whereswaldon/forest-go"
 	"git.sr.ht/~whereswaldon/forest-go/fields"
+	"git.sr.ht/~whereswaldon/wisteria/archive"
 	"github.com/gdamore/tcell"
 	"github.com/gdamore/tcell/views"
 )
@@ -19,7 +20,7 @@ type RenderedLine struct {
 
 // HistoryView models the visible contents of the chat history. It implements tcell.CellModel
 type HistoryView struct {
-	*Archive
+	*archive.Archive
 	FilterID, SelectedReplyID *fields.QualifiedHash
 	rendered                  []RenderedLine
 	Cursor                    struct {

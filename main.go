@@ -20,6 +20,7 @@ import (
 	"git.sr.ht/~whereswaldon/forest-go/grove"
 	"git.sr.ht/~whereswaldon/sprout-go"
 	"git.sr.ht/~whereswaldon/sprout-go/watch"
+	"git.sr.ht/~whereswaldon/wisteria/archive"
 )
 
 func CheckNotify() {
@@ -123,7 +124,7 @@ and [flags] are among those listed below:
 	}
 
 	// create the queryable store abstraction that we need
-	history, err := NewArchive(store)
+	history, err := archive.NewArchive(store)
 	if err != nil {
 		log.Fatalf("Failed to create archive: %v", err)
 	}
