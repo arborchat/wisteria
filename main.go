@@ -1,14 +1,12 @@
 package main
 
 import (
-	"crypto/tls"
 	"flag"
 	"fmt"
 	"log"
 	"os"
 	"os/exec"
 	"runtime"
-	"time"
 
 	"github.com/0xAX/notificator"
 	"github.com/gdamore/tcell"
@@ -16,7 +14,6 @@ import (
 	"github.com/pkg/profile"
 
 	forest "git.sr.ht/~whereswaldon/forest-go"
-	"git.sr.ht/~whereswaldon/forest-go/fields"
 	"git.sr.ht/~whereswaldon/forest-go/grove"
 	"git.sr.ht/~whereswaldon/sprout-go"
 	"git.sr.ht/~whereswaldon/sprout-go/watch"
@@ -29,25 +26,6 @@ func CheckNotify() {
 			log.Println("WARNING: desktop notifications require `notify-send` to be installed")
 		}
 	}
-}
-
-func LaunchWorker(address string, store forest.Store) (*sprout.Worker, error) {
-	doneChan := make(chan struct{})
-	tcpConn, err := tls.Dial("tcp", address, &tls.Config{
-		MinVersion:         tls.VersionTLS12,
-		InsecureSkipVerify: true,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed dialing %s: %w", address, err)
-	}
-	substore := sprout.NewSubscriberStore(store)
-	worker, err := sprout.NewWorker(doneChan, tcpConn, substore)
-	if err != nil {
-		tcpConn.Close()
-		return nil, fmt.Errorf("failed starting sprout worker: %v", err)
-	}
-	go worker.Run()
-	return worker, nil
 }
 
 func main() {
@@ -123,37 +101,18 @@ and [flags] are among those listed below:
 		log.Fatal("Unable to construct builder using configuration:", err)
 	}
 
+	// create the observable message storage abstraction that sprout workers use
+	subscriberStore := sprout.NewSubscriberStore(store)
 	// create the queryable store abstraction that we need
-	history, err := archive.NewArchive(store)
+	history, err := archive.NewArchive(subscriberStore)
 	if err != nil {
 		log.Fatalf("Failed to create archive: %v", err)
 	}
 
 	// dial relay address (if provided)
-	if flag.NArg() > 0 {
-		address := flag.Arg(0)
-		worker, err := LaunchWorker(address, store)
-		if err != nil {
-			log.Printf("Failed to launch worker: %v", err)
-		} else {
-			log.Printf("Launched sprout worker connected to %s", address)
-		}
-		_, err = worker.SendList(fields.NodeTypeCommunity, 1024)
-		if err != nil {
-			log.Printf("Failed sending list verb to fetch communities: %v", err)
-		}
-		time.Sleep(time.Second)
-		communities, err := store.Recent(fields.NodeTypeCommunity, 1024)
-		if err != nil {
-			log.Printf("Failed loading known recent communities: %v", err)
-		}
-		for _, community := range communities {
-			if _, err := worker.SendSubscribe(community.(*forest.Community)); err != nil {
-				log.Printf("Failed subscribing to community %s: %v", community.ID().String(), err)
-			} else {
-				log.Printf("Subscribed to %s", community.ID().String())
-			}
-		}
+	done := make(chan struct{})
+	for _, address := range config.RelayAddresses {
+		sprout.LaunchSupervisedWorker(done, address, subscriberStore, nil, log.New(log.Writer(), "", log.Flags()))
 	}
 
 	// ensure its internal state is what we want

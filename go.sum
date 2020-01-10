@@ -4,6 +4,8 @@ git.sr.ht/~whereswaldon/forest-go v0.0.0-20191121211948-559a3de408da h1:D+uEZkES
 git.sr.ht/~whereswaldon/forest-go v0.0.0-20191121211948-559a3de408da/go.mod h1:LV1LNV6Mg4ajBo2fOTk16RIaC9Oh8pB+SpgXev6kAoU=
 git.sr.ht/~whereswaldon/sprout-go v0.0.0-20191121205705-5c9c56677b09 h1:MykHS1M7WJTZetTn0CT+X/CxXfBtGAR+bv+k+V9V0yI=
 git.sr.ht/~whereswaldon/sprout-go v0.0.0-20191121205705-5c9c56677b09/go.mod h1:c1+jlrZfyMjQa9e7/TywAPsIw+JF6Kza9u54/ksHHqQ=
+git.sr.ht/~whereswaldon/sprout-go v0.0.0-20200110020007-b453c046837e h1:8UiUrMLQQdZUcGeIYyC47VYk3sue9MSvd+uqMTXCFIE=
+git.sr.ht/~whereswaldon/sprout-go v0.0.0-20200110020007-b453c046837e/go.mod h1:PsgrkxcnBkB8EYk/WQrbe51Ykel/WHAln3yx+cTN5ig=
 github.com/0xAX/notificator v0.0.0-20181105090803-d81462e38c21 h1:moSC7ACaTejHmVRRwfDTMgByRSwjg2vZooncdWLj7o8=
 github.com/0xAX/notificator v0.0.0-20181105090803-d81462e38c21/go.mod h1:NtXa9WwQsukMHZpjNakTTz0LArxvGYdPA9CjIcUSZ6s=
 github.com/DATA-DOG/go-sqlmock v1.3.3 h1:CWUqKXe0s8A2z6qCgkP4Kru7wC11YoAnoupUKFDnH08=
