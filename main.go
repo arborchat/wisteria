@@ -34,7 +34,7 @@ func main() {
 		executable := os.Args[0]
 		fmt.Fprintf(flag.CommandLine.Output(), `Usage of %s:
 
-%s [flags] [relay-address]
+%s [flags] [relay-address [relay-address]...]
 
 Where [relay-address] is the IP:PORT or FQDN:PORT of a sprout relay
 and [flags] are among those listed below:
@@ -111,7 +111,7 @@ and [flags] are among those listed below:
 
 	// dial relay address (if provided)
 	done := make(chan struct{})
-	for _, address := range config.RelayAddresses {
+	for _, address := range flag.Args() {
 		sprout.LaunchSupervisedWorker(done, address, subscriberStore, nil, log.New(log.Writer(), "", log.Flags()))
 	}
 
