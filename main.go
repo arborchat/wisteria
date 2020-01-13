@@ -153,9 +153,15 @@ and [flags] are among those listed below:
 	titlebar.SetRight("%Sarrows or vi to move; enter to reply; c for new convo")
 	titlebar.SetStyle(tcell.StyleDefault.Reverse(true))
 
+	logs := views.NewTextArea()
+	logs.Init()
+	logs.SetContent("testing\nlogs\nplz")
+
+	switcher := NewSwitcherLayout(hw, logs)
+
 	layout := views.NewBoxLayout(views.Vertical)
 	layout.AddWidget(titlebar, 0)
-	layout.AddWidget(hw, 1)
+	layout.AddWidget(switcher, 1)
 	app.SetRootWidget(layout)
 
 	// watch the cwd for new nodes from other sources
