@@ -82,9 +82,9 @@ func (ta *Writer) SetLines(lines []string) {
 	ta.Init()
 	m := ta.model
 	m.width = 0
-	m.height = len(lines)
 	m.lines = append(m.lines, lines...)
-	for _, l := range lines {
+	m.height = len(m.lines)
+	for _, l := range m.lines {
 		if len(l) > m.width {
 			m.width = len(l)
 		}
