@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
+	"time"
 
 	"github.com/0xAX/notificator"
 	"github.com/gdamore/tcell"
@@ -53,11 +54,21 @@ and [flags] are among those listed below:
 	// profile to runtime directory chosen by config
 	defer profile.Start(profile.ProfilePath(config.RuntimeDirectory)).Stop()
 
+	// create log widget early so we can provide it to log configuration
+	logWidget := NewWriterWidget()
+	logWidget.EnableCursor(true)
+
 	// set up logging to runtime directory
-	if err := config.StartLogging(); err != nil {
+	if err := config.StartLogging(logWidget); err != nil {
 		log.Fatalf("Failed to configure logging: %v", err)
 	}
 
+	go func() {
+		for {
+			time.Sleep(time.Second * 3)
+			log.Println("log")
+		}
+	}()
 	// look up our working directory
 	cwd, err := os.Getwd()
 	if err != nil {
@@ -153,11 +164,7 @@ and [flags] are among those listed below:
 	titlebar.SetRight("%Sarrows or vi to move; enter to reply; c for new convo")
 	titlebar.SetStyle(tcell.StyleDefault.Reverse(true))
 
-	logs := views.NewTextArea()
-	logs.Init()
-	logs.SetContent("testing\nlogs\nplz")
-
-	switcher := NewSwitcherLayout(hw, logs)
+	switcher := NewSwitcherLayout(app, hw, logWidget)
 
 	layout := views.NewBoxLayout(views.Vertical)
 	layout.AddWidget(titlebar, 0)

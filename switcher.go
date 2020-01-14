@@ -8,30 +8,57 @@ import (
 // SwitcherLayout extends BoxLayout with simple facilities to switch out
 // the primary content widget in the BoxLayout.
 type SwitcherLayout struct {
-	*views.BoxLayout
+	*views.Application
 	LogWidget     views.Widget
 	ContentWidget views.Widget
-}
 
-const primaryViewIndex = 0
+	Current views.Widget
+
+	views.WidgetWatchers
+}
 
 // NewSwitcherLayout creates a SwitcherLayout with the given views as its
 // Content and Log widgets.
-func NewSwitcherLayout(content, log views.Widget) *SwitcherLayout {
+func NewSwitcherLayout(app *views.Application, content, log views.Widget) *SwitcherLayout {
 	s := &SwitcherLayout{
+		Application:   app,
 		ContentWidget: content,
 		LogWidget:     log,
-		BoxLayout:     views.NewBoxLayout(views.Vertical),
 	}
-	s.BoxLayout.InsertWidget(primaryViewIndex, content, 1)
+	s.Current = s.ContentWidget
+
+	// subscribe to the events of child widgets
+	log.Watch(s)
+	content.Watch(s)
 	return s
 }
 
+func (s *SwitcherLayout) Draw() {
+	s.Current.Draw()
+}
+
+func (s *SwitcherLayout) Resize() {
+	s.ContentWidget.Resize()
+	s.LogWidget.Resize()
+}
+
+func (s *SwitcherLayout) SetView(view views.View) {
+	s.ContentWidget.SetView(view)
+	s.LogWidget.SetView(view)
+}
+
+func (s *SwitcherLayout) Size() (int, int) {
+	return s.Current.Size()
+}
+
 func (s *SwitcherLayout) HandleEvent(ev tcell.Event) bool {
-	if s.BoxLayout.HandleEvent(ev) {
+	if s.Current.HandleEvent(ev) {
 		return true
 	}
 	switch keyEvent := ev.(type) {
+	case *views.EventWidgetContent:
+		// propagate content events upward
+		s.Application.Update()
 	case *tcell.EventKey:
 		switch keyEvent.Key() {
 		case tcell.KeyRune:
@@ -46,11 +73,9 @@ func (s *SwitcherLayout) HandleEvent(ev tcell.Event) bool {
 }
 
 func (s *SwitcherLayout) ToggleLogWidget() {
-	if s.Widgets()[primaryViewIndex] == s.LogWidget {
-		s.RemoveWidget(s.LogWidget)
-		s.InsertWidget(primaryViewIndex, s.ContentWidget, 1)
+	if s.Current == s.LogWidget {
+		s.Current = s.ContentWidget
 		return
 	}
-	s.RemoveWidget(s.ContentWidget)
-	s.InsertWidget(primaryViewIndex, s.LogWidget, 1)
+	s.Current = s.LogWidget
 }

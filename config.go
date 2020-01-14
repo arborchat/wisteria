@@ -49,15 +49,18 @@ func NewConfig() *Config {
 	}
 }
 
-// Start logging to configured log file, log location on stderr
-func (c *Config) StartLogging() error {
+// StartLogging configures logging to a file chosen based on the Config. If
+// any io.Writers are provided, they will all receive logs in addition to the
+// configured log file.
+func (c *Config) StartLogging(additionalLogSinks ...io.Writer) error {
 	logPath := filepath.Join(c.RuntimeDirectory, "viewer.log")
 	log.Println("Logging to", logPath)
 	logFile, err := os.OpenFile(logPath, os.O_APPEND|os.O_RDWR|os.O_CREATE, 0660)
 	if err != nil {
 		return fmt.Errorf("Failed to open log file %s: %w", logPath, err)
 	}
-	log.SetOutput(logFile)
+	writers := append([]io.Writer{logFile}, additionalLogSinks...)
+	log.SetOutput(io.MultiWriter(writers...))
 	log.SetFlags(log.Lshortfile | log.LstdFlags)
 	return nil
 }
