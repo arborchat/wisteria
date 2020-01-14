@@ -19,6 +19,7 @@ import (
 	"git.sr.ht/~whereswaldon/sprout-go"
 	"git.sr.ht/~whereswaldon/sprout-go/watch"
 	"git.sr.ht/~whereswaldon/wisteria/archive"
+	"git.sr.ht/~whereswaldon/wisteria/widgets"
 )
 
 func CheckNotify() {
@@ -55,7 +56,7 @@ and [flags] are among those listed below:
 	defer profile.Start(profile.ProfilePath(config.RuntimeDirectory)).Stop()
 
 	// create log widget early so we can provide it to log configuration
-	logWidget := NewWriterWidget()
+	logWidget := widgets.NewWriterWidget()
 	logWidget.EnableCursor(true)
 
 	// set up logging to runtime directory
