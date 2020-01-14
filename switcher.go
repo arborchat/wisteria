@@ -61,6 +61,8 @@ func (s *SwitcherLayout) HandleEvent(ev tcell.Event) bool {
 		s.Application.Update()
 	case *tcell.EventKey:
 		switch keyEvent.Key() {
+		case tcell.KeyCtrlC:
+			s.Application.Quit()
 		case tcell.KeyRune:
 			switch keyEvent.Rune() {
 			case 'L':

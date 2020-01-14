@@ -7,7 +7,6 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
-	"time"
 
 	"github.com/0xAX/notificator"
 	"github.com/gdamore/tcell"
@@ -64,12 +63,6 @@ and [flags] are among those listed below:
 		log.Fatalf("Failed to configure logging: %v", err)
 	}
 
-	go func() {
-		for {
-			time.Sleep(time.Second * 3)
-			log.Println("log")
-		}
-	}()
 	// look up our working directory
 	cwd, err := os.Getwd()
 	if err != nil {
