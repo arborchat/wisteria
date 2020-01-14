@@ -1,13 +1,14 @@
-package main
+package widgets
 
 import (
 	"github.com/gdamore/tcell"
 	"github.com/gdamore/tcell/views"
 )
 
-// SwitcherLayout extends BoxLayout with simple facilities to switch out
-// the primary content widget in the BoxLayout.
-type SwitcherLayout struct {
+// Switcher allows toggling a single widget between multiple underlying widgets
+// with only one widget visible at a time. Only the visible widget receives
+// events.
+type Switcher struct {
 	*views.Application
 	LogWidget     views.Widget
 	ContentWidget views.Widget
@@ -17,10 +18,10 @@ type SwitcherLayout struct {
 	views.WidgetWatchers
 }
 
-// NewSwitcherLayout creates a SwitcherLayout with the given views as its
+// NewSwitcher creates a Switcher with the given views as its
 // Content and Log widgets.
-func NewSwitcherLayout(app *views.Application, content, log views.Widget) *SwitcherLayout {
-	s := &SwitcherLayout{
+func NewSwitcher(app *views.Application, content, log views.Widget) *Switcher {
+	s := &Switcher{
 		Application:   app,
 		ContentWidget: content,
 		LogWidget:     log,
@@ -33,25 +34,25 @@ func NewSwitcherLayout(app *views.Application, content, log views.Widget) *Switc
 	return s
 }
 
-func (s *SwitcherLayout) Draw() {
+func (s *Switcher) Draw() {
 	s.Current.Draw()
 }
 
-func (s *SwitcherLayout) Resize() {
+func (s *Switcher) Resize() {
 	s.ContentWidget.Resize()
 	s.LogWidget.Resize()
 }
 
-func (s *SwitcherLayout) SetView(view views.View) {
+func (s *Switcher) SetView(view views.View) {
 	s.ContentWidget.SetView(view)
 	s.LogWidget.SetView(view)
 }
 
-func (s *SwitcherLayout) Size() (int, int) {
+func (s *Switcher) Size() (int, int) {
 	return s.Current.Size()
 }
 
-func (s *SwitcherLayout) HandleEvent(ev tcell.Event) bool {
+func (s *Switcher) HandleEvent(ev tcell.Event) bool {
 	if s.Current.HandleEvent(ev) {
 		return true
 	}
@@ -74,7 +75,7 @@ func (s *SwitcherLayout) HandleEvent(ev tcell.Event) bool {
 	return false
 }
 
-func (s *SwitcherLayout) ToggleLogWidget() {
+func (s *Switcher) ToggleLogWidget() {
 	if s.Current == s.LogWidget {
 		s.Current = s.ContentWidget
 		return

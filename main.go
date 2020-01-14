@@ -158,7 +158,7 @@ and [flags] are among those listed below:
 	titlebar.SetRight("%Sarrows or vi to move; enter to reply; c for new convo")
 	titlebar.SetStyle(tcell.StyleDefault.Reverse(true))
 
-	switcher := NewSwitcherLayout(app, hw, logWidget)
+	switcher := widgets.NewSwitcher(app, hw, logWidget)
 
 	layout := views.NewBoxLayout(views.Vertical)
 	layout.AddWidget(titlebar, 0)
