@@ -124,7 +124,7 @@ and [flags] are among those listed below:
 	// dial relay address (if provided)
 	done := make(chan struct{})
 	for _, address := range flag.Args() {
-		sprout.LaunchSupervisedWorker(done, address, subscriberStore, nil, log.New(log.Writer(), "", log.Flags()))
+		sprout.LaunchSupervisedWorker(done, address, subscriberStore, nil, log.New(log.Writer(), address+" ", log.Flags()))
 	}
 
 	// ensure its internal state is what we want
