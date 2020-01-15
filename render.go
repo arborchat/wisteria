@@ -64,7 +64,7 @@ func renderNode(node forest.Node, store forest.Store, config renderConfig) ([]Re
 			out = append(out, RenderedLine{
 				ID:    n.ID(),
 				Style: style,
-				Text:  line,
+				Text:  []rune(line),
 			})
 		}
 		if n.Depth == 1 {
