@@ -183,8 +183,6 @@ func (v *HistoryWidget) HandleEvent(event tcell.Event) bool {
 	switch keyEvent := event.(type) {
 	case *tcell.EventKey:
 		switch keyEvent.Key() {
-		case tcell.KeyCtrlC:
-			v.Application.Quit()
 		case tcell.KeyEnter:
 			if err := v.StartReply(); err != nil {
 				log.Printf("Error starting reply: %v", err)
