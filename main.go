@@ -30,6 +30,9 @@ func CheckNotify() {
 }
 
 func main() {
+	// declare flags
+	profiling := flag.Bool("profiling", false, "Log CPU profiling")
+
 	// configure our usage information
 	flag.Usage = func() {
 		executable := os.Args[0]
@@ -43,6 +46,7 @@ and [flags] are among those listed below:
 `, executable, executable)
 		flag.PrintDefaults()
 	}
+
 	flag.Parse()
 
 	// check whether we can send desktop notifications and warn if we can't
@@ -51,8 +55,10 @@ and [flags] are among those listed below:
 	// make basic configuration
 	config := NewConfig()
 
-	// profile to runtime directory chosen by config
-	defer profile.Start(profile.ProfilePath(config.RuntimeDirectory)).Stop()
+	if *profiling {
+		// profile to runtime directory chosen by config
+		defer profile.Start(profile.ProfilePath(config.RuntimeDirectory)).Stop()
+	}
 
 	// create log widget early so we can provide it to log configuration
 	logWidget := widgets.NewWriterWidget()
