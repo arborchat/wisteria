@@ -31,7 +31,7 @@ func CheckNotify() {
 
 func main() {
 	// declare flags
-	profiling := flag.Bool("profiling", false, "Log CPU profiling")
+	profiling := flag.Bool("profile", false, "enable CPU profiling (pprof file location will be logged)")
 
 	// configure our usage information
 	flag.Usage = func() {
