@@ -5,6 +5,7 @@ import (
 	"sort"
 
 	forest "git.sr.ht/~whereswaldon/forest-go"
+	forestArch "git.sr.ht/~whereswaldon/forest-go/archive"
 	"git.sr.ht/~whereswaldon/forest-go/fields"
 )
 
@@ -31,7 +32,7 @@ func (h ReplyList) IndexForID(id *fields.QualifiedHash) int {
 // Archive manages a group of known arbor nodes
 type Archive struct {
 	ReplyList
-	forest.Store
+	*forestArch.Archive
 }
 
 const defaultArchiveReplyListLen = 1024
@@ -39,7 +40,7 @@ const defaultArchiveReplyListLen = 1024
 func NewArchive(store forest.Store) (*Archive, error) {
 	archive := &Archive{
 		ReplyList: []*forest.Reply{},
-		Store:     store,
+		Archive:   forestArch.New(store),
 	}
 	nodes, err := store.Recent(fields.NodeTypeReply, defaultArchiveReplyListLen)
 	if err != nil {
@@ -73,45 +74,4 @@ func (a *Archive) Add(node forest.Node) error {
 	}
 	return nil
 
-}
-
-// AncestryOf returns the IDs of all known ancestors of the node with the given `id`
-func (v *Archive) AncestryOf(id *fields.QualifiedHash) ([]*fields.QualifiedHash, error) {
-	node, present, err := v.Store.Get(id)
-	if err != nil {
-		return nil, err
-	} else if !present {
-		return []*fields.QualifiedHash{}, nil
-	}
-	ancestors := make([]*fields.QualifiedHash, 0, node.TreeDepth())
-	next := node.ParentID()
-	for !next.Equals(fields.NullHash()) {
-		parent, present, err := v.Store.Get(next)
-		if err != nil {
-			return nil, err
-		} else if !present {
-			return ancestors, nil
-		}
-		ancestors = append(ancestors, next)
-		next = parent.ParentID()
-	}
-	return ancestors, nil
-}
-
-// DescendantsOf returns the IDs of all known descendants of the node with the given `id`
-func (v *Archive) DescendantsOf(id *fields.QualifiedHash) ([]*fields.QualifiedHash, error) {
-	descendants := make([]*fields.QualifiedHash, 0)
-	directChildren := []*fields.QualifiedHash{id}
-
-	for len(directChildren) > 0 {
-		target := directChildren[0]
-		directChildren = directChildren[1:]
-		for _, node := range v.ReplyList {
-			if node.ParentID().Equals(target) {
-				descendants = append(descendants, node.ID())
-				directChildren = append(directChildren, node.ID())
-			}
-		}
-	}
-	return descendants, nil
 }
