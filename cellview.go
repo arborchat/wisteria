@@ -72,8 +72,8 @@ func (a *CellView) Draw() {
 	cx, cy, en, sh := a.model.GetCursor()
 	// get the coordinate space that the viewport is actually displaying
 	vpUpLeftX, vpUpLeftY, vpDownRightX, vpDownRightY := a.port.GetVisible()
-	for y := vpUpLeftY; y < vpDownRightY; y++ {
-		for x := vpUpLeftX; x < vpDownRightX; x++ {
+	for y := vpUpLeftY; y <= vpDownRightY; y++ {
+		for x := vpUpLeftX; x <= vpDownRightX; x++ {
 			ch, style, comb, wid := model.GetCell(x, y)
 			if ch == 0 {
 				ch = ' '
