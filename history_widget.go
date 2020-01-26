@@ -150,7 +150,9 @@ func (v *HistoryWidget) FinishReply(parent forest.Node, replyFileName string, ed
 		log.Printf("Error reading reply from %s: %v", replyFileName, err)
 		return
 	}
-	replyContentString := strings.Trim(wrap.Wrap(stripCommentLines(string(replyContent)), 80), "\n")
+	wrapper := wrap.NewWrapper()
+	wrapper.Breakpoints = " "
+	replyContentString := strings.Trim(wrapper.Wrap(stripCommentLines(string(replyContent)), 80), "\n")
 	if len(replyContentString) == 0 {
 		log.Println("Message is empty, not sending")
 		return
