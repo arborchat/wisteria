@@ -73,7 +73,7 @@ func DefaultConfigFilePath() (string, error) {
 		return "", fmt.Errorf("failed looking up configuration dir: %w", err)
 	}
 	const wisteriaConfigDirName = "wisteria"
-	const wisteriaConfigFileNameJSON = "wisteria.json"
+	const wisteriaConfigFileNameJSON = "wisteria-2.json"
 	configFile := filepath.Join(configDir, wisteriaConfigDirName, wisteriaConfigFileNameJSON)
 	return configFile, nil
 }
