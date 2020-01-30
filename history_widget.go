@@ -157,7 +157,7 @@ func (v *HistoryWidget) FinishReply(parent forest.Node, replyFileName string, ed
 		log.Println("Message is empty, not sending")
 		return
 	}
-	reply, err := v.NewReply(parent, replyContentString, "")
+	reply, err := v.NewReply(parent, replyContentString, []byte{})
 	if err != nil {
 		log.Printf("Error creating reply: %v", err)
 		return

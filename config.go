@@ -388,7 +388,7 @@ func (w *Wizard) ConfigureNewIdentity() error {
 	if err != nil {
 		return fmt.Errorf("Failed to get username: %v", err)
 	}
-	identity, err := forest.NewIdentity(signer, username, "")
+	identity, err := forest.NewIdentity(signer, username, []byte{})
 	if err != nil {
 		return fmt.Errorf("Failed to create identity: %v", err)
 	}
