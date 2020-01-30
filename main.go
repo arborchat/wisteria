@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/tls"
 	"flag"
 	"fmt"
 	"log"
@@ -32,6 +33,7 @@ func CheckNotify() {
 func main() {
 	// declare flags
 	profiling := flag.Bool("profile", false, "enable CPU profiling (pprof file location will be logged)")
+	insecure := flag.Bool("insecure", false, "disable TLS certificate validation when dialing relay addresses")
 
 	// configure our usage information
 	flag.Usage = func() {
@@ -123,7 +125,13 @@ and [flags] are among those listed below:
 	// dial relay address (if provided)
 	done := make(chan struct{})
 	for _, address := range flag.Args() {
-		sprout.LaunchSupervisedWorker(done, address, subscriberStore, nil, log.New(log.Writer(), address+" ", log.Flags()))
+		tlsConfig := (*tls.Config)(nil)
+		if *insecure {
+			tlsConfig = &tls.Config{
+				InsecureSkipVerify: true,
+			}
+		}
+		sprout.LaunchSupervisedWorker(done, address, subscriberStore, tlsConfig, log.New(log.Writer(), address+" ", log.Flags()))
 	}
 
 	// ensure its internal state is what we want
