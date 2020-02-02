@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	forest "git.sr.ht/~whereswaldon/forest-go"
+	"git.sr.ht/~whereswaldon/wisteria/widgets"
 	"github.com/0xAX/notificator"
 	wrap "github.com/bbrks/wrap/v2"
 	"github.com/gdamore/tcell"
@@ -89,6 +90,7 @@ func (v *HistoryWidget) StartReply() error {
 	if err != nil {
 		return fmt.Errorf("couldn't determine current reply: %v", err)
 	}
+	v.PostEvent(widgets.NewEventReplyRequest(v, reply))
 	msg := strings.Join(strings.Split(string(reply.Content.Blob), "\n"), "\n#")
 	file, err := ioutil.TempFile("", "arbor-msg")
 	if err != nil {

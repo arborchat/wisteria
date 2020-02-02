@@ -159,12 +159,14 @@ and [flags] are among those listed below:
 		notify,
 	}
 
+	editorLayer := widgets.NewEphemeralEditor(hw)
+
 	titlebar := views.NewSimpleStyledTextBar()
 	titlebar.SetLeft("%Swisteria")
 	titlebar.SetRight("%Sarrows or vi to move; enter to reply; c for new convo")
 	titlebar.SetStyle(tcell.StyleDefault.Reverse(true))
 
-	switcher := widgets.NewSwitcher(app, hw, logWidget)
+	switcher := widgets.NewSwitcher(app, editorLayer, logWidget)
 
 	layout := views.NewBoxLayout(views.Vertical)
 	layout.AddWidget(titlebar, 0)
