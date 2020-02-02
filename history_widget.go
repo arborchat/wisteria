@@ -90,8 +90,10 @@ func (v *HistoryWidget) StartReply() error {
 	if err != nil {
 		return fmt.Errorf("couldn't determine current reply: %v", err)
 	}
-	v.PostEvent(widgets.NewEventReplyRequest(v, reply))
 	msg := strings.Join(strings.Split(string(reply.Content.Blob), "\n"), "\n#")
+	msg = fmt.Sprintf("# replying to %s\n", msg)
+	editReq := widgets.NewEventEditRequest(0, v, msg)
+	v.PostEvent(editReq)
 	file, err := ioutil.TempFile("", "arbor-msg")
 	if err != nil {
 		return fmt.Errorf("couldn't create temporary file for reply: %v", err)
@@ -99,7 +101,7 @@ func (v *HistoryWidget) StartReply() error {
 	// ensure this file descriptor is closed
 	file.Close()
 	// populate the file, but keep it closed
-	err = ioutil.WriteFile(file.Name(), []byte(fmt.Sprintf("# replying to %s\n", msg)), 0660)
+	err = ioutil.WriteFile(file.Name(), []byte(msg), 0660)
 	if err != nil {
 		return fmt.Errorf("couldn't write template into temporary file: %v", err)
 	}
@@ -185,6 +187,8 @@ func (v *HistoryWidget) HandleEvent(event tcell.Event) bool {
 		return true
 	}
 	switch keyEvent := event.(type) {
+	case widgets.EventEditFinished:
+		log.Printf("Got event edit finished: %v", keyEvent)
 	case *tcell.EventKey:
 		switch keyEvent.Key() {
 		case tcell.KeyEnter:

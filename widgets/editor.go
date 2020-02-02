@@ -29,7 +29,9 @@ func (e *Editor) HandleEvent(ev tcell.Event) bool {
 	case *tcell.EventKey:
 		switch event.Key() {
 		case tcell.KeyEnter:
-			e.PostEvent(NewEventSendRequest(e, nil))
+			// don't provide an ID because we don't actually know the right one
+			// higher level logic should populate it.
+			e.PostEvent(NewEventEditFinished(0, e, e.content))
 			return true
 		case tcell.KeyBackspace:
 			fallthrough
