@@ -108,12 +108,6 @@ and [flags] are among those listed below:
 		}
 	}
 
-	// get a node builder from config so we can sign nodes
-	builder, err := config.Builder(store)
-	if err != nil {
-		log.Fatal("Unable to construct builder using configuration:", err)
-	}
-
 	// create the observable message storage abstraction that sprout workers use
 	subscriberStore := sprout.NewSubscriberStore(store)
 	// create the queryable store abstraction that we need
@@ -137,20 +131,6 @@ and [flags] are among those listed below:
 	// ensure its internal state is what we want
 	history.Sort()
 
-	// make a TUI view of that history
-	historyView := &HistoryView{
-		Archive: history,
-	}
-	if err := historyView.Render(); err != nil {
-		log.Fatal(err)
-	}
-
-	// wrap TUI view in the necessary tcell abstractions
-	cv := NewCellView()
-	cv.SetModel(historyView)
-	cv.MakeCursorVisible()
-	historyView.SelectLastLine() // start at bottom of history
-
 	// set up desktop notifications
 	notify := notificator.New(notificator.Options{
 		AppName: "Arbor",
@@ -158,21 +138,18 @@ and [flags] are among those listed below:
 
 	// build an widget/application from existing views and services
 	app := new(views.Application)
-	hw := &HistoryWidget{
-		historyView,
-		cv,
-		app,
-		builder,
-		config,
-		notify,
+	hw, err := NewHistoryWidget(app, history, config, notify)
+	if err != nil {
+		log.Fatalf("Failed to create history widget: %v", err)
 	}
+	editorLayer := widgets.NewEphemeralEditor(hw)
 
 	titlebar := views.NewSimpleStyledTextBar()
 	titlebar.SetLeft("%Swisteria")
 	titlebar.SetRight("%Sarrows or vi to move; enter to reply; c for new convo")
 	titlebar.SetStyle(tcell.StyleDefault.Reverse(true))
 
-	switcher := widgets.NewSwitcher(app, hw, logWidget)
+	switcher := widgets.NewSwitcher(app, editorLayer, logWidget)
 
 	layout := views.NewBoxLayout(views.Vertical)
 	layout.AddWidget(titlebar, 0)

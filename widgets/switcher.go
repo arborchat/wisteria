@@ -53,14 +53,14 @@ func (s *Switcher) Size() (int, int) {
 }
 
 func (s *Switcher) HandleEvent(ev tcell.Event) bool {
-	if s.Current.HandleEvent(ev) {
-		return true
-	}
 	switch keyEvent := ev.(type) {
 	case *views.EventWidgetContent:
 		// propagate content events upward
 		s.Application.Update()
 	case *tcell.EventKey:
+		if s.Current.HandleEvent(ev) {
+			return true
+		}
 		switch keyEvent.Key() {
 		case tcell.KeyCtrlC:
 			s.Application.Quit()
