@@ -287,6 +287,26 @@ func (v *HistoryWidget) FinishReplyString(parent forest.Node, content string) er
 	return nil
 }
 
+// UpdateCursor ensures that the cursor is visible and handles all necessary
+// state changes each time the cursor moves. This includes firing events
+// related to moving the cursor.
+func (v *HistoryWidget) UpdateCursor() {
+	v.MakeCursorVisible()
+	current, err := v.CurrentReply()
+	if err != nil {
+		log.Printf("Failed updating cursor state: %v", err)
+	}
+	author, _, err := v.GetIdentity(&current.Author)
+	if err != nil {
+		log.Printf("Failed updating cursor state, couldn't get author: %v", err)
+	}
+	community, _, err := v.GetCommunity(&current.CommunityID)
+	if err != nil {
+		log.Printf("Failed updating cursor state, couldn't get community: %v", err)
+	}
+	v.PostEvent(widgets.NewEventReplySelected(v, current, author.(*forest.Identity), community.(*forest.Community)))
+}
+
 func (v *HistoryWidget) HandleEvent(event tcell.Event) bool {
 	if v.CellView.HandleEvent(event) {
 		return true
@@ -312,27 +332,27 @@ func (v *HistoryWidget) HandleEvent(event tcell.Event) bool {
 		switch keyEvent.Rune() {
 		case 'g':
 			v.HistoryView.SetCursor(0, 0)
-			v.MakeCursorVisible()
+			v.UpdateCursor()
 			return true
 		case 'G':
 			v.SelectLastLine()
-			v.MakeCursorVisible()
+			v.UpdateCursor()
 			return true
 		case 'h':
 			v.MoveCursor(-1, 0)
-			v.MakeCursorVisible()
+			v.UpdateCursor()
 			return true
 		case 'j':
 			v.MoveCursor(0, 1)
-			v.MakeCursorVisible()
+			v.UpdateCursor()
 			return true
 		case 'k':
 			v.MoveCursor(0, -1)
-			v.MakeCursorVisible()
+			v.UpdateCursor()
 			return true
 		case 'l':
 			v.MoveCursor(1, 0)
-			v.MakeCursorVisible()
+			v.UpdateCursor()
 			return true
 		case 'c':
 			if err := v.EmitConversationRequest(); err != nil {

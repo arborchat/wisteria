@@ -149,11 +149,17 @@ and [flags] are among those listed below:
 	titlebar.SetRight("%Sarrows or vi to move; enter to reply; c for new convo")
 	titlebar.SetStyle(tcell.StyleDefault.Reverse(true))
 
+	statusbar := widgets.NewStatusBar()
+	// subscribe the status bar to events from the history widget
+	hw.Watch(statusbar)
+	hw.UpdateCursor() // set initial statusbar state
+
 	switcher := widgets.NewSwitcher(app, editorLayer, logWidget)
 
 	layout := views.NewBoxLayout(views.Vertical)
 	layout.AddWidget(titlebar, 0)
 	layout.AddWidget(switcher, 1)
+	layout.AddWidget(statusbar, 0)
 	app.SetRootWidget(layout)
 
 	// watch the cwd for new nodes from other sources
