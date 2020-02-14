@@ -496,7 +496,7 @@ func (w *Wizard) Run(store forest.Store) error {
 }
 
 func FindEditors() []string {
-	out := []string{}
+	out := []string{DummyEditor}
 	for term := range KnownEditorCommands {
 		if _, err := exec.LookPath(term); err == nil {
 			out = append(out, term)
@@ -518,9 +518,12 @@ func ExpandAll(in []string) []string {
 	return in
 }
 
+const DummyEditor = "dummy-editor"
+
 var KnownEditorCommands = map[string][]string{
 	"xterm":          ExpandAll([]string{"xterm", "-e", "$EDITOR", "{}"}),
 	"gnome-terminal": ExpandAll([]string{"gnome-terminal", "--wait", "--", "$EDITOR", "{}"}),
 	"gedit":          {"gedit", "{}"},
 	"notepad":        {"notepad", "{}"},
+	DummyEditor:      {"choose", "this", "if", "uncertain"},
 }
