@@ -295,6 +295,7 @@ func (v *HistoryWidget) UpdateCursor() {
 	current, err := v.CurrentReply()
 	if err != nil {
 		log.Printf("Failed updating cursor state: %v", err)
+		return
 	}
 	author, _, err := v.GetIdentity(&current.Author)
 	if err != nil {
