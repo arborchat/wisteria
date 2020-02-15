@@ -27,7 +27,7 @@ func NewEphemeralEditor(primary views.Widget) *EphemeralEditor {
 	separator := views.NewTextBar()
 	style := tcell.StyleDefault.Reverse(true)
 	separator.SetStyle(style)
-	separator.SetLeft("Type your reply below", style)
+	separator.SetLeft("Type your reply below; Enter to send; Send empty message to cancel", style)
 	e := &EphemeralEditor{
 		PrimaryContent: primary,
 		Editor:         NewEditor(),
