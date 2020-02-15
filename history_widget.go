@@ -310,6 +310,36 @@ func (v *HistoryWidget) UpdateCursor() {
 	v.PostEvent(widgets.NewEventReplySelected(v, current, author.(*forest.Identity), community.(*forest.Community)))
 }
 
+func (v *HistoryWidget) goToTop() {
+	v.HistoryView.SetCursor(0, 0)
+	v.UpdateCursor()
+}
+
+func (v *HistoryWidget) goToBottom() {
+	v.SelectLastLine()
+	v.UpdateCursor()
+}
+
+func (v *HistoryWidget) goUpOneLine() {
+	v.MoveCursor(0, -1)
+	v.UpdateCursor()
+}
+
+func (v *HistoryWidget) goDownOneLine() {
+	v.MoveCursor(0, 1)
+	v.UpdateCursor()
+}
+
+func (v *HistoryWidget) goLeftOneCell() {
+	v.MoveCursor(-1, 0)
+	v.UpdateCursor()
+}
+
+func (v *HistoryWidget) goRightOneCell() {
+	v.MoveCursor(1, 0)
+	v.UpdateCursor()
+}
+
 func (v *HistoryWidget) HandleEvent(event tcell.Event) bool {
 	if v.CellView.HandleEvent(event) {
 		return true
@@ -327,6 +357,32 @@ func (v *HistoryWidget) HandleEvent(event tcell.Event) bool {
 				log.Printf("Error starting reply: %v", err)
 				return true
 			}
+		case tcell.KeyUp, tcell.KeyCtrlP:
+			v.goUpOneLine()
+			return true
+		case tcell.KeyDown, tcell.KeyCtrlN:
+			v.goDownOneLine()
+			return true
+		case tcell.KeyRight, tcell.KeyCtrlF:
+			v.goRightOneCell()
+			return true
+		case tcell.KeyLeft, tcell.KeyCtrlB:
+			v.goLeftOneCell()
+			return true
+		case tcell.KeyPgDn:
+			v.keyPgDn()
+			v.UpdateCursor()
+			return true
+		case tcell.KeyPgUp:
+			v.keyPgUp()
+			v.UpdateCursor()
+			return true
+		case tcell.KeyEnd:
+			v.goToBottom()
+			return true
+		case tcell.KeyHome:
+			v.goToTop()
+			return true
 		case tcell.KeyRune:
 			// break if it's a normal keypress
 		default:
@@ -334,28 +390,22 @@ func (v *HistoryWidget) HandleEvent(event tcell.Event) bool {
 		}
 		switch keyEvent.Rune() {
 		case 'g':
-			v.HistoryView.SetCursor(0, 0)
-			v.UpdateCursor()
+			v.goToTop()
 			return true
 		case 'G':
-			v.SelectLastLine()
-			v.UpdateCursor()
+			v.goToBottom()
 			return true
 		case 'h':
-			v.MoveCursor(-1, 0)
-			v.UpdateCursor()
+			v.goLeftOneCell()
 			return true
 		case 'j':
-			v.MoveCursor(0, 1)
-			v.UpdateCursor()
+			v.goDownOneLine()
 			return true
 		case 'k':
-			v.MoveCursor(0, -1)
-			v.UpdateCursor()
+			v.goUpOneLine()
 			return true
 		case 'l':
-			v.MoveCursor(1, 0)
-			v.UpdateCursor()
+			v.goRightOneCell()
 			return true
 		case 'c':
 			if err := v.EmitConversationRequest(); err != nil {

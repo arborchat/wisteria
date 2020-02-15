@@ -187,30 +187,6 @@ func (a *CellView) HandleEvent(e tcell.Event) bool {
 	switch e := e.(type) {
 	case *tcell.EventKey:
 		switch e.Key() {
-		case tcell.KeyUp, tcell.KeyCtrlP:
-			a.keyUp()
-			return true
-		case tcell.KeyDown, tcell.KeyCtrlN:
-			a.keyDown()
-			return true
-		case tcell.KeyRight, tcell.KeyCtrlF:
-			a.keyRight()
-			return true
-		case tcell.KeyLeft, tcell.KeyCtrlB:
-			a.keyLeft()
-			return true
-		case tcell.KeyPgDn:
-			a.keyPgDn()
-			return true
-		case tcell.KeyPgUp:
-			a.keyPgUp()
-			return true
-		case tcell.KeyEnd:
-			a.keyEnd()
-			return true
-		case tcell.KeyHome:
-			a.keyHome()
-			return true
 		}
 	}
 	return false
