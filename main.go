@@ -22,6 +22,11 @@ import (
 	"git.sr.ht/~whereswaldon/wisteria/widgets"
 )
 
+var (
+	version = "git"
+	commit  = "unknown"
+)
+
 func CheckNotify() {
 	if runtime.GOOS == "linux" {
 		if _, err := exec.LookPath("notify-send"); err != nil {
@@ -34,6 +39,8 @@ func main() {
 	// declare flags
 	profiling := flag.Bool("profile", false, "enable CPU profiling (pprof file location will be logged)")
 	insecure := flag.Bool("insecure", false, "disable TLS certificate validation when dialing relay addresses")
+	printVersion := flag.Bool("version", false, "print version information and exit")
+	flag.BoolVar(printVersion, "v", false, "print version information and exit")
 
 	// configure our usage information
 	flag.Usage = func() {
@@ -51,6 +58,10 @@ and [flags] are among those listed below:
 
 	flag.Parse()
 
+	if *printVersion {
+		fmt.Printf("%s version: %s commit: %s\n", os.Args[0], version, commit)
+		return
+	}
 	// check whether we can send desktop notifications and warn if we can't
 	CheckNotify()
 
