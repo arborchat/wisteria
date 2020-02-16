@@ -1,6 +1,7 @@
 image: archlinux
 packages:
   - go
+  - wget
 sources:
   - https://git.sr.ht/~whereswaldon/wisteria
 environment:
@@ -13,12 +14,13 @@ tasks:
       cd wisteria
       go test -cover
   - cross_compile: |
+      mkdir -p ~/go/bin
       wget 'https://github.com/goreleaser/goreleaser/releases/download/v0.126.0/goreleaser_Linux_x86_64.tar.gz'
       tar xvzf goreleaser_Linux_x86_64.tar.gz goreleaser
       mv -v goreleaser ~/go/bin/
       cd wisteria
       ~/go/bin/goreleaser --snapshot --skip-publish --rm-dist
-      cat dist/checksums.txt
+      find dist -executable -type f -exec md5sum '{}' \; | rev | sort | rev
   - annotate: |
       go get git.sr.ht/~sircmpwn/annotatego
       cd wisteria

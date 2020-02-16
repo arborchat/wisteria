@@ -11,8 +11,9 @@ builds:
       - -trimpath
   ldflags:
       # this is the default without the date being set. The date would
-      # prevent build reproducibility
-      - -s -w -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.builtBy=goreleaser
+      # prevent build reproducibility. Similarly, we must set the buildid
+      # to be the empty string.
+      - -s -w -buildid='' -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.builtBy=goreleaser
   goos:
     - linux
     - darwin
