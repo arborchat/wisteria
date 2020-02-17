@@ -9,13 +9,15 @@ environment:
 secrets:
   - c18470ea-9f49-4fcf-8814-2223cfa175f1
   - 3f11ff14-dff1-45ca-990c-c69873656f63
-  - 649e6fb2-6046-4afb-aa61-d0609842d3db
+  - e6103a13-65c0-4696-b5a7-f0ad909468aa
 tasks:
   - test: |
       cd wisteria
       go test -cover
   - cross_compile: |
+      set +x # don't leak contents of this file
       source ~/.github_token
+      set -x
       mkdir -p ~/go/bin
       wget 'https://github.com/goreleaser/goreleaser/releases/download/v0.126.0/goreleaser_Linux_x86_64.tar.gz'
       tar xvzf goreleaser_Linux_x86_64.tar.gz goreleaser
