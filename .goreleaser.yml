@@ -13,7 +13,11 @@ builds:
       # this is the default without the date being set. The date would
       # prevent build reproducibility. Similarly, we must set the buildid
       # to be the empty string.
-      - -s -w -buildid='' -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.builtBy=goreleaser
+      # goreleaser normally uses '-s -w' in these flags to suppress the
+      # symbol table and debug info, but I think we probably want to include
+      # that right now so that we can debug official builds without losing
+      # our minds.
+      - -buildid='' -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.builtBy=goreleaser
   goos:
     - linux
     - darwin
@@ -38,6 +42,10 @@ archives:
     windows: Windows
     386: i386
     amd64: x86_64
+release:
+  github:
+    owner: arborchat
+    name: wisteria
 checksum:
   name_template: 'checksums.txt'
 snapshot:
