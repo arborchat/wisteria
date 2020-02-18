@@ -23,12 +23,7 @@ tasks:
       tar xvzf goreleaser_Linux_x86_64.tar.gz goreleaser
       mv -v goreleaser ~/go/bin/
       cd wisteria
-      if [ "$(git rev-parse --abbrev-ref HEAD)" != "master" ]; then
-          GORELEASER_FLAGS="--snapshot --skip-publish"
-      fi
-      ~/go/bin/goreleaser $GORELEASER_FLAGS --rm-dist
-      # sort the hashes of the built binaries in a reliable (if derpy) way
-      find dist -executable -type f -exec md5sum '{}' \; | rev | sort | rev
+      ./.builds/release.sh
   - annotate: |
       go get git.sr.ht/~sircmpwn/annotatego
       cd wisteria
