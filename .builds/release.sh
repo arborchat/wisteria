@@ -1,5 +1,6 @@
 #!/bin/sh
-#
+
+set -x
 basedir=$(dirname "$(realpath "$0")")
 
 # determine current commit
