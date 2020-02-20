@@ -40,12 +40,18 @@ func main() {
 	// for a flag.
 	defaultConfig, err := DefaultConfigFilePath()
 	if err != nil {
-		log.Printf("Unable to determine configuration file location: %v", err)
+		log.Printf("Unable to determine default configuration file location: %v", err)
+		return
+	}
+	defaultGrovePath, err := DefaultGrovePath()
+	if err != nil {
+		log.Printf("Unable to determine default grove location: %v", err)
 		return
 	}
 
 	// declare flags
 	configpath := flag.String("config", defaultConfig, "the configuration file to load")
+	grovepath := flag.String("grove", defaultGrovePath, "path to the grove in use (directory of arbor history)")
 	profiling := flag.Bool("profile", false, "enable CPU profiling (pprof file location will be logged)")
 	insecure := flag.Bool("insecure", false, "disable TLS certificate validation when dialing relay addresses")
 	printVersion := flag.Bool("version", false, "print version information and exit")
@@ -74,6 +80,11 @@ and [flags] are among those listed below:
 	// check whether we can send desktop notifications and warn if we can't
 	CheckNotify()
 
+	// ensure the grove path that we're working with actually exists
+	if err := os.MkdirAll(*grovepath, 0770); err != nil {
+		log.Fatalf("Failed creating the grove path: %v", err)
+	}
+
 	// make basic configuration
 	config := NewConfig()
 
@@ -98,7 +109,7 @@ and [flags] are among those listed below:
 	}
 
 	// use a grove rooted in our current working directory as our node storage
-	groveStore, err := grove.New(cwd)
+	groveStore, err := grove.New(*grovepath)
 	if err != nil {
 		log.Fatalf("Failed to create grove at %s: %v", cwd, err)
 	}
@@ -184,7 +195,7 @@ and [flags] are among those listed below:
 
 	// watch the cwd for new nodes from other sources
 	logger := log.New(log.Writer(), "", log.LstdFlags|log.Lshortfile)
-	if _, err := watch.Watch(cwd, logger, hw.ReadMessageFile); err != nil {
+	if _, err := watch.Watch(*grovepath, logger, hw.ReadMessageFile); err != nil {
 		log.Fatal(err)
 	}
 

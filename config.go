@@ -78,6 +78,17 @@ func DefaultConfigFilePath() (string, error) {
 	return configFile, nil
 }
 
+func DefaultGrovePath() (string, error) {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return "", fmt.Errorf("failed finding user home directory: %w", err)
+	}
+	const wisteriaHistoryParentDir = "Documents"
+	const wisteriaHistoryDirName = "ArborHistory"
+	wisteriaHistoryPath := filepath.Join(homeDir, wisteriaHistoryParentDir, wisteriaHistoryDirName)
+	return wisteriaHistoryPath, nil
+}
+
 func (c *Config) LoadFromPath(configPath string) error {
 	configFile, err := os.Open(configPath)
 	if err != nil {
@@ -361,7 +372,8 @@ type Wizard struct {
 }
 
 // ConfigureNewIdentity creates a completely new identity using an existing GPG key
-func (w *Wizard) ConfigureNewIdentity() error {
+// The identity will be stored in the provided forest.Store implementation
+func (w *Wizard) ConfigureNewIdentity(store forest.Store) error {
 	secKeys, err := GetSecretKeys()
 	if err != nil {
 		return fmt.Errorf("Failed to list available secret keys: %v", err)
@@ -396,11 +408,10 @@ func (w *Wizard) ConfigureNewIdentity() error {
 	if err != nil {
 		return fmt.Errorf("Failed to create identity: %v", err)
 	}
-	name := identity.ID().String()
-	if err := saveAs(name, identity); err != nil {
-		return fmt.Errorf("Error saving new identity %s: %v", name, err)
+	if err := store.Add(identity); err != nil {
+		return fmt.Errorf("Error saving new identity %s: %v", identity.ID(), err)
 	}
-	w.IdentityID = name
+	w.IdentityID = identity.ID().String()
 	return nil
 }
 
@@ -446,7 +457,7 @@ func (w *Wizard) ConfigureIdentity(store forest.Store) error {
 		return nil
 	}
 
-	return w.ConfigureNewIdentity()
+	return w.ConfigureNewIdentity(store)
 }
 
 const installGPGMessage = "This program requires GPG to run. Please install GPG and restart. https://gnupg.org/"
