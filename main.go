@@ -2,6 +2,7 @@ package main
 
 import (
 	"crypto/tls"
+	"errors"
 	"flag"
 	"fmt"
 	"log"
@@ -122,7 +123,9 @@ and [flags] are among those listed below:
 	}
 
 	if err := config.LoadFromPath(*configpath); err != nil {
-		log.Printf("Failed loading configuration file: %v", err)
+		if !errors.Is(err, os.ErrNotExist) {
+			log.Fatalf("Failed loading configuration file: %v", err)
+		}
 		// ask user for interactive configuration
 		wizard := &Wizard{
 			Config:   config,
@@ -134,8 +137,11 @@ and [flags] are among those listed below:
 		if err := config.Validate(); err != nil {
 			log.Fatal("Error validating configuration:", err)
 		}
-		if err := config.SaveToDefault(); err != nil {
-			log.Fatal("Error saving configuration:", err)
+		if err := config.SaveToPath(*configpath); err != nil {
+			if !errors.Is(err, os.ErrExist) {
+				log.Fatal("Error saving configuration:", err)
+			}
+			log.Printf("Choosing not to overwrite existing config file %s", *configpath)
 		}
 	}
 

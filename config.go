@@ -136,17 +136,25 @@ func (c *Config) FileExists() (bool, error) {
 }
 
 // SaveTo persists this configuration within the given WriteCloser and then closes it.
-func (c *Config) SaveTo(configFile io.WriteCloser) (err error) {
-	defer func() {
-		if closeErr := configFile.Close(); closeErr != nil {
-			err = fmt.Errorf("failed closing config file: %w", err)
-		}
-	}()
+func (c *Config) SaveTo(configFile io.Writer) error {
 	encoder := json.NewEncoder(configFile)
 	if err := encoder.Encode(c); err != nil {
 		return fmt.Errorf("failed writing config file: %w", err)
 	}
 	return nil
+}
+
+func (c *Config) SaveToPath(configpath string) (err error) {
+	configFile, err := os.OpenFile(configpath, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0664)
+	if err != nil {
+		return fmt.Errorf("couldn't save config file %s: %w", configpath, err)
+	}
+	defer func() {
+		if closeErr := configFile.Close(); closeErr != nil {
+			err = fmt.Errorf("failed closing config file: %w", err)
+		}
+	}()
+	return c.SaveTo(configFile)
 }
 
 // SaveToDefault saves this configuration to the default configuration file path.
