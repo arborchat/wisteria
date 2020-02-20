@@ -78,10 +78,21 @@ func DefaultConfigFilePath() (string, error) {
 	return configFile, nil
 }
 
+func (c *Config) LoadFromPath(configPath string) error {
+	configFile, err := os.Open(configPath)
+	if err != nil {
+		return fmt.Errorf("unable to open config file: %w", err)
+	}
+	defer configFile.Close()
+	if err := c.LoadFrom(configFile); err != nil {
+		return fmt.Errorf("unable to load config file: %w", err)
+	}
+	return nil
+}
+
 // LoadFrom loads the configuration from the given ReadCloser and closes it. It will error if
 // it fails to read, parse, or validate the configuration that it reads.
-func (c *Config) LoadFrom(configFile io.ReadCloser) error {
-	defer configFile.Close()
+func (c *Config) LoadFrom(configFile io.Reader) error {
 	decoder := json.NewDecoder(configFile)
 	if err := decoder.Decode(c); err != nil {
 		return fmt.Errorf("failed decoding config file: %w", err)
@@ -98,14 +109,7 @@ func (c *Config) LoadFromDefault() error {
 	if err != nil {
 		return fmt.Errorf("unable to get default config path: %w", err)
 	}
-	configFile, err := os.Open(defaultPath)
-	if err != nil {
-		return fmt.Errorf("unable to open default config file: %w", err)
-	}
-	if err := c.LoadFrom(configFile); err != nil {
-		return fmt.Errorf("unable to load default config file: %w", err)
-	}
-	return nil
+	return c.LoadFromPath(defaultPath)
 }
 
 // FileExists returns whether a wisteria configuration file exists at the default path.
@@ -445,23 +449,6 @@ func (w *Wizard) ConfigureIdentity(store forest.Store) error {
 	return w.ConfigureNewIdentity()
 }
 
-// ConfigureEditor walks the user through choosing an editor command for their client.
-func (w *Wizard) ConfigureEditor() error {
-	editors := []interface{}{}
-	for _, ed := range FindEditors() {
-		editors = append(editors, ed)
-	}
-	choiceInterface, err := w.Choose("Please choose a command to edit messages with:", editors, func(i interface{}) string {
-		return strings.Join(KnownEditorCommands[i.(string)], " ")
-	})
-	if err != nil {
-		return fmt.Errorf("Error reading user response: %v", err)
-	}
-
-	w.EditorCmd = KnownEditorCommands[choiceInterface.(string)]
-	return nil
-}
-
 const installGPGMessage = "This program requires GPG to run. Please install GPG and restart. https://gnupg.org/"
 
 // Run populates the config by asking the user for information and
@@ -489,41 +476,5 @@ func (w *Wizard) Run(store forest.Store) error {
 		pgpIds = append(pgpIds, keyID)
 	}
 	w.PGPUser = pgpIds[0]
-	if err := w.ConfigureEditor(); err != nil {
-		return fmt.Errorf("Error configuring editor command: %v", err)
-	}
 	return nil
-}
-
-func FindEditors() []string {
-	out := []string{DummyEditor}
-	for term := range KnownEditorCommands {
-		if _, err := exec.LookPath(term); err == nil {
-			out = append(out, term)
-		}
-	}
-	return out
-}
-
-func ExpandAll(in []string) []string {
-	for i, s := range in {
-		in[i] = os.Expand(s, func(in string) string {
-			if val, ok := os.LookupEnv(in); !ok {
-				return fmt.Sprintf("[set $%s to use]", in)
-			} else {
-				return val
-			}
-		})
-	}
-	return in
-}
-
-const DummyEditor = "dummy-editor"
-
-var KnownEditorCommands = map[string][]string{
-	"xterm":          ExpandAll([]string{"xterm", "-e", "$EDITOR", "{}"}),
-	"gnome-terminal": ExpandAll([]string{"gnome-terminal", "--wait", "--", "$EDITOR", "{}"}),
-	"gedit":          {"gedit", "{}"},
-	"notepad":        {"notepad", "{}"},
-	DummyEditor:      {"choose", "this", "if", "uncertain"},
 }

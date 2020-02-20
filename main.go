@@ -36,7 +36,16 @@ func CheckNotify() {
 }
 
 func main() {
+	// need to find this value early in order to print it as the default value
+	// for a flag.
+	defaultConfig, err := DefaultConfigFilePath()
+	if err != nil {
+		log.Printf("Unable to determine configuration file location: %v", err)
+		return
+	}
+
 	// declare flags
+	configpath := flag.String("config", defaultConfig, "the configuration file to load")
 	profiling := flag.Bool("profile", false, "enable CPU profiling (pprof file location will be logged)")
 	insecure := flag.Bool("insecure", false, "disable TLS certificate validation when dialing relay addresses")
 	printVersion := flag.Bool("version", false, "print version information and exit")
@@ -101,7 +110,7 @@ and [flags] are among those listed below:
 		log.Fatal("Failed to wrap Store in CacheStore:", err)
 	}
 
-	if err := config.LoadFromDefault(); err != nil {
+	if err := config.LoadFromPath(*configpath); err != nil {
 		log.Printf("Failed loading configuration file: %v", err)
 		// ask user for interactive configuration
 		wizard := &Wizard{
