@@ -279,10 +279,10 @@ func (v *HistoryWidget) FinishReplyString(parent forest.Node, content string) er
 	if err != nil {
 		return fmt.Errorf("failed creating reply: %w", err)
 	}
-	outfile := reply.ID().String()
-	err = saveAs(outfile, reply)
+
+	err = v.Add(reply)
 	if err != nil {
-		return fmt.Errorf("failed saving reply to disk: %w", err)
+		return fmt.Errorf("failed saving reply into store: %w", err)
 	}
 	return nil
 }
