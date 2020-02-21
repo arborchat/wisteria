@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
+	"time"
 
 	"github.com/0xAX/notificator"
 	"github.com/gdamore/tcell"
@@ -55,6 +56,7 @@ func main() {
 	grovepath := flag.String("grove", defaultGrovePath, "path to the grove in use (directory of arbor history)")
 	profiling := flag.Bool("profile", false, "enable CPU profiling (pprof file location will be logged)")
 	insecure := flag.Bool("insecure", false, "disable TLS certificate validation when dialing relay addresses")
+	testStartup := flag.Bool("test-startup", false, "run all the way through initializing the application, then exit gracefully. This flag is useful for automated testing of the startup configuration")
 	printVersion := flag.Bool("version", false, "print version information and exit")
 	flag.BoolVar(printVersion, "v", false, "print version information and exit")
 
@@ -103,16 +105,10 @@ and [flags] are among those listed below:
 		log.Fatalf("Failed to configure logging: %v", err)
 	}
 
-	// look up our working directory
-	cwd, err := os.Getwd()
-	if err != nil {
-		log.Fatal(err)
-	}
-
 	// use a grove rooted in our current working directory as our node storage
 	groveStore, err := grove.New(*grovepath)
 	if err != nil {
-		log.Fatalf("Failed to create grove at %s: %v", cwd, err)
+		log.Fatalf("Failed to create grove at %s: %v", *grovepath, err)
 	}
 
 	// Wrap store in CacheStore
@@ -129,7 +125,7 @@ and [flags] are among those listed below:
 		// ask user for interactive configuration
 		wizard := &Wizard{
 			Config:   config,
-			Prompter: &StdoutPrompter{In: os.Stdin, Out: os.Stdout},
+			Prompter: NewStdoutPrompter(os.Stdin, os.Stdout),
 		}
 		if err := wizard.Run(store); err != nil {
 			log.Fatal("Error running configuration wizard:", err)
@@ -203,6 +199,12 @@ and [flags] are among those listed below:
 	logger := log.New(log.Writer(), "", log.LstdFlags|log.Lshortfile)
 	if _, err := watch.Watch(*grovepath, logger, hw.ReadMessageFile); err != nil {
 		log.Fatal(err)
+	}
+	if *testStartup {
+		go func() {
+			time.Sleep(time.Second)
+			app.Quit()
+		}()
 	}
 
 	// run the TUI

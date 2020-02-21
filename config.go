@@ -240,7 +240,14 @@ type Prompter interface {
 // StdoutPrompter asks the user to make choices in an interactive text prompt
 type StdoutPrompter struct {
 	Out io.Writer
-	In  io.Reader
+	In  *bufio.Reader
+}
+
+func NewStdoutPrompter(in io.Reader, out io.Writer) *StdoutPrompter {
+	return &StdoutPrompter{
+		Out: out,
+		In:  bufio.NewReader(in),
+	}
 }
 
 // Choose asks the user to choose from among a list of options. The formatter
@@ -249,7 +256,6 @@ func (s *StdoutPrompter) Choose(prompt string, slice []interface{}, formatter fu
 	if len(slice) < 1 {
 		return nil, fmt.Errorf("Cannot choose from empty option list")
 	}
-	in := bufio.NewReader(s.In)
 	success := false
 	attempts := 0
 	index := 0
@@ -262,7 +268,7 @@ func (s *StdoutPrompter) Choose(prompt string, slice []interface{}, formatter fu
 			fmt.Fprintf(s.Out, "\t%d) %s\n", i, formatter(v))
 		}
 		fmt.Print("Your choice: ")
-		str, err := in.ReadString("\n"[0])
+		str, err := s.In.ReadString("\n"[0])
 		if err != nil {
 			fmt.Fprintf(s.Out, "Error reading input: %v", err)
 			continue
