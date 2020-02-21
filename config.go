@@ -114,15 +114,6 @@ func (c *Config) LoadFrom(configFile io.Reader) error {
 	return nil
 }
 
-// LoadFromDefault populates the config from the default configuration file.
-func (c *Config) LoadFromDefault() error {
-	defaultPath, err := DefaultConfigFilePath()
-	if err != nil {
-		return fmt.Errorf("unable to get default config path: %w", err)
-	}
-	return c.LoadFromPath(defaultPath)
-}
-
 // FileExists returns whether a wisteria configuration file exists at the default path.
 func (c *Config) FileExists() (bool, error) {
 	defaultPath, err := DefaultConfigFilePath()
@@ -145,6 +136,9 @@ func (c *Config) SaveTo(configFile io.Writer) error {
 }
 
 func (c *Config) SaveToPath(configpath string) (err error) {
+	if err := os.MkdirAll(filepath.Dir(configpath), 0755); err != nil {
+		return fmt.Errorf("failed ensuring config directory exists: %w", err)
+	}
 	configFile, err := os.OpenFile(configpath, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0664)
 	if err != nil {
 		return fmt.Errorf("couldn't save config file %s: %w", configpath, err)
@@ -155,25 +149,6 @@ func (c *Config) SaveToPath(configpath string) (err error) {
 		}
 	}()
 	return c.SaveTo(configFile)
-}
-
-// SaveToDefault saves this configuration to the default configuration file path.
-func (c *Config) SaveToDefault() error {
-	defaultPath, err := DefaultConfigFilePath()
-	if err != nil {
-		return fmt.Errorf("failed determining config file path: %w", err)
-	}
-	if err := os.MkdirAll(filepath.Dir(defaultPath), 0755); err != nil {
-		return fmt.Errorf("failed ensuring config directory exists: %w", err)
-	}
-	configFile, err := os.OpenFile(defaultPath, os.O_CREATE|os.O_WRONLY, 0644)
-	if err != nil {
-		return fmt.Errorf("failed opening configuration: %w", err)
-	}
-	if err := c.SaveTo(configFile); err != nil {
-		return fmt.Errorf("failed saving configuration: %w", err)
-	}
-	return nil
 }
 
 // Validate errors if the configuration is invalid
