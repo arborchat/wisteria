@@ -311,32 +311,40 @@ func (v *HistoryWidget) UpdateCursor() {
 	v.PostEvent(widgets.NewEventReplySelected(v, current, author.(*forest.Identity), community.(*forest.Community)))
 }
 
-func (v *HistoryWidget) goToTop() {
+func (v *HistoryWidget) cursorToTop() {
 	v.HistoryView.SetCursor(0, 0)
 	v.UpdateCursor()
 }
 
-func (v *HistoryWidget) goToBottom() {
+func (v *HistoryWidget) cursorToBottom() {
 	v.SelectLastLine()
 	v.UpdateCursor()
 }
 
-func (v *HistoryWidget) goUpOneLine() {
+func (v *HistoryWidget) panUpOneLine() {
+	v.cursorUpOneLine()
+}
+
+func (v *HistoryWidget) cursorUpOneLine() {
 	v.MoveCursor(0, -1)
 	v.UpdateCursor()
 }
 
-func (v *HistoryWidget) goDownOneLine() {
+func (v *HistoryWidget) panDownOneLine() {
+	v.cursorDownOneLine()
+}
+
+func (v *HistoryWidget) cursorDownOneLine() {
 	v.MoveCursor(0, 1)
 	v.UpdateCursor()
 }
 
-func (v *HistoryWidget) goLeftOneCell() {
+func (v *HistoryWidget) cursorLeftOneCell() {
 	v.MoveCursor(-1, 0)
 	v.UpdateCursor()
 }
 
-func (v *HistoryWidget) goRightOneCell() {
+func (v *HistoryWidget) cursorRightOneCell() {
 	v.MoveCursor(1, 0)
 	v.UpdateCursor()
 }
@@ -353,6 +361,13 @@ func (v *HistoryWidget) HandleEvent(event tcell.Event) bool {
 		}
 	case *tcell.EventMouse:
 		log.Println(keyEvent)
+		buttons := keyEvent.Buttons()
+		switch {
+		case buttons&tcell.WheelUp > 0:
+			v.panUpOneLine()
+		case buttons&tcell.WheelDown > 0:
+			v.panDownOneLine()
+		}
 	case *tcell.EventKey:
 		switch keyEvent.Key() {
 		case tcell.KeyEnter:
@@ -361,16 +376,16 @@ func (v *HistoryWidget) HandleEvent(event tcell.Event) bool {
 				return true
 			}
 		case tcell.KeyUp, tcell.KeyCtrlP:
-			v.goUpOneLine()
+			v.cursorUpOneLine()
 			return true
 		case tcell.KeyDown, tcell.KeyCtrlN:
-			v.goDownOneLine()
+			v.cursorDownOneLine()
 			return true
 		case tcell.KeyRight, tcell.KeyCtrlF:
-			v.goRightOneCell()
+			v.cursorRightOneCell()
 			return true
 		case tcell.KeyLeft, tcell.KeyCtrlB:
-			v.goLeftOneCell()
+			v.cursorLeftOneCell()
 			return true
 		case tcell.KeyPgDn:
 			v.keyPgDn()
@@ -381,10 +396,10 @@ func (v *HistoryWidget) HandleEvent(event tcell.Event) bool {
 			v.UpdateCursor()
 			return true
 		case tcell.KeyEnd:
-			v.goToBottom()
+			v.cursorToBottom()
 			return true
 		case tcell.KeyHome:
-			v.goToTop()
+			v.cursorToTop()
 			return true
 		case tcell.KeyRune:
 			// break if it's a normal keypress
@@ -393,22 +408,22 @@ func (v *HistoryWidget) HandleEvent(event tcell.Event) bool {
 		}
 		switch keyEvent.Rune() {
 		case 'g':
-			v.goToTop()
+			v.cursorToTop()
 			return true
 		case 'G':
-			v.goToBottom()
+			v.cursorToBottom()
 			return true
 		case 'h':
-			v.goLeftOneCell()
+			v.cursorLeftOneCell()
 			return true
 		case 'j':
-			v.goDownOneLine()
+			v.cursorDownOneLine()
 			return true
 		case 'k':
-			v.goUpOneLine()
+			v.cursorUpOneLine()
 			return true
 		case 'l':
-			v.goRightOneCell()
+			v.cursorRightOneCell()
 			return true
 		case 'c':
 			if err := v.EmitConversationRequest(); err != nil {
