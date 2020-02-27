@@ -1,15 +1,19 @@
 package widgets
 
 import (
+	"log"
+
 	"github.com/gdamore/tcell"
 	"github.com/gdamore/tcell/views"
+
+	wistTcell "git.sr.ht/~whereswaldon/wisteria/widgets/tcell"
 )
 
 // Switcher allows toggling a single widget between multiple underlying widgets
 // with only one widget visible at a time. Only the visible widget receives
 // events.
 type Switcher struct {
-	*views.Application
+	*wistTcell.Application
 	LogWidget     views.Widget
 	ContentWidget views.Widget
 
@@ -20,7 +24,7 @@ type Switcher struct {
 
 // NewSwitcher creates a Switcher with the given views as its
 // Content and Log widgets.
-func NewSwitcher(app *views.Application, content, log views.Widget) *Switcher {
+func NewSwitcher(app *wistTcell.Application, content, log views.Widget) *Switcher {
 	s := &Switcher{
 		Application:   app,
 		ContentWidget: content,
@@ -57,6 +61,11 @@ func (s *Switcher) HandleEvent(ev tcell.Event) bool {
 	case *views.EventWidgetContent:
 		// propagate content events upward
 		s.Application.Update()
+	case *tcell.EventMouse:
+		log.Println("mouse", ev)
+		if s.Current.HandleEvent(ev) {
+			return true
+		}
 	case *tcell.EventKey:
 		if s.Current.HandleEvent(ev) {
 			return true

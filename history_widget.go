@@ -12,6 +12,7 @@ import (
 	forest "git.sr.ht/~whereswaldon/forest-go"
 	"git.sr.ht/~whereswaldon/wisteria/archive"
 	"git.sr.ht/~whereswaldon/wisteria/widgets"
+	wistTcell "git.sr.ht/~whereswaldon/wisteria/widgets/tcell"
 	"github.com/0xAX/notificator"
 	wrap "github.com/bbrks/wrap/v2"
 	"github.com/gdamore/tcell"
@@ -64,14 +65,14 @@ func (e *EditRequestMap) Delete(id int) forest.Node {
 type HistoryWidget struct {
 	*HistoryView
 	*CellView
-	*views.Application
+	*wistTcell.Application
 	*forest.Builder
 	*Config
 	*notificator.Notificator
 	*EditRequestMap
 }
 
-func NewHistoryWidget(app *views.Application, archive *archive.Archive, config *Config, notifier *notificator.Notificator) (*HistoryWidget, error) {
+func NewHistoryWidget(app *wistTcell.Application, archive *archive.Archive, config *Config, notifier *notificator.Notificator) (*HistoryWidget, error) {
 	hv := &HistoryView{
 		Archive: archive,
 	}
@@ -350,6 +351,8 @@ func (v *HistoryWidget) HandleEvent(event tcell.Event) bool {
 		if err := v.FinishReplyString(v.EditRequestMap.Delete(keyEvent.ID), keyEvent.Content); err != nil {
 			log.Printf("Failed finalizing reply: %v", err)
 		}
+	case *tcell.EventMouse:
+		log.Println(keyEvent)
 	case *tcell.EventKey:
 		switch keyEvent.Key() {
 		case tcell.KeyEnter:

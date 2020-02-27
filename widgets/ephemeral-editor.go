@@ -98,15 +98,24 @@ func (e *EphemeralEditor) HandleEvent(ev tcell.Event) bool {
 		e.ClearRequestor()
 	case views.EventWidget:
 		e.PostEvent(event)
+	case *tcell.EventMouse:
+		e.passEventDown(ev)
 	case *tcell.EventKey:
-		if e.EditorVisible {
-			if e.Editor.HandleEvent(ev) {
-				return true
-			}
-		}
-		if e.PrimaryContent.HandleEvent(ev) {
+		e.passEventDown(ev)
+	}
+	return false
+}
+
+// passEventDown sends the input event to the editor if it is visible and
+// otherwise to the underlying view.
+func (e *EphemeralEditor) passEventDown(ev tcell.Event) bool {
+	if e.EditorVisible {
+		if e.Editor.HandleEvent(ev) {
 			return true
 		}
+	}
+	if e.PrimaryContent.HandleEvent(ev) {
+		return true
 	}
 	return false
 }

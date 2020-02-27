@@ -22,6 +22,7 @@ import (
 	"git.sr.ht/~whereswaldon/sprout-go/watch"
 	"git.sr.ht/~whereswaldon/wisteria/archive"
 	"git.sr.ht/~whereswaldon/wisteria/widgets"
+	wistTcell "git.sr.ht/~whereswaldon/wisteria/widgets/tcell"
 )
 
 var (
@@ -170,7 +171,7 @@ and [flags] are among those listed below:
 	})
 
 	// build an widget/application from existing views and services
-	app := new(views.Application)
+	app := new(wistTcell.Application)
 	hw, err := NewHistoryWidget(app, history, config, notify)
 	if err != nil {
 		log.Fatalf("Failed to create history widget: %v", err)
@@ -205,6 +206,16 @@ and [flags] are among those listed below:
 			time.Sleep(time.Second)
 			app.Quit()
 		}()
+	}
+
+	// configure the TUI screen for mouse support
+	app.ConfigureScreen = func(screen tcell.Screen) {
+		if screen.HasMouse() {
+			log.Println("Enabling mouse support")
+			screen.EnableMouse()
+		} else {
+			log.Println("Terminal does not advertise mouse support")
+		}
 	}
 
 	// run the TUI
