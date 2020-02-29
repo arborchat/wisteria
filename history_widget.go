@@ -380,11 +380,8 @@ func (v *HistoryWidget) HandleEvent(event tcell.Event) bool {
 			const TopBarHeight = 1
 			const LeftContentWidth = 0
 			physicalX, physicalY := keyEvent.Position()
-			log.Println("Detected click:", physicalX, physicalY)
 			ulVizX, ulVizY, _, _ := v.port.GetVisible()
-			log.Println("UL Physical:", ulVizX, ulVizY)
 			logicalX, logicalY := physicalX+ulVizX-LeftContentWidth, physicalY+ulVizY-TopBarHeight
-			log.Println("Logical:", logicalX, logicalY)
 			v.model.SetCursor(logicalX, logicalY)
 		case buttons&tcell.WheelUp > 0:
 			v.panUp(mouseScrollMultiplier)
