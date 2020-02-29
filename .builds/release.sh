@@ -10,8 +10,10 @@ GIT_COMMIT="$(git rev-parse HEAD)"
 . "$basedir/lib.sh"
 
 # if we're not on master or master isn't tagged
+ON_MASTER=0
 if ! commit_on_branch "$GIT_COMMIT" "master" || ! git describe --tags --exact-match HEAD; then
   GORELEASER_FLAGS="--snapshot --skip-publish"
+  ON_MASTER=1
 fi
 
 if command -v goreleaser ; then
@@ -25,4 +27,15 @@ fi
 "$goreleaser_path" $GORELEASER_FLAGS --rm-dist
 
 # sort the hashes of the built binaries in a reliable (if derpy) way
-find dist -executable -type f -exec md5sum '{}' \; | rev | sort | rev
+find dist -executable -type f -exec sha256sum '{}' \; | rev | sort | rev
+
+# check if we're on master and on a tag
+if [ "$ON_MASTER" -eq 1 ] && git describe --exact-match HEAD > /dev/null 2>&1; then
+    # erase the non-tarred directories from disk
+    find dist -type d --exec rm -rf '{}' \;
+
+    tag=$(git describe --exact-match HEAD)
+    for artifact in dist/* ; do
+        curl -H "Authorization: token $SRHT_TOKEN" -F "file=@$artifact" "https://git.sr.ht/api/repos/wisteria/artifacts/$tag"
+    done
+fi
