@@ -321,8 +321,8 @@ func (v *HistoryWidget) cursorToBottom() {
 	v.UpdateCursor()
 }
 
-func (v *HistoryWidget) panUpOneLine() {
-	v.cursorUpOneLine()
+func (v *HistoryWidget) panUp(rows int) {
+	v.CellView.PanUp(rows)
 }
 
 func (v *HistoryWidget) cursorUpOneLine() {
@@ -330,8 +330,8 @@ func (v *HistoryWidget) cursorUpOneLine() {
 	v.UpdateCursor()
 }
 
-func (v *HistoryWidget) panDownOneLine() {
-	v.cursorDownOneLine()
+func (v *HistoryWidget) panDown(rows int) {
+	v.CellView.PanDown(rows)
 }
 
 func (v *HistoryWidget) cursorDownOneLine() {
@@ -339,9 +339,17 @@ func (v *HistoryWidget) cursorDownOneLine() {
 	v.UpdateCursor()
 }
 
+func (v *HistoryWidget) panLeft(cols int) {
+	v.CellView.PanLeft(cols)
+}
+
 func (v *HistoryWidget) cursorLeftOneCell() {
 	v.MoveCursor(-1, 0)
 	v.UpdateCursor()
+}
+
+func (v *HistoryWidget) panRight(cols int) {
+	v.CellView.PanRight(cols)
 }
 
 func (v *HistoryWidget) cursorRightOneCell() {
@@ -350,6 +358,7 @@ func (v *HistoryWidget) cursorRightOneCell() {
 }
 
 func (v *HistoryWidget) HandleEvent(event tcell.Event) bool {
+	const mouseScrollMultiplier = 5
 	if v.CellView.HandleEvent(event) {
 		return true
 	}
@@ -364,9 +373,13 @@ func (v *HistoryWidget) HandleEvent(event tcell.Event) bool {
 		buttons := keyEvent.Buttons()
 		switch {
 		case buttons&tcell.WheelUp > 0:
-			v.panUpOneLine()
+			v.panUp(mouseScrollMultiplier)
 		case buttons&tcell.WheelDown > 0:
-			v.panDownOneLine()
+			v.panDown(mouseScrollMultiplier)
+		case buttons&tcell.WheelLeft > 0:
+			v.panLeft(mouseScrollMultiplier)
+		case buttons&tcell.WheelRight > 0:
+			v.panRight(mouseScrollMultiplier)
 		}
 	case *tcell.EventKey:
 		switch keyEvent.Key() {

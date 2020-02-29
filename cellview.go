@@ -88,6 +88,10 @@ func (a *CellView) Draw() {
 	}
 }
 
+func (a *CellView) PanUp(rows int) {
+	a.port.ScrollUp(rows)
+}
+
 func (a *CellView) keyUp() {
 	if _, _, en, _ := a.model.GetCursor(); !en {
 		a.port.ScrollUp(1)
@@ -95,6 +99,10 @@ func (a *CellView) keyUp() {
 	}
 	a.model.MoveCursor(0, -1)
 	a.MakeCursorVisible()
+}
+
+func (a *CellView) PanDown(rows int) {
+	a.port.ScrollDown(rows)
 }
 
 func (a *CellView) keyDown() {
@@ -106,6 +114,10 @@ func (a *CellView) keyDown() {
 	a.MakeCursorVisible()
 }
 
+func (a *CellView) PanLeft(cols int) {
+	a.port.ScrollLeft(cols)
+}
+
 func (a *CellView) keyLeft() {
 	if _, _, en, _ := a.model.GetCursor(); !en {
 		a.port.ScrollLeft(1)
@@ -113,6 +125,10 @@ func (a *CellView) keyLeft() {
 	}
 	a.model.MoveCursor(-1, 0)
 	a.MakeCursorVisible()
+}
+
+func (a *CellView) PanRight(cols int) {
+	a.port.ScrollRight(cols)
 }
 
 func (a *CellView) keyRight() {
