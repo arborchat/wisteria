@@ -1,8 +1,6 @@
 package widgets
 
 import (
-	"log"
-
 	"github.com/gdamore/tcell"
 	"github.com/gdamore/tcell/views"
 
@@ -62,7 +60,6 @@ func (s *Switcher) HandleEvent(ev tcell.Event) bool {
 		// propagate content events upward
 		s.Application.Update()
 	case *tcell.EventMouse:
-		log.Println("mouse", ev)
 		if s.Current.HandleEvent(ev) {
 			return true
 		}

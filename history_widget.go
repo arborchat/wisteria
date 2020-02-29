@@ -369,9 +369,23 @@ func (v *HistoryWidget) HandleEvent(event tcell.Event) bool {
 			log.Printf("Failed finalizing reply: %v", err)
 		}
 	case *tcell.EventMouse:
-		log.Println(keyEvent)
 		buttons := keyEvent.Buttons()
 		switch {
+		case buttons&tcell.Button1 > 0:
+			// TODO(whereswaldon): avoid hard-coding the height of the top
+			// status bar here. This requires teaching the views package
+			// how to translate these clicks coordinates between the coordinate
+			// systems of the physical terminal and each widget, which it does
+			// not currently support.
+			const TopBarHeight = 1
+			const LeftContentWidth = 0
+			physicalX, physicalY := keyEvent.Position()
+			log.Println("Detected click:", physicalX, physicalY)
+			ulVizX, ulVizY, _, _ := v.port.GetVisible()
+			log.Println("UL Physical:", ulVizX, ulVizY)
+			logicalX, logicalY := physicalX+ulVizX-LeftContentWidth, physicalY+ulVizY-TopBarHeight
+			log.Println("Logical:", logicalX, logicalY)
+			v.model.SetCursor(logicalX, logicalY)
 		case buttons&tcell.WheelUp > 0:
 			v.panUp(mouseScrollMultiplier)
 		case buttons&tcell.WheelDown > 0:
