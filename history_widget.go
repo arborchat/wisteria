@@ -258,7 +258,7 @@ func (v *HistoryWidget) FinishReply(parent forest.Node, replyFileName string, ed
 		return
 	}
 	if err := v.FinishReplyString(parent, string(replyContent)); err != nil {
-		log.Printf("Error creating & sending reply: %w", err)
+		log.Printf("Error creating & sending reply: %v", err)
 		return
 	}
 	if err := os.Remove(replyFileName); err != nil {
