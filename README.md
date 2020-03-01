@@ -14,14 +14,74 @@ You can get information about the Arbor project [here](https://man.sr.ht/~wheres
 
 For news about the project, join our [mailing list](https://lists.sr.ht/~whereswaldon/arbor-dev)!
 
-# What is this?
+## Trying it out
 
-`wisteria` is a minimal terminal arbor client. It is capable of interactively rendering messages stored on disk into a scrollable tree and creating new reply nodes. It also detects new files on disk and loads their contents automatically (if they are arbor nodes).
+To get started with `wisteria`, you can follow our [Getting Started with Arbor guide](https://man.sr.ht/%7Ewhereswaldon/arborchat/getting-started.md).
 
-> So if it only renders what's on disk, how can I talk to someone?
+## FAQ
 
-Well, the key is that it live-loads any new arbor nodes that appear in its current working directory. This means that you can exchange messages with anything from a shared folder (syncthing, dropbox, google drive, etc...) to our relay infrastructure. We recommend that you start with relays, as they have the least latency.
+> What is this?
 
-# Trying it out
+`wisteria` is a minimal terminal arbor client. It is capable of both speaking the [Sprout protocol](https://arbor.chat/specifications/sprout.md) to an Arbor relay and discovering new arbor nodes on disk in order to receive messages.
 
-`wisteria` currently needs you to have a running [arbor `relay`]() in order to exchange messages with other users. To set everything up together, you can follow our [Getting Started with Arbor guide](https://man.sr.ht/%7Ewhereswaldon/arborchat/getting-started.md).
+> Why is rendering new nodes on disk useful?
+
+It lets you acquire nodes from essentially any transport. You can store your history in syncthing, dropbox, a mounted google drive folder, or whatever else. This allows you to configure history replication via a variety of protocols and techniques in addition to Sprout.
+
+## Developing
+
+Want to work on `wisteria`? Here's how to do common stuff:
+
+### Build a customized version
+
+If you've modified your code and want to take it for a spin, you can use:
+
+```shell
+go build .
+```
+
+This will place a `wisteria` executable in the current working directory.
+You can run that with:
+
+```shell
+./wisteria
+```
+
+### Running the tests
+
+You can run all of our tests by doing:
+
+```
+go test -v -coverprofile=coverage.profile ./...
+```
+
+This will give you lots of feedback about the tests, and will also generate
+a code coverage report. You can view the code coverage in your browser by
+running:
+
+```
+go tool cover -html=coverage.profile
+```
+
+### Submitting a change
+
+We accept Pull Requests two ways:
+
+#### SourceHut
+
+Make your own version of the code in a personal SourceHut repo. You can either
+push your local clone to SourceHut or click the blue "Clone repo to your account"
+button on [this page](https://git.sr.ht/~whereswaldon/wisteria) to get your own copy in SourceHut.
+
+Once you have your own SourceHut repo for `wisteria`, click the blue "Prepare a patchset" button (in the same place that "Clone repo to your account" was).
+Choose your branch and the commits within it that you'd like to submit. Once you
+reach the stage with the title "Finalize the patchset", click to "Add a cover letter"
+and explain what your PR is for. Feel free to also add commentary to any of the
+patches.
+
+Once you reach "Review your patchset", send the email to `~whereswaldon/arbor-dev@lists.sr.ht`. You should then be able to see your patches
+and our responses to them [here on the mailing list](https://lists.sr.ht/~whereswaldon/arbor-dev).
+
+#### GitHub
+
+We have a [GitHub `wisteria` mirror repo](https://github.com/arborchat/wisteria). You can [submit a Pull Request](https://help.github.com/en/github/collaborating-with-issues-and-pull-requests/creating-a-pull-request) there.
