@@ -66,7 +66,6 @@ type HistoryWidget struct {
 	*HistoryView
 	*CellView
 	*wistTcell.Application
-	*forest.Builder
 	*Config
 	*notificator.Notificator
 	*EditRequestMap
@@ -84,15 +83,10 @@ func NewHistoryWidget(app *wistTcell.Application, archive *archive.Archive, conf
 	cv.MakeCursorVisible()
 	hv.SelectLastLine()
 
-	builder, err := config.Builder(archive)
-	if err != nil {
-		return nil, fmt.Errorf("failed creating node builder for widget: %w", err)
-	}
 	return &HistoryWidget{
 		HistoryView:    hv,
 		CellView:       cv,
 		Application:    app,
-		Builder:        builder,
 		Config:         config,
 		Notificator:    notifier,
 		EditRequestMap: NewEditRequestMap(),
@@ -265,6 +259,14 @@ func (v *HistoryWidget) FinishReply(parent forest.Node, replyFileName string, ed
 		log.Printf("Error removing %s: %v", replyFileName, err)
 		return
 	}
+}
+
+func (v *HistoryWidget) NewReply(parent interface{}, content string, metadata []byte) (forest.Node, error) {
+	builder, err := v.Config.Builder(v.Archive)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't construct node builder: %w", err)
+	}
+	return builder.NewReply(parent, content, metadata)
 }
 
 // FinishReplyString writes the content provided as the content of a new forest
