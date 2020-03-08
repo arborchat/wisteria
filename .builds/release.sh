@@ -18,7 +18,8 @@ elif find "$HOME/go/bin" -executable -type f -name goreleaser; then
     goreleaser_path="$HOME/go/bin/goreleaser"
 fi
 
-if [ "$PUBLISH_RELEASE" -eq 1 ]; then
+if [ "$PUBLISH_RELEASE" -eq 0 ]; then
+  # Build but do not publish
   GORELEASER_FLAGS="--snapshot --skip-publish"
 fi
 
@@ -29,7 +30,6 @@ fi
 # sort the hashes of the built binaries in a reliable (if derpy) way
 find dist -executable -type f -exec sha256sum '{}' \; | rev | sort | rev
 
-# check if we're on master and on a tag
 if [ "$PUBLISH_RELEASE" -eq 1 ]; then
     # erase the non-tarred directories from disk
     find dist -type d --exec rm -rf '{}' \;
