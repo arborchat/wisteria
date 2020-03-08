@@ -10,7 +10,7 @@ secrets:
   - c18470ea-9f49-4fcf-8814-2223cfa175f1
   - 3f11ff14-dff1-45ca-990c-c69873656f63
   - e6103a13-65c0-4696-b5a7-f0ad909468aa
-  - c3f53ffa-5f34-4ce8-986d-aeb6835548d0
+  - 142caa07-7f7c-4c13-b17b-17cf7fe37c0f
 tasks:
   - test: |
       cd wisteria
