@@ -35,7 +35,12 @@ if [ "$PUBLISH_RELEASE" -eq 1 ]; then
     find dist -type d -exec rm -rf '{}' \;
 
     tag=$(git describe --exact-match HEAD)
+
+    # ensure that we don't leak this srht token
+    set +x
     for artifact in dist/* ; do
+        echo curl -H "Authorization: token <token>" -F "file=@$artifact" "https://git.sr.ht/api/repos/wisteria/artifacts/$tag"
         curl -H "Authorization: token $SRHT_TOKEN" -F "file=@$artifact" "https://git.sr.ht/api/repos/wisteria/artifacts/$tag"
     done
+    set -x
 fi
