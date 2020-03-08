@@ -32,7 +32,7 @@ find dist -executable -type f -exec sha256sum '{}' \; | rev | sort | rev
 
 if [ "$PUBLISH_RELEASE" -eq 1 ]; then
     # erase the non-tarred directories from disk
-    find dist -type d --exec rm -rf '{}' \;
+    find dist -type d -exec rm -rf '{}' \;
 
     tag=$(git describe --exact-match HEAD)
     for artifact in dist/* ; do
