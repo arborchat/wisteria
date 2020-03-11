@@ -8,6 +8,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"time"
 
@@ -91,6 +92,8 @@ and [flags] are among those listed below:
 
 	// make basic configuration
 	config := NewConfig()
+	config.GroveDirectory = *grovepath
+	config.ConfigDirectory = filepath.Dir(*configpath)
 
 	if *profiling {
 		// profile to runtime directory chosen by config

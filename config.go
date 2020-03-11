@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -15,6 +16,7 @@ import (
 
 	forest "git.sr.ht/~whereswaldon/forest-go"
 	"git.sr.ht/~whereswaldon/forest-go/fields"
+	"golang.org/x/crypto/openpgp"
 )
 
 // Config holds the user's runtime configuration
@@ -25,6 +27,10 @@ type Config struct {
 	IdentityID string
 	// where to store log and profile data
 	RuntimeDirectory string
+	// where application configuration is stored
+	ConfigDirectory string
+	// where arbor nodes are stored
+	GroveDirectory string
 	// The command to launch an editor for composing new messages
 	EditorCmd []string
 }
@@ -186,9 +192,27 @@ func (c *Config) Builder(store forest.Store) (*forest.Builder, error) {
 			cmd.Stderr = log.Writer()
 			return nil
 		}
+	} else {
+		// assume wisteria manages the private key
+		const extension = ".key"
+		const keydir = "keys"
+		keyringFile := c.IdentityID + extension
+		keyringPath := filepath.Join(c.ConfigDirectory, keydir, keyringFile)
+		data, err := ioutil.ReadFile(keyringPath)
+		if err != nil {
+			return nil, fmt.Errorf("failed reading key file %s: %w", keyringPath, err)
+		}
+		keys, err := openpgp.ReadKeyRing(bytes.NewBuffer(data))
+		if err != nil {
+			return nil, fmt.Errorf("failed parsing key file %s: %w", keyringPath, err)
+		}
+		if len(keys) < 1 {
+			return nil, fmt.Errorf("expected keyring %s to contain at least one key", keyringPath)
+		}
+		signer, err = forest.NewNativeSigner(keys[0])
 	}
 	if err != nil {
-		log.Fatal(err)
+		return nil, fmt.Errorf("failed creating signer: %w", err)
 	}
 	identity, err := c.IdentityNode(store)
 	if err != nil {
