@@ -15,18 +15,12 @@ import (
 
 	forest "git.sr.ht/~whereswaldon/forest-go"
 	"git.sr.ht/~whereswaldon/forest-go/fields"
-	"golang.org/x/crypto/openpgp"
-	"golang.org/x/crypto/openpgp/packet"
 )
 
 // Config holds the user's runtime configuration
 type Config struct {
 	// a PGP key ID for the user's private key that controls their arbor identity.
-	// Mutually exclusive with PGPKey
 	PGPUser string
-	// an unencrypted PGP private key file that controls the user's identity. Insecure,
-	// and mutually exclusive with PGPUser
-	PGPKey string
 	// the file name of the user's arbor identity node
 	IdentityID string
 	// where to store log and profile data
@@ -154,10 +148,8 @@ func (c *Config) SaveToPath(configpath string) (err error) {
 // Validate errors if the configuration is invalid
 func (c *Config) Validate() error {
 	switch {
-	case c.PGPUser != "" && c.PGPKey != "":
-		return fmt.Errorf("PGPUser and PGPKey cannot both be set")
-	case c.PGPUser == "" && c.PGPKey == "":
-		return fmt.Errorf("One of PGPUser and PGPKey must be set")
+	case c.PGPUser == "":
+		return fmt.Errorf("PGPUser must be set")
 	case c.IdentityID == "":
 		return fmt.Errorf("Identity must be set")
 	case len(c.EditorCmd) < 2:
@@ -194,11 +186,6 @@ func (c *Config) Builder(store forest.Store) (*forest.Builder, error) {
 			cmd.Stderr = log.Writer()
 			return nil
 		}
-	} else if c.PGPKey != "" {
-		keyfile, _ := os.Open(c.PGPKey)
-		defer keyfile.Close()
-		entity, _ := openpgp.ReadEntity(packet.NewReader(keyfile))
-		signer, err = forest.NewNativeSigner(entity)
 	}
 	if err != nil {
 		log.Fatal(err)
