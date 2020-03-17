@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"syscall"
 	"time"
 
 	"github.com/0xAX/notificator"
@@ -58,6 +59,7 @@ func main() {
 	grovepath := flag.String("grove", defaultGrovePath, "path to the grove in use (directory of arbor history)")
 	profiling := flag.Bool("profile", false, "enable CPU profiling (pprof file location will be logged)")
 	insecure := flag.Bool("insecure", false, "disable TLS certificate validation when dialing relay addresses")
+	nogpg := flag.Bool("nogpg", false, "disable the use of GPG for cryptography even when it is installed")
 	testStartup := flag.Bool("test-startup", false, "run all the way through initializing the application, then exit gracefully. This flag is useful for automated testing of the startup configuration")
 	printVersion := flag.Bool("version", false, "print version information and exit")
 	flag.BoolVar(printVersion, "v", false, "print version information and exit")
@@ -94,6 +96,9 @@ and [flags] are among those listed below:
 	config := NewConfig()
 	config.GroveDirectory = *grovepath
 	config.ConfigDirectory = filepath.Dir(*configpath)
+	if *nogpg {
+		config.UseGPG = false
+	}
 
 	if *profiling {
 		// profile to runtime directory chosen by config
@@ -129,7 +134,7 @@ and [flags] are among those listed below:
 		// ask user for interactive configuration
 		wizard := &Wizard{
 			Config:   config,
-			Prompter: NewStdoutPrompter(os.Stdin, os.Stdout),
+			Prompter: NewStdoutPrompter(os.Stdin, syscall.Stdin, os.Stdout),
 		}
 		if err := wizard.Run(store); err != nil {
 			log.Fatal("Error running configuration wizard:", err)

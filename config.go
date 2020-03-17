@@ -17,12 +17,15 @@ import (
 	forest "git.sr.ht/~whereswaldon/forest-go"
 	"git.sr.ht/~whereswaldon/forest-go/fields"
 	"golang.org/x/crypto/openpgp"
+	"golang.org/x/crypto/ssh/terminal"
 )
 
 // Config holds the user's runtime configuration
 type Config struct {
 	// a PGP key ID for the user's private key that controls their arbor identity.
 	PGPUser string
+	// allows control over whether GPG support is used when it is available
+	UseGPG bool
 	// the file name of the user's arbor identity node
 	IdentityID string
 	// where to store log and profile data
@@ -245,19 +248,26 @@ func Unixify(in string) string {
 type Prompter interface {
 	Choose(prompt string, slice []interface{}, formatter func(element interface{}) string) (choice interface{}, err error)
 	PromptLine(prompt string) (input string, err error)
+	PromptSecure(prompt string) (input []byte, err error)
 	Display(message string) error
 }
 
 // StdoutPrompter asks the user to make choices in an interactive text prompt
 type StdoutPrompter struct {
 	Out io.Writer
-	In  *bufio.Reader
+	// SecureFD is the file descriptor of a TTY that can be used directly to
+	// prompt for password entry (this allows disabling echo)
+	SecureFD int
+	In       *bufio.Reader
 }
 
-func NewStdoutPrompter(in io.Reader, out io.Writer) *StdoutPrompter {
+// NewStdoutPrompter creates a new prompter that can ask for user input in an
+// interactive terminal session.
+func NewStdoutPrompter(in io.Reader, secureFD int, out io.Writer) *StdoutPrompter {
 	return &StdoutPrompter{
-		Out: out,
-		In:  bufio.NewReader(in),
+		Out:      out,
+		SecureFD: secureFD,
+		In:       bufio.NewReader(in),
 	}
 }
 
@@ -303,7 +313,6 @@ func (s *StdoutPrompter) Choose(prompt string, slice []interface{}, formatter fu
 
 // PromptLine asks the user for a single line of free-form input text
 func (s *StdoutPrompter) PromptLine(prompt string) (input string, err error) {
-	in := bufio.NewReader(s.In)
 	success := false
 	attempts := 0
 	const maxAttempts = 5
@@ -311,7 +320,7 @@ func (s *StdoutPrompter) PromptLine(prompt string) (input string, err error) {
 		fmt.Fprintln(s.Out)
 		attempts++
 		fmt.Fprintln(s.Out, prompt)
-		input, err = in.ReadString("\n"[0])
+		input, err = s.In.ReadString("\n"[0])
 		if err != nil {
 			fmt.Fprintf(s.Out, "Error reading input: %v", err)
 			continue
@@ -325,6 +334,33 @@ func (s *StdoutPrompter) PromptLine(prompt string) (input string, err error) {
 	}
 	if !success {
 		return "", fmt.Errorf("max input attempts exceeded")
+	}
+	return input, nil
+}
+
+// PromptSecure asks the user for a single line of free-form input text that will
+// be unmodified (no string trimming)
+func (s *StdoutPrompter) PromptSecure(prompt string) (input []byte, err error) {
+	success := false
+	attempts := 0
+	const maxAttempts = 5
+	for !success && attempts < maxAttempts {
+		fmt.Fprintln(s.Out)
+		attempts++
+		fmt.Fprintln(s.Out, prompt)
+		input, err := terminal.ReadPassword(s.SecureFD)
+		if err != nil {
+			fmt.Fprintf(s.Out, "Error reading input: %v", err)
+			continue
+		}
+		if len(input) < 1 {
+			fmt.Fprintf(s.Out, "Passphrase cannot be empty\n")
+			continue
+		}
+		success = true
+	}
+	if !success {
+		return nil, fmt.Errorf("max input attempts exceeded")
 	}
 	return input, nil
 }
@@ -374,44 +410,103 @@ type Wizard struct {
 // ConfigureNewIdentity creates a completely new identity using an existing GPG key
 // The identity will be stored in the provided forest.Store implementation
 func (w *Wizard) ConfigureNewIdentity(store forest.Store) error {
-	secKeys, err := GetSecretKeys()
-	if err != nil {
-		return fmt.Errorf("Failed to list available secret keys: %v", err)
-	}
-	asInterface := make([]interface{}, len(secKeys))
-	for i := range secKeys {
-		asInterface[i] = secKeys[i]
-	}
-	const createNewOption = "Create a new key"
-	asInterface = append(asInterface, createNewOption)
-	secKey, err := w.Choose("Choose a gpg private key for this identity:", asInterface, func(i interface{}) string {
-		return i.(string)
-	})
+	// do we have GPG?
+	// if we have it, choose an existing key or create a new one
+	// if we don't create a new key natively
+	var (
+		signer forest.Signer
+		err    error
+		useGPG = true
+
+		//only used if gpg support is not
+		entity *openpgp.Entity
+	)
 	gpgPath, err := forest.FindGPG()
 	if err != nil {
-		w.Display(installGPGMessage)
-		return fmt.Errorf("Failed finding gpg installation: %v", err)
+		w.Display("Couldn't find an installation of GPG. That's okay, but if you want the strongest possible security, you may wish to install it before continuing.")
+		useGPG = false
 	}
-	if secKey.(string) == createNewOption {
-		w.Display(fmt.Sprintf("\nTo create a new key, run:\n\n%s --generate-key\n\nRe-run %v when you've done that.\n", gpgPath, os.Args[0]))
-		return fmt.Errorf("Closing so that you can generate a key")
-	}
-	signer, err := forest.NewGPGSigner(secKey.(string))
-	if err != nil {
-		return fmt.Errorf("Unable to construct a signer from gpg key for %s: %v", secKey, err)
+	useGPG = useGPG && w.Config.UseGPG
+	if useGPG {
+		secKeys, err := GetSecretKeys()
+		if err != nil {
+			return fmt.Errorf("Failed to list available secret keys: %v", err)
+		}
+		asInterface := make([]interface{}, len(secKeys))
+		for i := range secKeys {
+			asInterface[i] = secKeys[i]
+		}
+		const createNewOption = "Create a new key"
+		asInterface = append(asInterface, createNewOption)
+		secKey, err := w.Choose("Choose a gpg private key for this identity:", asInterface, func(i interface{}) string {
+			return i.(string)
+		})
+		if secKey.(string) == createNewOption {
+			w.Display(fmt.Sprintf("\nTo create a new key, run:\n\n%s --generate-key\n\nRe-run %v when you've done that.\n", gpgPath, os.Args[0]))
+			return fmt.Errorf("Closing so that you can generate a key")
+		}
+		signer, err = forest.NewGPGSigner(secKey.(string))
+		if err != nil {
+			return fmt.Errorf("Unable to construct a signer from gpg key for %s: %v", secKey, err)
+		}
+	} else {
+		entity, err = openpgp.NewEntity("wisteria", "", "", nil)
+		if err != nil {
+			return fmt.Errorf("failed to generate new openpgp keys: %w", err)
+		}
+		// guard against failing to sign the public key (depending on whether
+		// this api changes again):
+		// https://github.com/golang/go/issues/25463#issuecomment-390778292
+		// This should force the public identity within this entity to be
+		// signed by the private key. We can then serialize the identity in
+		// a way that GPG is happy with (in theory).
+		if err := entity.SerializePrivate(ioutil.Discard, nil); err != nil {
+			return fmt.Errorf("failed preserializing private key: %w", err)
+		}
+		signer, err = forest.NewNativeSigner(entity)
+		if err != nil {
+			return fmt.Errorf("failed to create a native signer for new openpgp entity: %w", err)
+		}
 	}
 	username, err := w.PromptLine("Enter a username:")
 	if err != nil {
-		return fmt.Errorf("Failed to get username: %v", err)
+		return fmt.Errorf("failed to get username: %v", err)
 	}
 	identity, err := forest.NewIdentity(signer, username, []byte{})
 	if err != nil {
-		return fmt.Errorf("Failed to create identity: %v", err)
+		return fmt.Errorf("failed to create identity: %v", err)
 	}
 	if err := store.Add(identity); err != nil {
-		return fmt.Errorf("Error saving new identity %s: %v", identity.ID(), err)
+		return fmt.Errorf("error saving new identity %s: %v", identity.ID(), err)
 	}
 	w.IdentityID = identity.ID().String()
+	if !useGPG {
+		// we need to encrypt and save the new private key
+
+		// get a passphrase
+		w.Display("It's time to secure your Arbor identity! This passphrase protects your account from someone stealing your account. If you forget it, you will have to make a new account. There is no password recovery.")
+		passphrase, err := w.PromptSecure("Enter a secure passphrase:")
+		defer func() {
+			//erase passphrase from memory no matter what
+			fullViewOfSlice := passphrase[:cap(passphrase)]
+			for i := range fullViewOfSlice {
+				fullViewOfSlice[i] = 0
+			}
+		}()
+		if err != nil {
+			return fmt.Errorf("failed reading passphrase from user: %w", err)
+		}
+		if err := entity.PrivateKey.Encrypt(passphrase); err != nil {
+			return fmt.Errorf("failed encrypting primary private key with passphrase: %w", err)
+		}
+		for i := range entity.Subkeys {
+			if err := entity.Subkeys[i].PrivateKey.Encrypt(passphrase); err != nil {
+				return fmt.Errorf("failed encrypting subkey private key at index %d with passphrase: %w", i, err)
+			}
+		}
+
+		// write encrypted entity to file
+	}
 	return nil
 }
 
