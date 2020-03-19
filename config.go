@@ -18,6 +18,9 @@ import (
 	"git.sr.ht/~whereswaldon/forest-go/fields"
 	"golang.org/x/crypto/openpgp"
 	"golang.org/x/crypto/ssh/terminal"
+
+	"github.com/awnumar/memguard"
+	"github.com/awnumar/memguard/core"
 )
 
 // Config holds the user's runtime configuration
@@ -36,6 +39,9 @@ type Config struct {
 	GroveDirectory string
 	// The command to launch an editor for composing new messages
 	EditorCmd []string
+
+	// Secure memory enclave where pgp passphrase is stored
+	PassphraseEnclave *memguard.Enclave
 }
 
 // NewConfig creates a config that is prepopulated with a runtime directory and an editor command that
@@ -198,7 +204,7 @@ func (c *Config) Builder(store forest.Store) (*forest.Builder, error) {
 		signer forest.Signer
 		err    error
 	)
-	if c.PGPUser != "" {
+	if c.PGPUser != "" && c.UseGPG {
 		signer, err = forest.NewGPGSigner(c.PGPUser)
 		asGPG := signer.(*forest.GPGSigner)
 		asGPG.Rewriter = func(cmd *exec.Cmd) error {
@@ -218,6 +224,23 @@ func (c *Config) Builder(store forest.Store) (*forest.Builder, error) {
 		}
 		if len(keys) < 1 {
 			return nil, fmt.Errorf("expected keyring %s to contain at least one key", keyringPath)
+		}
+		key := keys[0]
+		if c.PassphraseEnclave == nil {
+			return nil, fmt.Errorf("passphrase enclave is nil")
+		}
+		b, err := c.PassphraseEnclave.Open()
+		if err != nil {
+			return nil, fmt.Errorf("failed accessing keyring passphrase: %w", err)
+		}
+		defer b.Destroy()
+		if err := key.PrivateKey.Decrypt(b.Bytes()); err != nil {
+			return nil, fmt.Errorf("failed decrypting keyring with enclave passphrase: %w", err)
+		}
+		for i, subkey := range key.Subkeys {
+			if err := subkey.PrivateKey.Decrypt(b.Bytes()); err != nil {
+				return nil, fmt.Errorf("failed decrypting subkey at index %d: %w", i, err)
+			}
 		}
 		signer, err = forest.NewNativeSigner(keys[0])
 	}
@@ -355,7 +378,7 @@ func (s *StdoutPrompter) PromptSecure(prompt string) (input []byte, err error) {
 		fmt.Fprintln(s.Out)
 		attempts++
 		fmt.Fprintln(s.Out, prompt)
-		input, err := terminal.ReadPassword(s.SecureFD)
+		input, err = terminal.ReadPassword(s.SecureFD)
 		if err != nil {
 			fmt.Fprintf(s.Out, "Error reading input: %v", err)
 			continue
@@ -490,8 +513,10 @@ func (w *Wizard) ConfigureNewIdentity(store forest.Store) (err error) {
 		// we need to encrypt and save the new private key
 
 		// get a passphrase
-		w.Display("It's time to secure your Arbor identity! This passphrase protects your account from someone stealing your account. If you forget it, you will have to make a new account. There is no password recovery.")
-		passphrase, err := w.PromptSecure("Enter a secure passphrase:")
+		w.Display(`It's time to secure your Arbor identity! This passphrase protects
+your account from theft. If you forget it, you will have to make a new account.
+There is no password recovery.`)
+		passphrase, err := w.PromptSecure("Enter a secure passphrase (nothing will print, but just hit enter when you're done):")
 		defer func() {
 			//erase passphrase from memory no matter what
 			fullViewOfSlice := passphrase[:cap(passphrase)]
@@ -510,6 +535,11 @@ func (w *Wizard) ConfigureNewIdentity(store forest.Store) (err error) {
 				return fmt.Errorf("failed encrypting subkey private key at index %d with passphrase: %w", i, err)
 			}
 		}
+		enclave, err := core.NewEnclave(passphrase)
+		if err != nil {
+			return fmt.Errorf("failed creating secure enclave: %w", err)
+		}
+		w.Config.PassphraseEnclave = &memguard.Enclave{Enclave: enclave}
 
 		// write encrypted entity to file
 		keyringPath := w.KeyRingPath(w.IdentityID)

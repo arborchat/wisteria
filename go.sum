@@ -1,9 +1,5 @@
-git.sr.ht/~whereswaldon/forest-go v0.0.0-20200207033954-0859340e8253 h1:/2kO5f1X7Ge4efmRwPF5MHiZMmKonBsypTiPnZeQwys=
-git.sr.ht/~whereswaldon/forest-go v0.0.0-20200207033954-0859340e8253/go.mod h1:LV1LNV6Mg4ajBo2fOTk16RIaC9Oh8pB+SpgXev6kAoU=
 git.sr.ht/~whereswaldon/forest-go v0.0.0-20200319194448-e3a47dd95cda h1:ZF4rIf3sXbTsw92VhjZM51t8FqqNBjfnm/sgdILCInU=
 git.sr.ht/~whereswaldon/forest-go v0.0.0-20200319194448-e3a47dd95cda/go.mod h1:I3iVoJydL66XlhJQ9+L1RJHk/cSlsxDxEG0BbU5Senk=
-git.sr.ht/~whereswaldon/sprout-go v0.0.0-20200208174132-0b59703c7bc8 h1:CvK7aHEGlshVyM5QyhkMIqRS+Pnz/P6cAOWp1ZmU1bY=
-git.sr.ht/~whereswaldon/sprout-go v0.0.0-20200208174132-0b59703c7bc8/go.mod h1:OxbuKgcepjADdfl75kPkSmUmgKYWBWaSq2OrL2T7zkg=
 git.sr.ht/~whereswaldon/sprout-go v0.0.0-20200319194723-df82b3bc1ee9 h1:1yN441LUagDMslcIct4YqUJZl4I3nK1J7fPURoipQS4=
 git.sr.ht/~whereswaldon/sprout-go v0.0.0-20200319194723-df82b3bc1ee9/go.mod h1:/geNVTdJAS4wMB5Z0/HgkZdrT+MNZMg4Su40+4IZE0s=
 github.com/0xAX/notificator v0.0.0-20181105090803-d81462e38c21 h1:moSC7ACaTejHmVRRwfDTMgByRSwjg2vZooncdWLj7o8=
@@ -12,6 +8,10 @@ github.com/DATA-DOG/go-sqlmock v1.3.3 h1:CWUqKXe0s8A2z6qCgkP4Kru7wC11YoAnoupUKFD
 github.com/DATA-DOG/go-sqlmock v1.3.3/go.mod h1:f/Ixk793poVmq4qj/V1dPUg2JEAKC73Q5eFN3EC/SaM=
 github.com/ProtonMail/crypto v0.0.0-20191122234321-e77a1f03baa0 h1:mCww5Yl0Pm4PZPSooupyWDgihrh96p6+O4PY1hs0FBw=
 github.com/ProtonMail/crypto v0.0.0-20191122234321-e77a1f03baa0/go.mod h1:MBriIAodHvZ+YvwvMJWCTmseW/LkeVRPWp/iZKvee4g=
+github.com/awnumar/memcall v0.0.0-20191004114545-73db50fd9f80 h1:8kObYoBO4LNmQ+fLiScBfxEdxF1w2MHlvH/lr9MLaTg=
+github.com/awnumar/memcall v0.0.0-20191004114545-73db50fd9f80/go.mod h1:S911igBPR9CThzd/hYQQmTc9SWNu3ZHIlCGaWsWsoJo=
+github.com/awnumar/memguard v0.21.0 h1:BZvZ69RXlIQPChLJnpJ0u5cIJQmsWLGfNa6XX5/UZGU=
+github.com/awnumar/memguard v0.21.0/go.mod h1:+ejY3DekvjnDWBXHwL5xB5p4Il77kDsrIz+UOUNrm2Q=
 github.com/bbrks/wrap/v2 v2.3.1-0.20191113183707-81f8a5d714b8 h1:u4Ag9klQt1+3pH+Kjlknk2OlFAywsBG1PBJLl4qQqnk=
 github.com/bbrks/wrap/v2 v2.3.1-0.20191113183707-81f8a5d714b8/go.mod h1:FdEamYFrsjX8zlv3UXgnT3JxirrDv67jCDYaE0Q/qww=
 github.com/fsnotify/fsnotify v1.4.7 h1:IXs+QLmnXW2CcXuY+8Mzv/fWEsPGWxqefPtCP5CnV9I=
@@ -31,6 +31,11 @@ golang.org/x/sys v0.0.0-20190412213103-97732733099d h1:+R4KGOnez64A81RvjARKc4UT5
 golang.org/x/sys v0.0.0-20190412213103-97732733099d/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
 golang.org/x/sys v0.0.0-20190626150813-e07cf5db2756 h1:9nuHUbU8dRnRRfj9KjWUVrJeoexdbeMjttk6Oh1rD10=
 golang.org/x/sys v0.0.0-20190626150813-e07cf5db2756/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
+golang.org/x/sys v0.0.0-20191001151750-bb3f8db39f24/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
+golang.org/x/sys v0.0.0-20191127021746-63cb32ae39b2 h1:/J2nHFg1MTqaRLFO7M+J78ASNsJoz3r0cvHBPQ77fsE=
+golang.org/x/sys v0.0.0-20191127021746-63cb32ae39b2/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
+golang.org/x/sys v0.0.0-20191224085550-c709ea063b76 h1:Dho5nD6R3PcW2SH1or8vS0dszDaXRxIw55lBX7XiE5g=
+golang.org/x/sys v0.0.0-20191224085550-c709ea063b76/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
 golang.org/x/text v0.3.0 h1:g61tztE5qeGQ89tm6NTjjM9VPIm088od1l6aSorWRWg=
 golang.org/x/text v0.3.0/go.mod h1:NqM8EUOU14njkJ3fqMW+pc6Ldnwhi/IjpwHt7yyuwOQ=
 golang.org/x/text v0.3.2 h1:tW2bmiBqwgJj/UpqtC8EpXEZVYOwU0yG4iWbprSVAcs=

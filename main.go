@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/0xAX/notificator"
+	"github.com/awnumar/memguard"
 	"github.com/gdamore/tcell"
 	"github.com/gdamore/tcell/views"
 	"github.com/pkg/profile"
@@ -41,6 +42,12 @@ func CheckNotify() {
 }
 
 func main() {
+	// Safely terminate in case of an interrupt signal
+	memguard.CatchInterrupt()
+
+	// Purge the session when we return
+	defer memguard.Purge()
+
 	// need to find this value early in order to print it as the default value
 	// for a flag.
 	defaultConfig, err := DefaultConfigFilePath()
