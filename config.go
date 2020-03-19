@@ -181,6 +181,16 @@ func (c *Config) EditFile(filename string) *exec.Cmd {
 	return exec.Command(out[0], out[1:]...)
 }
 
+// KeyRingPath returns where the keyring holding the private key for the provided Identity
+// *should* be stored (if wisteria manages it).
+func (c *Config) KeyRingPath(identityID string) string {
+	const extension = ".key"
+	const keydir = "keys"
+	keyringFile := c.IdentityID + extension
+	keyringPath := filepath.Join(c.ConfigDirectory, keydir, keyringFile)
+	return keyringPath
+}
+
 // Builder creates a forest.Builder based on the configuration. This allows the client
 // to create nodes on this user's behalf.
 func (c *Config) Builder(store forest.Store) (*forest.Builder, error) {
@@ -197,10 +207,7 @@ func (c *Config) Builder(store forest.Store) (*forest.Builder, error) {
 		}
 	} else {
 		// assume wisteria manages the private key
-		const extension = ".key"
-		const keydir = "keys"
-		keyringFile := c.IdentityID + extension
-		keyringPath := filepath.Join(c.ConfigDirectory, keydir, keyringFile)
+		keyringPath := c.KeyRingPath(c.IdentityID)
 		data, err := ioutil.ReadFile(keyringPath)
 		if err != nil {
 			return nil, fmt.Errorf("failed reading key file %s: %w", keyringPath, err)
@@ -409,13 +416,12 @@ type Wizard struct {
 
 // ConfigureNewIdentity creates a completely new identity using an existing GPG key
 // The identity will be stored in the provided forest.Store implementation
-func (w *Wizard) ConfigureNewIdentity(store forest.Store) error {
+func (w *Wizard) ConfigureNewIdentity(store forest.Store) (err error) {
 	// do we have GPG?
 	// if we have it, choose an existing key or create a new one
 	// if we don't create a new key natively
 	var (
 		signer forest.Signer
-		err    error
 		useGPG = true
 
 		//only used if gpg support is not
@@ -506,6 +512,28 @@ func (w *Wizard) ConfigureNewIdentity(store forest.Store) error {
 		}
 
 		// write encrypted entity to file
+		keyringPath := w.KeyRingPath(w.IdentityID)
+		keyDir := filepath.Dir(keyringPath)
+		if err := os.MkdirAll(keyDir, 0770); err != nil {
+			return fmt.Errorf("failed creating directory %s to store private keys: %w", keyDir, err)
+		}
+		keyFile, err := os.OpenFile(keyringPath, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0660)
+		if err != nil {
+			return fmt.Errorf("failed opening key file %s: %w", keyringPath, err)
+		}
+		defer func() {
+			// must defer anonymous function in order to actually handle the error returned from
+			// closing the file. Since we are writing an important file, it is critical to handle
+			// a possible error here.
+			if closeErr := keyFile.Close(); closeErr != nil {
+				// override the return value of the function to be this error
+				err = fmt.Errorf("failed saving private key file %s: %w", keyringPath, err)
+				return
+			}
+		}()
+		if err := entity.SerializePrivateNoSign(keyFile, nil); err != nil {
+			return fmt.Errorf("failed writing private key into file %s: %w", keyringPath, err)
+		}
 	}
 	return nil
 }
