@@ -134,15 +134,15 @@ and [flags] are among those listed below:
 		log.Fatal("Failed to wrap Store in CacheStore:", err)
 	}
 
+	wizard := &Wizard{
+		Config:   config,
+		Prompter: NewStdoutPrompter(os.Stdin, syscall.Stdin, os.Stdout),
+	}
 	if err := config.LoadFromPath(*configpath); err != nil {
 		if !errors.Is(err, os.ErrNotExist) {
 			log.Fatalf("Failed loading configuration file: %v", err)
 		}
 		// ask user for interactive configuration
-		wizard := &Wizard{
-			Config:   config,
-			Prompter: NewStdoutPrompter(os.Stdin, syscall.Stdin, os.Stdout),
-		}
 		if err := wizard.Run(store); err != nil {
 			log.Fatal("Error running configuration wizard:", err)
 		}
@@ -154,6 +154,12 @@ and [flags] are among those listed below:
 				log.Fatal("Error saving configuration:", err)
 			}
 			log.Printf("Choosing not to overwrite existing config file %s", *configpath)
+		}
+	}
+	if (config.PGPUser == "" || !config.UseGPG) && config.passphraseEnclave == nil {
+		prompt := "Please enter your arbor identity passphrase (hit enter when finished):"
+		if err := wizard.ConfigurePassphrase(prompt); err != nil {
+			log.Fatalf("Failed to get arbor passphrase: %v", err)
 		}
 	}
 

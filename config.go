@@ -41,7 +41,7 @@ type Config struct {
 	EditorCmd []string
 
 	// Secure memory enclave where pgp passphrase is stored
-	PassphraseEnclave *memguard.Enclave
+	passphraseEnclave *memguard.Enclave
 }
 
 // NewConfig creates a config that is prepopulated with a runtime directory and an editor command that
@@ -226,10 +226,10 @@ func (c *Config) Builder(store forest.Store) (*forest.Builder, error) {
 			return nil, fmt.Errorf("expected keyring %s to contain at least one key", keyringPath)
 		}
 		key := keys[0]
-		if c.PassphraseEnclave == nil {
+		if c.passphraseEnclave == nil {
 			return nil, fmt.Errorf("passphrase enclave is nil")
 		}
-		b, err := c.PassphraseEnclave.Open()
+		b, err := c.passphraseEnclave.Open()
 		if err != nil {
 			return nil, fmt.Errorf("failed accessing keyring passphrase: %w", err)
 		}
@@ -437,6 +437,28 @@ type Wizard struct {
 	*Config
 }
 
+// ConfigurePassphrase prompts the user to enter their
+func (w *Wizard) ConfigurePassphrase(prompt string) error {
+	// get a passphrase
+	passphrase, err := w.PromptSecure(prompt)
+	defer func() {
+		//erase passphrase from memory no matter what
+		fullViewOfSlice := passphrase[:cap(passphrase)]
+		for i := range fullViewOfSlice {
+			fullViewOfSlice[i] = 0
+		}
+	}()
+	if err != nil {
+		return fmt.Errorf("failed reading passphrase from user: %w", err)
+	}
+	enclave, err := core.NewEnclave(passphrase)
+	if err != nil {
+		return fmt.Errorf("failed creating secure enclave: %w", err)
+	}
+	w.Config.passphraseEnclave = &memguard.Enclave{Enclave: enclave}
+	return nil
+}
+
 // ConfigureNewIdentity creates a completely new identity using an existing GPG key
 // The identity will be stored in the provided forest.Store implementation
 func (w *Wizard) ConfigureNewIdentity(store forest.Store) (err error) {
@@ -510,60 +532,58 @@ func (w *Wizard) ConfigureNewIdentity(store forest.Store) (err error) {
 	}
 	w.IdentityID = identity.ID().String()
 	if !useGPG {
-		// we need to encrypt and save the new private key
+		if err := w.PersistNewPrivateKey(entity); err != nil {
+			return fmt.Errorf("failed saving new private key: %w", err)
+		}
+	}
+	return nil
+}
 
-		// get a passphrase
-		w.Display(`It's time to secure your Arbor identity! This passphrase protects
+// PersistNewPrivateKey saves the new private key entity to disk in an encrypted
+// format using the passphrase available in the PassphraseEnclave
+func (w *Wizard) PersistNewPrivateKey(entity *openpgp.Entity) error {
+	w.Display(`It's time to secure your Arbor identity! This passphrase protects
 your account from theft. If you forget it, you will have to make a new account.
 There is no password recovery.`)
-		passphrase, err := w.PromptSecure("Enter a secure passphrase (nothing will print, but just hit enter when you're done):")
-		defer func() {
-			//erase passphrase from memory no matter what
-			fullViewOfSlice := passphrase[:cap(passphrase)]
-			for i := range fullViewOfSlice {
-				fullViewOfSlice[i] = 0
-			}
-		}()
-		if err != nil {
-			return fmt.Errorf("failed reading passphrase from user: %w", err)
+	prompt := "Enter a secure passphrase (nothing will print, but just hit enter when you're done):"
+	if err := w.ConfigurePassphrase(prompt); err != nil {
+		return fmt.Errorf("failed prompting for passphrase: %w", err)
+	}
+	passphraseBuf, err := w.passphraseEnclave.Open()
+	if err != nil {
+		return fmt.Errorf("failed opening passphrase enclave: %w", err)
+	}
+	defer passphraseBuf.Destroy()
+	if err := entity.PrivateKey.Encrypt(passphraseBuf.Bytes()); err != nil {
+		return fmt.Errorf("failed encrypting primary private key with passphrase: %w", err)
+	}
+	for i := range entity.Subkeys {
+		if err := entity.Subkeys[i].PrivateKey.Encrypt(passphraseBuf.Bytes()); err != nil {
+			return fmt.Errorf("failed encrypting subkey private key at index %d with passphrase: %w", i, err)
 		}
-		if err := entity.PrivateKey.Encrypt(passphrase); err != nil {
-			return fmt.Errorf("failed encrypting primary private key with passphrase: %w", err)
+	}
+	// write encrypted entity to file
+	keyringPath := w.KeyRingPath(w.IdentityID)
+	keyDir := filepath.Dir(keyringPath)
+	if err := os.MkdirAll(keyDir, 0770); err != nil {
+		return fmt.Errorf("failed creating directory %s to store private keys: %w", keyDir, err)
+	}
+	keyFile, err := os.OpenFile(keyringPath, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0660)
+	if err != nil {
+		return fmt.Errorf("failed opening key file %s: %w", keyringPath, err)
+	}
+	defer func() {
+		// must defer anonymous function in order to actually handle the error returned from
+		// closing the file. Since we are writing an important file, it is critical to handle
+		// a possible error here.
+		if closeErr := keyFile.Close(); closeErr != nil {
+			// override the return value of the function to be this error
+			err = fmt.Errorf("failed saving private key file %s: %w", keyringPath, err)
+			return
 		}
-		for i := range entity.Subkeys {
-			if err := entity.Subkeys[i].PrivateKey.Encrypt(passphrase); err != nil {
-				return fmt.Errorf("failed encrypting subkey private key at index %d with passphrase: %w", i, err)
-			}
-		}
-		enclave, err := core.NewEnclave(passphrase)
-		if err != nil {
-			return fmt.Errorf("failed creating secure enclave: %w", err)
-		}
-		w.Config.PassphraseEnclave = &memguard.Enclave{Enclave: enclave}
-
-		// write encrypted entity to file
-		keyringPath := w.KeyRingPath(w.IdentityID)
-		keyDir := filepath.Dir(keyringPath)
-		if err := os.MkdirAll(keyDir, 0770); err != nil {
-			return fmt.Errorf("failed creating directory %s to store private keys: %w", keyDir, err)
-		}
-		keyFile, err := os.OpenFile(keyringPath, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0660)
-		if err != nil {
-			return fmt.Errorf("failed opening key file %s: %w", keyringPath, err)
-		}
-		defer func() {
-			// must defer anonymous function in order to actually handle the error returned from
-			// closing the file. Since we are writing an important file, it is critical to handle
-			// a possible error here.
-			if closeErr := keyFile.Close(); closeErr != nil {
-				// override the return value of the function to be this error
-				err = fmt.Errorf("failed saving private key file %s: %w", keyringPath, err)
-				return
-			}
-		}()
-		if err := entity.SerializePrivateNoSign(keyFile, nil); err != nil {
-			return fmt.Errorf("failed writing private key into file %s: %w", keyringPath, err)
-		}
+	}()
+	if err := entity.SerializePrivateNoSign(keyFile, nil); err != nil {
+		return fmt.Errorf("failed writing private key into file %s: %w", keyringPath, err)
 	}
 	return nil
 }
