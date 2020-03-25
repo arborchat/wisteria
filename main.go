@@ -106,7 +106,10 @@ and [flags] are among those listed below:
 	if *nogpg {
 		config.UseGPG = false
 	} else {
-		config.UseGPG = true
+		gpgPath, err := forest.FindGPG()
+		if err == nil && gpgPath != "" {
+			config.UseGPG = true
+		}
 	}
 
 	if *profiling {
