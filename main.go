@@ -105,6 +105,8 @@ and [flags] are among those listed below:
 	config.ConfigDirectory = filepath.Dir(*configpath)
 	if *nogpg {
 		config.UseGPG = false
+	} else {
+		config.UseGPG = true
 	}
 
 	if *profiling {
