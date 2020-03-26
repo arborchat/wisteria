@@ -23,12 +23,22 @@ import (
 	"github.com/awnumar/memguard/core"
 )
 
+// Tristate is a type with three possible values, true, false, and undefined
+type Tristate string
+
+const (
+	TristateTrue      Tristate = "true"
+	TristateFalse     Tristate = "false"
+	TristateUndefined Tristate = ""
+)
+
 // Config holds the user's runtime configuration
 type Config struct {
 	// a PGP key ID for the user's private key that controls their arbor identity.
 	PGPUser string
-	// allows control over whether GPG support is used when it is available
-	UseGPG bool
+	// allows control over whether GPG support is used when it is available. Legal
+	// values are "true","false", and "" (empty string will enable it if gpg is available)
+	UseGPG Tristate
 	// the file name of the user's arbor identity node
 	IdentityID string
 	// where to store log and profile data
@@ -204,7 +214,7 @@ func (c *Config) Builder(store forest.Store) (*forest.Builder, error) {
 		signer forest.Signer
 		err    error
 	)
-	if c.PGPUser != "" && c.UseGPG {
+	if c.PGPUser != "" && c.UseGPG == TristateTrue {
 		signer, err = forest.NewGPGSigner(c.PGPUser)
 		asGPG := signer.(*forest.GPGSigner)
 		asGPG.Rewriter = func(cmd *exec.Cmd) error {
@@ -401,6 +411,14 @@ func (s *StdoutPrompter) Display(message string) error {
 	return err
 }
 
+func GPGAvailable() bool {
+	gpgCommand, err := forest.FindGPG()
+	if err != nil {
+		return false
+	}
+	return gpgCommand != ""
+}
+
 func GetSecretKeys() ([]string, error) {
 	gpgCommand, err := forest.FindGPG()
 	if err != nil {
@@ -467,18 +485,10 @@ func (w *Wizard) ConfigureNewIdentity(store forest.Store) (err error) {
 	// if we don't create a new key natively
 	var (
 		signer forest.Signer
-		useGPG = true
-
 		//only used if gpg support is not
 		entity *openpgp.Entity
 	)
-	gpgPath, err := forest.FindGPG()
-	if err != nil {
-		w.Display("Couldn't find an installation of GPG. That's okay, but if you want the strongest possible security, you may wish to install it before continuing.")
-		useGPG = false
-	}
-	useGPG = useGPG && w.Config.UseGPG
-	if useGPG {
+	if w.Config.UseGPG == TristateTrue {
 		secKeys, err := GetSecretKeys()
 		if err != nil {
 			return fmt.Errorf("Failed to list available secret keys: %v", err)
@@ -493,7 +503,7 @@ func (w *Wizard) ConfigureNewIdentity(store forest.Store) (err error) {
 			return i.(string)
 		})
 		if secKey.(string) == createNewOption {
-			w.Display(fmt.Sprintf("\nTo create a new key, run:\n\n%s --generate-key\n\nRe-run %v when you've done that.\n", gpgPath, os.Args[0]))
+			w.Display(fmt.Sprintf("\nTo create a new key, run:\n\ngpg --generate-key\n\nRe-run %v when you've done that.\n", os.Args[0]))
 			return fmt.Errorf("Closing so that you can generate a key")
 		}
 		signer, err = forest.NewGPGSigner(secKey.(string))
@@ -501,10 +511,20 @@ func (w *Wizard) ConfigureNewIdentity(store forest.Store) (err error) {
 			return fmt.Errorf("Unable to construct a signer from gpg key for %s: %v", secKey, err)
 		}
 	} else {
+		w.Display("Couldn't find an installation of GPG. That's okay, but if you want the strongest possible security, you may wish to install it before continuing.")
 		entity, err = openpgp.NewEntity("wisteria", "", "", nil)
 		if err != nil {
 			return fmt.Errorf("failed to generate new openpgp keys: %w", err)
 		}
+		defer func() {
+			// if the rest of this function didn't fail, save the private key and
+			// propagate the error upwards if it fails
+			if err == nil {
+				if err := w.PersistNewPrivateKey(entity); err != nil {
+					err = fmt.Errorf("failed saving new private key: %w", err)
+				}
+			}
+		}()
 		// guard against failing to sign the public key (depending on whether
 		// this api changes again):
 		// https://github.com/golang/go/issues/25463#issuecomment-390778292
@@ -531,11 +551,6 @@ func (w *Wizard) ConfigureNewIdentity(store forest.Store) (err error) {
 		return fmt.Errorf("error saving new identity %s: %v", identity.ID(), err)
 	}
 	w.IdentityID = identity.ID().String()
-	if !useGPG {
-		if err := w.PersistNewPrivateKey(entity); err != nil {
-			return fmt.Errorf("failed saving new private key: %w", err)
-		}
-	}
 	return nil
 }
 
@@ -633,17 +648,10 @@ func (w *Wizard) ConfigureIdentity(store forest.Store) error {
 	return w.ConfigureNewIdentity(store)
 }
 
-const installGPGMessage = "This program requires GPG to run. Please install GPG and restart. https://gnupg.org/"
-
 // Run populates the config by asking the user for information and
 // inferring from the runtime environment
 func (w *Wizard) Run(store forest.Store) error {
-	_, err := forest.FindGPG()
-	if err != nil {
-		w.Display(installGPGMessage)
-		return fmt.Errorf("Cannot configure without GPG: %v", err)
-	}
-	err = w.ConfigureIdentity(store)
+	err := w.ConfigureIdentity(store)
 	if err != nil {
 		return fmt.Errorf("Error configuring user identity: %v", err)
 	}

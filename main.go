@@ -103,14 +103,6 @@ and [flags] are among those listed below:
 	config := NewConfig()
 	config.GroveDirectory = *grovepath
 	config.ConfigDirectory = filepath.Dir(*configpath)
-	if *nogpg {
-		config.UseGPG = false
-	} else {
-		gpgPath, err := forest.FindGPG()
-		if err == nil && gpgPath != "" {
-			config.UseGPG = true
-		}
-	}
 
 	if *profiling {
 		// profile to runtime directory chosen by config
@@ -139,14 +131,32 @@ and [flags] are among those listed below:
 		log.Fatal("Failed to wrap Store in CacheStore:", err)
 	}
 
-	wizard := &Wizard{
-		Config:   config,
-		Prompter: NewStdoutPrompter(os.Stdin, syscall.Stdin, os.Stdout),
-	}
+	runConfigurationWizard := false
 	if err := config.LoadFromPath(*configpath); err != nil {
 		if !errors.Is(err, os.ErrNotExist) {
 			log.Fatalf("Failed loading configuration file: %v", err)
 		}
+		runConfigurationWizard = true
+	}
+
+	// choose whether to enable gpg support.
+	if *nogpg {
+		// the flag to disable it should always win
+		config.UseGPG = TristateFalse
+	} else if config.UseGPG == TristateUndefined {
+		// use gpg if it's available and the user hasn't opted out
+		if GPGAvailable() {
+			config.UseGPG = TristateTrue
+		} else {
+			config.UseGPG = TristateFalse
+		}
+	}
+
+	wizard := &Wizard{
+		Config:   config,
+		Prompter: NewStdoutPrompter(os.Stdin, syscall.Stdin, os.Stdout),
+	}
+	if runConfigurationWizard {
 		// ask user for interactive configuration
 		if err := wizard.Run(store); err != nil {
 			log.Fatal("Error running configuration wizard:", err)
@@ -161,7 +171,7 @@ and [flags] are among those listed below:
 			log.Printf("Choosing not to overwrite existing config file %s", *configpath)
 		}
 	}
-	if (config.PGPUser == "" || !config.UseGPG) && config.passphraseEnclave == nil {
+	if config.UseGPG == TristateFalse && config.passphraseEnclave == nil {
 		prompt := "Please enter your arbor identity passphrase (hit enter when finished):"
 		if err := wizard.ConfigurePassphrase(prompt); err != nil {
 			log.Fatalf("Failed to get arbor passphrase: %v", err)
