@@ -21,9 +21,9 @@ builds:
   goos:
     - linux
     - darwin
-    - openbsd
+#    - openbsd the protonmail crypto fork doesn't compile here for some reason
     - freebsd
-    - netbsd
+#    - netbsd memguard is failing to compile for this target right now
     - windows
   goarch:
     - amd64
