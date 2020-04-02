@@ -30,10 +30,13 @@ fi
 # sort the hashes of the built binaries in a reliable (if derpy) way
 find dist -executable -type f -exec sha256sum '{}' \; | rev | sort | rev
 
-if [ "$PUBLISH_RELEASE" -eq 1 ]; then
-    # erase the non-tarred directories from disk
-    find dist -type d -exec rm -rf '{}' \;
+# erase the non-tarred directories from disk
+(cd dist && find . -type d -exec rm -rf '{}' \;)
 
+# print the contents of dist
+find dist
+
+if [ "$PUBLISH_RELEASE" -eq 1 ]; then
     tag=$(git describe --exact-match HEAD)
 
     # ensure that we don't leak this srht token
