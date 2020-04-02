@@ -10,7 +10,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
-	"syscall"
 	"time"
 
 	"github.com/0xAX/notificator"
@@ -154,7 +153,7 @@ and [flags] are among those listed below:
 
 	wizard := &Wizard{
 		Config:   config,
-		Prompter: NewStdoutPrompter(os.Stdin, syscall.Stdin, os.Stdout),
+		Prompter: NewStdoutPrompter(os.Stdin, int(os.Stdin.Fd()), os.Stdout),
 	}
 	if runConfigurationWizard {
 		// ask user for interactive configuration
