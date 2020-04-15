@@ -385,6 +385,7 @@ func (v *HistoryWidget) HandleEvent(event tcell.Event) bool {
 			ulVizX, ulVizY, _, _ := v.port.GetVisible()
 			logicalX, logicalY := physicalX+ulVizX-LeftContentWidth, physicalY+ulVizY-TopBarHeight
 			v.model.SetCursor(logicalX, logicalY)
+			v.UpdateCursor()
 		case buttons&tcell.WheelUp > 0:
 			v.panUp(mouseScrollMultiplier)
 		case buttons&tcell.WheelDown > 0:
