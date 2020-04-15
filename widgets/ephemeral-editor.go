@@ -85,23 +85,25 @@ func (e *EphemeralEditor) ClearRequestor() {
 func (e *EphemeralEditor) HandleEvent(ev tcell.Event) bool {
 	switch event := ev.(type) {
 	case EventEditRequest:
-		log.Printf("EphemeralEditor received event: %T %v", ev, ev)
 		e.ShowEditor()
 		e.SetRequestor(event)
+		return true
 	case EventEditFinished:
-		log.Printf("EphemeralEditor received event: %T %v", ev, ev)
 		// pass the EventEditFinished to the widget that created the
 		// EventEditRequest with the ID field populated
 		event.ID = e.RequestID
-		e.Requestor.HandleEvent(event)
-		e.HideEditor()
-		e.ClearRequestor()
+		defer func() {
+			// clean up after handling event
+			e.HideEditor()
+			e.ClearRequestor()
+		}()
+		return e.Requestor.HandleEvent(event)
 	case views.EventWidget:
 		e.PostEvent(event)
 	case *tcell.EventMouse:
-		e.passEventDown(ev)
+		return e.passEventDown(ev)
 	case *tcell.EventKey:
-		e.passEventDown(ev)
+		return e.passEventDown(ev)
 	}
 	return false
 }
