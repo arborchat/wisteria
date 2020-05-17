@@ -10,7 +10,8 @@ import (
 	"sync"
 
 	forest "git.sr.ht/~whereswaldon/forest-go"
-	"git.sr.ht/~whereswaldon/wisteria/archive"
+	"git.sr.ht/~whereswaldon/forest-go/store"
+	"git.sr.ht/~whereswaldon/wisteria/replylist"
 	"git.sr.ht/~whereswaldon/wisteria/widgets"
 	wistTcell "git.sr.ht/~whereswaldon/wisteria/widgets/tcell"
 	"github.com/0xAX/notificator"
@@ -71,9 +72,12 @@ type HistoryWidget struct {
 	*EditRequestMap
 }
 
-func NewHistoryWidget(app *wistTcell.Application, archive *archive.Archive, config *Config, notifier *notificator.Notificator) (*HistoryWidget, error) {
+func NewHistoryWidget(app *wistTcell.Application, archive store.ExtendedStore, config *Config, notifier *notificator.Notificator) (*HistoryWidget, error) {
+	replyList := new(replylist.ReplyList)
+	replyList.SubscribeTo(archive)
 	hv := &HistoryView{
-		Archive: archive,
+		ReplyList:     replyList,
+		ExtendedStore: archive,
 	}
 	if err := hv.Render(); err != nil {
 		return nil, fmt.Errorf("failed initializing history view: %w", err)
@@ -129,7 +133,7 @@ func (v *HistoryWidget) ReadMessageFile(filename string) {
 // TryNotify checks whether a desktop notification should be sent
 // and attempts to send it
 func (v *HistoryWidget) TryNotify(reply *forest.Reply) {
-	identity, err := v.Config.IdentityNode(v.Archive)
+	identity, err := v.Config.IdentityNode(v.ExtendedStore)
 	if err != nil {
 		log.Printf("couldn't look up local identity: %v", err)
 		return
@@ -262,7 +266,7 @@ func (v *HistoryWidget) FinishReply(parent forest.Node, replyFileName string, ed
 }
 
 func (v *HistoryWidget) NewReply(parent interface{}, content string, metadata []byte) (forest.Node, error) {
-	builder, err := v.Config.Builder(v.Archive)
+	builder, err := v.Config.Builder(v.ExtendedStore)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't construct node builder: %w", err)
 	}

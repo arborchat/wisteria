@@ -6,7 +6,8 @@ import (
 
 	forest "git.sr.ht/~whereswaldon/forest-go"
 	"git.sr.ht/~whereswaldon/forest-go/fields"
-	"git.sr.ht/~whereswaldon/wisteria/archive"
+	"git.sr.ht/~whereswaldon/forest-go/store"
+	"git.sr.ht/~whereswaldon/wisteria/replylist"
 	"github.com/gdamore/tcell"
 	"github.com/gdamore/tcell/views"
 )
@@ -20,7 +21,8 @@ type RenderedLine struct {
 
 // HistoryView models the visible contents of the chat history. It implements tcell.CellModel
 type HistoryView struct {
-	*archive.Archive
+	*replylist.ReplyList
+	store.ExtendedStore
 	FilterID, SelectedReplyID *fields.QualifiedHash
 	rendered                  []RenderedLine
 	Cursor                    struct {
@@ -41,13 +43,15 @@ func (v *HistoryView) CurrentID() *fields.QualifiedHash {
 // UpdateCurrentID recomputes the currently-selected message id based on the
 // current position of the cursor.
 func (v *HistoryView) UpdateCurrentID() {
-	if len(v.rendered) > v.Cursor.Y && v.Cursor.Y > -1 {
-		v.SelectedReplyID = v.rendered[v.Cursor.Y].ID
-	} else if len(v.Archive.ReplyList) > 0 {
-		v.SelectedReplyID = v.Archive.ReplyList[0].ID()
-	} else {
-		v.SelectedReplyID = nil
-	}
+	v.ReplyList.WithReplies(func(replies []*forest.Reply) {
+		if len(v.rendered) > v.Cursor.Y && v.Cursor.Y > -1 {
+			v.SelectedReplyID = v.rendered[v.Cursor.Y].ID
+		} else if len(replies) > 0 {
+			v.SelectedReplyID = replies[0].ID()
+		} else {
+			v.SelectedReplyID = nil
+		}
+	})
 }
 
 // CurrentReply returns the currently-selected node
@@ -93,28 +97,30 @@ func (v *HistoryView) Render() error {
 			excludeMap[id.String()] = struct{}{}
 		}
 	}
-	for _, n := range v.ReplyList {
-		if v.FilterID != nil {
-			if _, matchesFilter := excludeMap[n.ID().String()]; !matchesFilter {
-				// skip nodes that don't match current filter
+	v.ReplyList.WithReplies(func(replies []*forest.Reply) {
+		for _, n := range replies {
+			if v.FilterID != nil {
+				if _, matchesFilter := excludeMap[n.ID().String()]; !matchesFilter {
+					// skip nodes that don't match current filter
+					continue
+				}
+			}
+			config := renderConfig{}
+			if n.ID().Equals(currentID) {
+				config.state = current
+			} else if in(n.ID(), ancestry) {
+				config.state = ancestor
+			} else if in(n.ID(), descendants) {
+				config.state = descendant
+			}
+			lines, err := renderNode(n, v.ExtendedStore, config)
+			if err != nil {
+				log.Printf("failed rendering %s: %v", n.ID().String(), err)
 				continue
 			}
+			v.rendered = append(v.rendered, lines...)
 		}
-		config := renderConfig{}
-		if n.ID().Equals(currentID) {
-			config.state = current
-		} else if in(n.ID(), ancestry) {
-			config.state = ancestor
-		} else if in(n.ID(), descendants) {
-			config.state = descendant
-		}
-		lines, err := renderNode(n, v.Archive, config)
-		if err != nil {
-			log.Printf("failed rendering %s: %v", n.ID().String(), err)
-			continue
-		}
-		v.rendered = append(v.rendered, lines...)
-	}
+	})
 	return nil
 }
 

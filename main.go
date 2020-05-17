@@ -22,7 +22,6 @@ import (
 	"git.sr.ht/~whereswaldon/forest-go/store"
 	"git.sr.ht/~whereswaldon/sprout-go"
 	"git.sr.ht/~whereswaldon/sprout-go/watch"
-	"git.sr.ht/~whereswaldon/wisteria/archive"
 	"git.sr.ht/~whereswaldon/wisteria/widgets"
 	wistTcell "git.sr.ht/~whereswaldon/wisteria/widgets/tcell"
 )
@@ -179,11 +178,6 @@ and [flags] are among those listed below:
 
 	// create the observable message storage abstraction that sprout workers use
 	subscriberStore := store.NewArchive(cacheStore)
-	// create the queryable store abstraction that we need
-	history, err := archive.NewArchive(subscriberStore)
-	if err != nil {
-		log.Fatalf("Failed to create archive: %v", err)
-	}
 
 	// dial relay address (if provided)
 	done := make(chan struct{})
@@ -197,9 +191,6 @@ and [flags] are among those listed below:
 		sprout.LaunchSupervisedWorker(done, address, subscriberStore, tlsConfig, log.New(log.Writer(), address+" ", log.Flags()))
 	}
 
-	// ensure its internal state is what we want
-	history.Sort()
-
 	// set up desktop notifications
 	notify := notificator.New(notificator.Options{
 		AppName: "Arbor",
@@ -207,7 +198,7 @@ and [flags] are among those listed below:
 
 	// build an widget/application from existing views and services
 	app := new(wistTcell.Application)
-	hw, err := NewHistoryWidget(app, history, config, notify)
+	hw, err := NewHistoryWidget(app, subscriberStore, config, notify)
 	if err != nil {
 		log.Fatalf("Failed to create history widget: %v", err)
 	}
