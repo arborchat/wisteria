@@ -34,20 +34,23 @@ func New(s store.ExtendedStore) (*ReplyList, error) {
 // you if you construct the ReplyList that way.
 func (r *ReplyList) SubscribeTo(s store.ExtendedStore) error {
 	s.SubscribeToNewMessages(func(node forest.Node) {
-		r.Lock()
-		defer r.Unlock()
-		if reply, ok := node.(*forest.Reply); ok {
-			alreadyInList := false
-			for _, element := range r.replies {
-				if element.Equals(reply) {
-					alreadyInList = true
-					break
+		// cannot block in subscription
+		go func() {
+			r.Lock()
+			defer r.Unlock()
+			if reply, ok := node.(*forest.Reply); ok {
+				alreadyInList := false
+				for _, element := range r.replies {
+					if element.Equals(reply) {
+						alreadyInList = true
+						break
+					}
+				}
+				if !alreadyInList {
+					r.replies = append(r.replies, reply)
 				}
 			}
-			if !alreadyInList {
-				r.replies = append(r.replies, reply)
-			}
-		}
+		}()
 	})
 	const defaultArchiveReplyListLen = 1024
 
