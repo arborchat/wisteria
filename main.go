@@ -18,8 +18,8 @@ import (
 	"github.com/gdamore/tcell/views"
 	"github.com/pkg/profile"
 
-	forest "git.sr.ht/~whereswaldon/forest-go"
 	"git.sr.ht/~whereswaldon/forest-go/grove"
+	"git.sr.ht/~whereswaldon/forest-go/store"
 	"git.sr.ht/~whereswaldon/sprout-go"
 	"git.sr.ht/~whereswaldon/sprout-go/watch"
 	"git.sr.ht/~whereswaldon/wisteria/archive"
@@ -124,8 +124,8 @@ and [flags] are among those listed below:
 	}
 
 	// Wrap store in CacheStore
-	cache := forest.NewMemoryStore()
-	store, err := forest.NewCacheStore(cache, groveStore)
+	cache := store.NewMemoryStore()
+	cacheStore, err := store.NewCacheStore(cache, groveStore)
 	if err != nil {
 		log.Fatal("Failed to wrap Store in CacheStore:", err)
 	}
@@ -157,7 +157,7 @@ and [flags] are among those listed below:
 	}
 	if runConfigurationWizard {
 		// ask user for interactive configuration
-		if err := wizard.Run(store); err != nil {
+		if err := wizard.Run(cacheStore); err != nil {
 			log.Fatal("Error running configuration wizard:", err)
 		}
 		if err := config.Validate(); err != nil {
@@ -178,7 +178,7 @@ and [flags] are among those listed below:
 	}
 
 	// create the observable message storage abstraction that sprout workers use
-	subscriberStore := sprout.NewSubscriberStore(store)
+	subscriberStore := store.NewArchive(cacheStore)
 	// create the queryable store abstraction that we need
 	history, err := archive.NewArchive(subscriberStore)
 	if err != nil {

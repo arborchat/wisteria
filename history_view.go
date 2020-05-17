@@ -108,7 +108,7 @@ func (v *HistoryView) Render() error {
 		} else if in(n.ID(), descendants) {
 			config.state = descendant
 		}
-		lines, err := renderNode(n, v.Store, config)
+		lines, err := renderNode(n, v.Archive, config)
 		if err != nil {
 			log.Printf("failed rendering %s: %v", n.ID().String(), err)
 			continue

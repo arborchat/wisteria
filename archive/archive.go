@@ -5,8 +5,8 @@ import (
 	"sort"
 
 	forest "git.sr.ht/~whereswaldon/forest-go"
-	forestArch "git.sr.ht/~whereswaldon/forest-go/archive"
 	"git.sr.ht/~whereswaldon/forest-go/fields"
+	"git.sr.ht/~whereswaldon/forest-go/store"
 )
 
 // ReplyList holds a sortable list of replies
@@ -31,18 +31,24 @@ func (h ReplyList) IndexForID(id *fields.QualifiedHash) int {
 
 // Archive manages a group of known arbor nodes
 type Archive struct {
+	*store.Archive
+
 	ReplyList
-	*forestArch.Archive
 }
 
 const defaultArchiveReplyListLen = 1024
 
-func NewArchive(store forest.Store) (*Archive, error) {
+func NewArchive(s forest.Store) (*Archive, error) {
 	archive := &Archive{
 		ReplyList: []*forest.Reply{},
-		Archive:   forestArch.New(store),
+		Archive:   store.NewArchive(s),
 	}
-	nodes, err := store.Recent(fields.NodeTypeReply, defaultArchiveReplyListLen)
+
+	// insert new messages into the ReplyList as they're added
+	archive.Archive.SubscribeToNewMessages(archive.tryListInsert)
+
+	// prepopulate the ReplyList
+	nodes, err := s.Recent(fields.NodeTypeReply, defaultArchiveReplyListLen)
 	if err != nil {
 		return nil, fmt.Errorf("Failed loading most recent messages: %w", err)
 	}
@@ -54,12 +60,7 @@ func NewArchive(store forest.Store) (*Archive, error) {
 	return archive, nil
 }
 
-// Add accepts an arbor node and stores it in the Archive. If it is
-// a Reply node, it will be added to the ReplyList
-func (a *Archive) Add(node forest.Node) error {
-	if err := a.Store.Add(node); err != nil {
-		return err
-	}
+func (a *Archive) tryListInsert(node forest.Node) {
 	if r, ok := node.(*forest.Reply); ok {
 		alreadyInList := false
 		for _, element := range a.ReplyList {
@@ -72,6 +73,4 @@ func (a *Archive) Add(node forest.Node) error {
 			a.ReplyList = append(a.ReplyList, r)
 		}
 	}
-	return nil
-
 }

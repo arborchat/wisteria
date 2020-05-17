@@ -597,7 +597,7 @@ There is no password recovery.`)
 			return
 		}
 	}()
-	if err := entity.SerializePrivateNoSign(keyFile, nil); err != nil {
+	if err := entity.SerializePrivateWithoutSigning(keyFile, nil); err != nil {
 		return fmt.Errorf("failed writing private key into file %s: %w", keyringPath, err)
 	}
 	return nil

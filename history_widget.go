@@ -129,7 +129,7 @@ func (v *HistoryWidget) ReadMessageFile(filename string) {
 // TryNotify checks whether a desktop notification should be sent
 // and attempts to send it
 func (v *HistoryWidget) TryNotify(reply *forest.Reply) {
-	identity, err := v.Config.IdentityNode(v.Store)
+	identity, err := v.Config.IdentityNode(v.Archive)
 	if err != nil {
 		log.Printf("couldn't look up local identity: %v", err)
 		return
