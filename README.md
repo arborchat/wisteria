@@ -22,13 +22,9 @@ To get started with `wisteria`, you can follow our [Getting Started with Arbor g
 
 > What is this?
 
-`wisteria` is a minimal terminal arbor client. It can receive messages through the [Sprout protocol](https://arbor.chat/specifications/sprout.md) connecting to an Arbor relay as well as read messages directly from disk..
+`wisteria` is a minimal terminal arbor client. It can receive messages directly from a relay through the [Sprout protocol](https://arbor.chat/specifications/sprout.md).
 
-> Why is reading from disk useful?
-
-It lets you acquire nodes from essentially any transport. You can store your history in syncthing, dropbox, a mounted google drive folder, or whatever else. This allows you to configure history replication via a variety of protocols and techniques if Sprout either isn't viable or isn't convenient.
-
-## Developing
+## Contributing
 
 Want to work on `wisteria`? Here's how to do common stuff:
 
@@ -65,7 +61,7 @@ go tool cover -html=coverage.profile
 
 ### Submitting a change
 
-We accept Pull Requests two ways:
+We accept Pull Requests three ways:
 
 #### SourceHut
 
@@ -85,3 +81,12 @@ and our responses to them [here on the mailing list](https://lists.sr.ht/~wheres
 #### GitHub
 
 We have a [GitHub `wisteria` mirror repo](https://github.com/arborchat/wisteria). You can [submit a Pull Request](https://help.github.com/en/github/collaborating-with-issues-and-pull-requests/creating-a-pull-request) there.
+
+#### E-mail
+
+If you don't want to create a SourceHut account or a Github account, you can submit patches via e-mail to the mailing list managed by SourceHut.
+
+Clone the repository from SourceHut using the anonymous https option and work as you normally would with git: make your changes, stage them, and commit them.
+
+Once you're ready to create your PR, follow the instructions [here](https://git-send-email.io/) to actually send your patch to the mailing list at [~whereswaldon/arbor-dev@lists.sr.ht](mailto:~whereswaldon/arbor-dev@lists.sr.ht).
+After you've sent your patch the process is identical to SourceHut: you can verify that your patch was received by looking at the list as well as see any responses.
