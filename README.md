@@ -22,11 +22,11 @@ To get started with `wisteria`, you can follow our [Getting Started with Arbor g
 
 > What is this?
 
-`wisteria` is a minimal terminal arbor client. It is capable of both speaking the [Sprout protocol](https://arbor.chat/specifications/sprout.md) to an Arbor relay and discovering new arbor nodes on disk in order to receive messages.
+`wisteria` is a minimal terminal arbor client. It can receive messages through the [Sprout protocol](https://arbor.chat/specifications/sprout.md) connecting to an Arbor relay as well as read messages directly from disk..
 
-> Why is rendering new nodes on disk useful?
+> Why is reading from disk useful?
 
-It lets you acquire nodes from essentially any transport. You can store your history in syncthing, dropbox, a mounted google drive folder, or whatever else. This allows you to configure history replication via a variety of protocols and techniques in addition to Sprout.
+It lets you acquire nodes from essentially any transport. You can store your history in syncthing, dropbox, a mounted google drive folder, or whatever else. This allows you to configure history replication via a variety of protocols and techniques if Sprout either isn't viable or isn't convenient.
 
 ## Developing
 
