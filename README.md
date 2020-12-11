@@ -4,6 +4,8 @@
 
 Wisteria is a terminal chat client for the Arbor Chat Project.
 
+**NOTE**: wisteria is not actively maintained right now. Development focus has shifted to [sprig](https://git.sr.ht/~whereswaldon/sprig), our cross-platform GUI client. We'd like to be able to maintain both, but we lack the number of people that requires right now.
+
 ## About Arbor
 
 ![arbor logo](https://git.sr.ht/~whereswaldon/forest-go/blob/master/img/arbor-logo.png)
